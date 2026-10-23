@@ -78,6 +78,46 @@ Mass drift of the Fisher–Hodge operator is below 4e-7 in every run, and no tes
 
 Two caveats. The GNN-ODE baseline was trained for 4000 steps and its loss was still falling. A longer run was interrupted at 7000 steps with a loss three times lower, so the GNN-ODE column overstates the gap. The reference solvers for S1 to S3 lie inside the operator's model class. The S4 and S5 systems are the first tests outside it, and a system with non-local interactions has not been run.
 
+## What the Hodge structure contributes, and where the gaps come from
+
+The Hodge part of the method fixes the form of the operator. Every model in this repository that moves mass does so through
+
+```
+K = dᵀ H d
+```
+
+`d` takes differences between neighbouring nodes. `H` decides how much flow each difference produces. `dᵀ` collects the flows on the edges into the change of density at each node. The project sets `H` to a weight that depends on the density itself,
+
+```
+H_e(ρ) = κ_e · Λ(ρ_i, ρ_j),      Λ(a, b) = (a − b) / (log a − log b),
+```
+
+where `Λ` is the logarithmic mean of the two endpoint densities and `κ_e > 0` is learned. The same difference in potential therefore drives different amounts of flow at different densities. This choice of `H` is the Otto metric of discrete Wasserstein transport (Maas 2011). The circulation term adds a second driving field on the edges. The S2 model reads
+
+```
+dρ/dt = − dᵀ [ κ Λ(ρ) d μ   +   Λ(ρ) c_θ ].
+            gradient transport    extra drive
+```
+
+A reversible JKO model has only the first term, so its net flow vanishes at a true steady state. The S2 reference system keeps a non-zero probability current at steady state, and the second term is what lets the Fisher–Hodge operator represent it. Against the reversible baseline, the first thing the method settles is therefore whether the true dynamics can be expressed at all.
+
+Three points keep this comparison honest.
+
+First, the JKO baseline uses the same logarithmic-mean mobility. Both model classes carry the same transport geometry, so the large gap on S2 cannot be read as "Fisher–Hodge has information geometry and JKO does not". The gap on S2 comes from the circulation term. On S1, where no circulation exists, the two models are within a factor of three of each other.
+
+Second, the diffusion law is written into the structure, which makes the learning problem easier. The chemical potential contains `log ρ`, and the logarithmic mean satisfies `Λ(ρ_i, ρ_j) (log ρ_j − log ρ_i) = ρ_j − ρ_i`. This term alone produces the standard discrete diffusion operator. The network learns the coefficients `κ`, a correction to the potential, and how the drive acts. The inputs also include the true potential `U` and the two fields `dpsi` and `psin` that generate the drive, so the task is to learn the evolution given these fields. The baselines receive the same inputs.
+
+Third, conservation and positivity help long rollouts. Because the flows are assembled through `dᵀ`, the total mass of S2 is conserved exactly. The integrator uses adaptive substeps to keep the density positive. Both mechanisms reduce mass drift and numerical blow-up far beyond the training window. The GNN and Euclidean baselines integrate differently, and the GNN was not trained to convergence, so the gap to them mixes model structure, numerics and optimisation.
+
+The evidence supports the following attribution.
+
+| Comparison | Cause best supported by the evidence |
+|---|---|
+| Against the reversible JKO model | The operator can represent non-equilibrium drive and steady circulation. |
+| Against the plain GNN and the Euclidean gradient-flow GNN | A structure close to the governing equation, exact mass conservation and positivity-preserving integration act together. Their separate contributions have not been isolated. |
+
+Separating these contributions, with a converged GNN and a mass-conserving positive GNN baseline, is the next step before the method's own contribution can be stated cleanly.
+
 ## Layout
 
 ```
