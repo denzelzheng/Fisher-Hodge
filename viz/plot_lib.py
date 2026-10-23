@@ -9,20 +9,16 @@ from common import RUNS, DT, D, HC
 
 VIZ = os.path.join(FH_ROOT, 'viz'); CACHE = os.path.join(VIZ, 'cache'); OUT = os.path.join(VIZ, 'out')
 os.makedirs(OUT, exist_ok=True)
-CJK = 'DejaVu Sans'
-for f in ['/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc', '/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc']:
-    if os.path.exists(f):
-        font_manager.fontManager.addfont(f)
-        CJK = font_manager.FontProperties(fname=f).get_name()
-plt.rcParams.update({'font.family': [CJK, 'DejaVu Sans'], 'font.size': 10, 'axes.unicode_minus': False,
+FONT = 'DejaVu Sans'
+plt.rcParams.update({'font.family': [FONT, 'DejaVu Sans'], 'font.size': 10, 'axes.unicode_minus': False,
                      'figure.facecolor': 'white', 'savefig.facecolor': 'white'})
 
 NEG_SOFT = np.array(mcolors.to_rgba('#00e5ff'))   # rho < 0 (mild): cyan
 NEG_HARD = np.array(mcolors.to_rgba('#ff2bd6'))   # rho strongly negative: magenta
 OVER = np.array(mcolors.to_rgba('#39ff14'))       # rho above the colour range (S3 overshoot): neon green
 NANC = np.array(mcolors.to_rgba('#9ca3af'))       # blown up / NaN: grey
-LAB = {'truth': '真值 (参考解)', 'fisher_hodge': 'Fisher–Hodge (本文)', 'euclid_gf': '欧氏梯度流 GNN', 'gnn_ode': 'GNN-ODE (无结构)',
-       'jko_amort': 'JKO 自由能 (可逆)', 'fisher_hodge_wfr': 'Fisher–Hodge-WFR (新反应项)', 'fisher_hodge_old': 'Fisher–Hodge (旧反应项)'}
+LAB = {'truth': 'Reference', 'fisher_hodge': 'Fisher–Hodge (ours)', 'euclid_gf': 'Euclidean gradient-flow GNN', 'gnn_ode': 'GNN-ODE (unstructured)',
+       'jko_amort': 'Reversible free energy (JKO)', 'fisher_hodge_wfr': 'Fisher–Hodge, Fisher–Rao reaction', 'fisher_hodge_old': 'Fisher–Hodge, free reaction MLP'}
 LCOL = {'truth': '#111111', 'fisher_hodge': '#2a78d6', 'euclid_gf': '#eb6834', 'gnn_ode': '#1baf7a', 'jko_amort': '#9b59b6',
         'fisher_hodge_wfr': '#2a78d6', 'fisher_hodge_old': '#eb6834'}
 TRAIN_C, FLASH_C, EXTRAP_C = '#22c55e', '#ff3b30', '#9aa0a6'
@@ -77,7 +73,7 @@ def set_border(ax, t, T=1.0, k=0):
 
 def stat_text(X, mass_mode='mean'):
     if not np.isfinite(X).all():
-        return '数值发散 (NaN)', '#ff3b30'
+        return 'diverged (NaN)', '#ff3b30'
     m = X.mean()
     mn = X.min()
     return f'∫ρ={m:.3f}\nmin ρ={mn:+.2f}', ('#ff2bd6' if mn < 0 else 'white')
@@ -93,8 +89,8 @@ class Timeline:
         for sp in ['left', 'right', 'top']:
             ax.spines[sp].set_visible(False)
         ax.axvspan(0, T, color=TRAIN_C, alpha=0.25, lw=0)
-        ax.text(T / 2, 0.5, '训练窗', ha='center', va='center', fontsize=8, color='#166534')
-        ax.text((T + tmax) / 2, 0.5, '外推（模型从未见过 t > T）', ha='center', va='center', fontsize=8, color='#555')
+        ax.text(T / 2, 0.5, 'training window', ha='center', va='center', fontsize=6, color='#166534')
+        ax.text((T + tmax) / 2, 0.5, 'extrapolation (t > T never seen in training)', ha='center', va='center', fontsize=8, color='#555')
         s.vl = ax.axvline(T, color=TRAIN_C, lw=2)
         s.cur = ax.axvline(0, color='#111', lw=3)
         s.T = T
@@ -149,4 +145,9 @@ def node_vec(J):
 
 def legend_patches():
     from matplotlib.patches import Patch
-    return [Patch(color=NEG_SOFT, label='ρ < 0'), Patch(color=NEG_HARD, label='ρ ≪ 0'), Patch(color=NANC, label='发散 NaN')]
+    return [Patch(color=NEG_SOFT, label='ρ < 0'), Patch(color=NEG_HARD, label='ρ ≪ 0'), Patch(color=NANC, label='NaN')]
+
+
+def wrap_label(s, width=18):
+    import textwrap
+    return '\n'.join(textwrap.wrap(s, width))

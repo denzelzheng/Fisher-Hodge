@@ -67,20 +67,20 @@ def static_row(axr, kind, n, eps, seed, label):
     pnorm = mcolors.TwoSlopeNorm(0, -pmax, pmax); pc = plt.get_cmap('RdBu_r')
     psz = 140 + 900 * pi / pi.max()
     draw(axr[0], pos, E, d['J'], np.abs(d['J']).max(), pi, mcolors.Normalize(0, pi.max()), plt.get_cmap('Greens'), '#0e7490',
-         f'{label}：稳态概率流 J（环流）', f'节点大小/颜色 = π，箭头 ∝ |J|\nΣ|J| = {np.abs(d["J"]).sum():.3f}', node_size=psz)
-    draw(axr[1], pos, E, d['gE'], gmax, d['phE'], pnorm, pc, '#c2410c', '欧氏 Hodge 分解的梯度部分',
-         f'节点色 = 势 φ_E，箭头 ∝ |dφ_E|\nmax|dφ_E| = {gmax:.3f} ≠ 0（虚假势能驱动）')
-    draw(axr[2], pos, E, d['gL'], gmax, d['phL'], pnorm, pc, '#c2410c', 'Onsager–Fisher 加权分解的梯度部分',
-         f'同一色标与箭头尺度\nmax|dφ_L| = {np.abs(d["gL"]).max():.1e}  ≈ 0（稳态无势能驱动）')
+         f'{label}:\nstationary probability current J (circulation)', f'node size/colour = π, arrow ∝ |J|\nΣ|J| = {np.abs(d["J"]).sum():.3f}', node_size=psz)
+    draw(axr[1], pos, E, d['gE'], gmax, d['phE'], pnorm, pc, '#c2410c', 'gradient part, Euclidean Hodge',
+         f'node colour = potential φ_E, arrow ∝ |dφ_E|\nmax|dφ_E| = {gmax:.3f} ≠ 0 (spurious potential driving)')
+    draw(axr[2], pos, E, d['gL'], gmax, d['phL'], pnorm, pc, '#c2410c', 'gradient part, Onsager–Fisher weighted Hodge',
+         f'same colour scale and arrow scale\nmax|dφ_L| = {np.abs(d["gL"]).max():.1e}  ≈ 0 (no potential driving at steady state)')
     return pnorm, pc
 
 
 fig, ax = plt.subplots(2, 3, figsize=(15, 10), dpi=110, gridspec_kw=dict(wspace=0.05, hspace=0.3))
-pn, pc = static_row(ax[0], 'grid', 4, 2.0, 7, '4×4 格子')
-static_row(ax[1], 'er', 12, 2.0, 11, 'ER 图 n=12')
+pn, pc = static_row(ax[0], 'grid', 4, 2.0, 7, '4×4 grid')
+static_row(ax[1], 'er', 12, 2.0, 11, 'ER graph n=12')
 cax = fig.add_axes([0.92, 0.3, 0.01, 0.4])
-cb = fig.colorbar(plt.cm.ScalarMappable(norm=pn, cmap=pc), cax=cax); cb.set_label('节点势 φ（上排色标）')
-fig.suptitle('非平衡 Markov 链在稳态 π 处的边力 f = log(π_i Q_ij / π_j Q_ji)：欧氏 vs Onsager–Fisher 加权 Hodge 分解', fontsize=13)
+cb = fig.colorbar(plt.cm.ScalarMappable(norm=pn, cmap=pc), cax=cax); cb.set_label('node potential φ (colour bar for the top row)')
+fig.suptitle('Edge force f = log(π_i Q_ij / π_j Q_ji) of a non-equilibrium Markov chain at stationarity π: Euclidean vs Onsager–Fisher weighted Hodge decomposition', fontsize=13)
 p = os.path.join(OUT, 'markov_hodge_grid4x4_er12_euclid_vs_onsager_fisher_stationary.png'); fig.savefig(p, bbox_inches='tight'); plt.close(fig)
 print('wrote', p)
 
@@ -104,10 +104,10 @@ def frame(axr, k, small=False):
     for a in axr:
         a.clear()
     nE, nL = np.abs(x['gE']).max(), np.abs(x['gL']).max()
-    draw(axr[0], pos, E, x['gE'], gmax, np.clip(x['phE'], -pmax, pmax), pnorm, pc, '#c2410c', '欧氏分解：梯度部分',
-         f'max|dφ| = {nE:.3f}' + ('' if small else '  → 收敛到非零（稳态仍有"势能驱动"）'), node_size=160 if small else None)
-    draw(axr[1], pos, E, x['gL'], gmax, np.clip(x['phL'], -pmax, pmax), pnorm, pc, '#c2410c', 'Onsager–Fisher 加权分解：梯度部分',
-         f'max|dφ| = {nL:.1e}' + ('' if small else '  → 0（只剩环流）'), node_size=160 if small else None)
+    draw(axr[0], pos, E, x['gE'], gmax, np.clip(x['phE'], -pmax, pmax), pnorm, pc, '#c2410c', 'Euclidean decomposition: gradient part',
+         f'max|dφ| = {nE:.3f}' + ('' if small else '  → converges to nonzero (potential driving persists at steady state)'), node_size=160 if small else None)
+    draw(axr[1], pos, E, x['gL'], gmax, np.clip(x['phL'], -pmax, pmax), pnorm, pc, '#c2410c', 'Onsager–Fisher weighted decomposition: gradient part',
+         f'max|dφ| = {nL:.1e}' + ('' if small else '  → 0 (only circulation remains)'), node_size=160 if small else None)
 
 
 fig, axr = plt.subplots(1, 2, figsize=(11, 5.6), dpi=100)
@@ -115,7 +115,7 @@ fig.subplots_adjust(top=0.82, bottom=0.12, wspace=0.08)
 frames = []
 for k in range(len(ts)):
     frame(axr, k)
-    fig.suptitle(f'4×4 格子 Markov 链弛豫 ρ(t) → π：t = {ts[k]:.1f}（谱隙 λ₂ = {ev:.2f}；同一色标与箭头尺度）', fontsize=12)
+    fig.suptitle(f'4×4 grid Markov chain relaxation ρ(t) → π: t = {ts[k]:.1f} (spectral gap λ₂ = {ev:.2f}; same colour and arrow scale)', fontsize=12)
     frames.append(fig_to_array(fig))
 frames += [frames[-1]] * 15
 plt.close(fig)
@@ -126,7 +126,7 @@ fig, ax = plt.subplots(2, 5, figsize=(16, 7.4), dpi=110, gridspec_kw=dict(wspace
 for j, tv in enumerate(TS):
     k = int(np.argmin(np.abs(ts - tv)))
     frame([ax[0, j], ax[1, j]], k, small=True)
-    ax[0, j].set_title(f't = {tv}\n欧氏梯度部分', fontsize=10); ax[1, j].set_title('加权梯度部分', fontsize=10)
-fig.suptitle('Markov 链弛豫胶片条：欧氏梯度部分收敛到非零图样，Onsager–Fisher 加权梯度部分衰减到 0', fontsize=12.5)
+    ax[0, j].set_title(f't = {tv}\nEuclidean gradient part', fontsize=10); ax[1, j].set_title('weighted gradient part', fontsize=10)
+fig.suptitle('Markov chain relaxation filmstrip: the Euclidean gradient part converges to a nonzero pattern, the Onsager–Fisher weighted gradient part decays to 0', fontsize=12.5)
 p = os.path.join(OUT, 'markov_hodge_grid4x4_relaxation_euclid_vs_onsager_fisher_filmstrip.png'); fig.savefig(p, bbox_inches='tight'); plt.close(fig)
 print('wrote', p)

@@ -35,13 +35,13 @@ for i, (m, rho, J) in enumerate(P):
         a.streamplot(xc, xc, U, V, density=1.6, color='#7df9ff', linewidth=lw, arrowsize=1.0, arrowstyle='-|>', minlength=0.08)
     a.set_xlim(0, 1); a.set_ylim(0, 1); a.set_xticks([]); a.set_yticks([])
     a.set_title(LAB[m], fontsize=12, fontweight='bold', color=LCOL[m] if m != 'truth' else '#111')
-    a.text(0.03, 0.03, f'max|J| = {mag.max() / Jref:.2f} × 真值', transform=a.transAxes, fontsize=9.5, color='white',
+    a.text(0.03, 0.03, f'max|J| = {mag.max() / Jref:.2f} × reference', transform=a.transAxes, fontsize=9.5, color='white',
            bbox=dict(boxstyle='round,pad=0.25', fc=(0, 0, 0, 0.6), ec='none'))
     if m == 'jko_amort':
-        a.text(0.5, 0.5, '稳态通量 ≈ 0\n（可逆模型无法表示环流）', transform=a.transAxes, ha='center', va='center', fontsize=12,
+        a.text(0.5, 0.5, 'steady flux ≈ 0\n(a reversible model\ncannot carry circulation)', transform=a.transAxes, ha='center', va='center', fontsize=10,
                color='white', fontweight='bold', bbox=dict(boxstyle='round,pad=0.4', fc=(0, 0, 0, 0.45), ec='none'))
-fig.colorbar(plt.cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax, shrink=0.85, pad=0.01, label='稳态密度 ρ(t=10T)（√ 刻度）')
-fig.suptitle('S2 稳态 (t = 10T) 的概率通量 J = ρv 流线（线宽 ∝ |J|，|J| < 3% 真值最大值处不画）：漩涡在 / 漩涡没了', fontsize=12)
+fig.colorbar(plt.cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax, shrink=0.85, pad=0.01, label='steady-state density ρ(t=10T) (sqrt scale)')
+fig.suptitle('S2 streamlines of the probability flux J = ρv at steady state (t = 10T) (line width ∝ |J|; not drawn where |J| < 3% of the reference maximum): vortices present / vortices absent', fontsize=12)
 p = os.path.join(OUT, f'{tag}_flux_streamlines_t10T.png'); fig.savefig(p, bbox_inches='tight'); plt.close(fig)
 print('  wrote', p)
 
@@ -115,14 +115,14 @@ for i, (m, rho, J) in enumerate(P):
     sc = a.scatter(x0, y0, s=12, c=col, edgecolors='black', linewidths=0.3, zorder=3)
     axs.append(a); scs.append(sc); lcs.append(lc)
 txt = fig.text(0.5, 0.035, '', ha='center', fontsize=11)
-fig.suptitle(f'S2 示踪粒子：在各模型自己的稳态速度场 v = J/ρ 中推进（同一组 {NP} 个初始位置，颜色 = 初始方位）', fontsize=12)
+fig.suptitle(f'S2 tracer particles advected in each model\'s own steady velocity field v = J/ρ (same {NP} initial positions; colour = initial azimuth)', fontsize=12)
 frames = []
 for k in range(nfr):
     for i in range(3):
         Tk = tracks[i]
         scs[i].set_offsets(Tk[k].T)
         S, C = segs(Tk, k); lcs[i].set_segments(S); lcs[i].set_color(C)
-    txt.set_text(f'粒子时间 s = {k * FR:.1f}（流场冻结在 t = 10T 的稳态）')
+    txt.set_text(f'particle time s = {k * FR:.1f} (velocity field frozen at the t = 10T steady state)')
     frames.append(fig_to_array(fig))
 frames += [frames[-1]] * 10
 plt.close(fig)
@@ -142,7 +142,7 @@ for i, (m, rho, J) in enumerate(P):
         if i == 0:
             a.set_title(f's = {s}', fontsize=10)
         if j == 0:
-            a.set_ylabel(LAB[m], fontsize=10, fontweight='bold', color=LCOL[m] if m != 'truth' else '#111')
-fig.suptitle('S2 示踪粒子胶片条（稳态速度场 v = J/ρ，粒子时间 s；拖尾 = 最近 1 个时间单位）', fontsize=11.5)
+            a.set_ylabel(wrap_label(LAB[m]), fontsize=9.5, fontweight='bold', color=LCOL[m] if m != 'truth' else '#111')
+fig.suptitle('S2 tracer particles filmstrip (steady velocity field v = J/ρ, particle time s; trail = last 1 time unit)', fontsize=11.5)
 p = os.path.join(OUT, f'{tag}_tracers_filmstrip.png'); fig.savefig(p, bbox_inches='tight'); plt.close(fig)
 print('  wrote', p)

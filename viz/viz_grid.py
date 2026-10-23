@@ -37,7 +37,7 @@ for i, (m, X) in enumerate(P):
     axs.append(ax); ims.append(im); txt.append(t1); tt.append(t2)
 cax = fig.add_axes([0.915, bot, 0.012, top - bot])
 sm = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
-cb = fig.colorbar(sm, cax=cax); cb.set_label('ρ（色标固定为真值全程最大值，√ 刻度）', fontsize=8)
+cb = fig.colorbar(sm, cax=cax); cb.set_label('ρ (colour scale fixed to the reference\nmaximum over the whole rollout, sqrt scale)', fontsize=7.5)
 fig.suptitle(title, fontsize=12.5, y=0.975)
 banner = fig.text(0.5, 0.155, '', ha='center', va='center', fontsize=11, color=FLASH_C, fontweight='bold')
 tl = Timeline(fig, [0.06, 0.075, 0.6, 0.05])
@@ -51,7 +51,7 @@ for kk, k in enumerate(times):
         tt[i].set_text(f't = {t:.1f}')
         set_border(axs[i], t, k=kk)
     ph = phase(t)
-    banner.set_text('训练窗结束 (t = T)：此后全部为外推' if ph == 'flash' else ('训练窗内 t ≤ T' if ph == 'train' else ''))
+    banner.set_text('end of training window (t = T): everything after is extrapolation' if ph == 'flash' else ('inside training window, t ≤ T' if ph == 'train' else ''))
     banner.set_color(FLASH_C if ph == 'flash' else '#166534')
     tl.update(t, kk)
     frames.append(fig_to_array(fig))
@@ -60,7 +60,7 @@ plt.close(fig)
 write_video(frames, os.path.join(OUT, f'{tag}_rollout'), fps=10, gif_width=1100)
 
 # ---------------------------------------------------------------- filmstrip
-TS = [(0, 't = 0'), (20, 't = T（训练窗末）'), (40, 't = 2T'), (100, 't = 5T'), (200, 't = 10T')]
+TS = [(0, 't = 0'), (20, 't = T (end of training window)'), (40, 't = 2T'), (100, 't = 5T'), (200, 't = 10T')]
 fig, ax = plt.subplots(nc, 5, figsize=(11.5, 2.1 * nc + 0.5), dpi=130, gridspec_kw=dict(wspace=0.04, hspace=0.08))
 for i, (m, X) in enumerate(P):
     for j, (k, lab) in enumerate(TS):
@@ -75,10 +75,10 @@ for i, (m, X) in enumerate(P):
         if i == 0:
             a.set_title(lab, fontsize=10)
         if j == 0:
-            a.set_ylabel(LAB[m], fontsize=9.5, color=LCOL[m], fontweight='bold')
-fig.colorbar(plt.cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax, shrink=0.6, pad=0.01, label='ρ（√ 刻度）')
+            a.set_ylabel(wrap_label(LAB[m]), fontsize=9, color=LCOL[m], fontweight='bold')
+fig.colorbar(plt.cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax, shrink=0.6, pad=0.01, label='ρ (sqrt scale)')
 fig.legend(handles=legend_patches(), loc='lower center', ncol=3, fontsize=8.5, frameon=False, bbox_to_anchor=(0.45, 0.0))
-fig.suptitle(title + '　|　绿框 = 训练窗内，灰框 = 外推', fontsize=11.5)
+fig.suptitle(title + '  |  green frame = training window, grey frame = extrapolation', fontsize=11.5)
 p = os.path.join(OUT, f'{tag}_filmstrip.png')
 fig.savefig(p, bbox_inches='tight'); plt.close(fig)
 print('  wrote', p, f'{os.path.getsize(p) / 1e6:.1f} MB')
