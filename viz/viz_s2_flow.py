@@ -41,7 +41,7 @@ for i, (m, rho, J) in enumerate(P):
         a.text(0.5, 0.5, 'steady flux ≈ 0\n(a reversible model\ncannot carry circulation)', transform=a.transAxes, ha='center', va='center', fontsize=10,
                color='white', fontweight='bold', bbox=dict(boxstyle='round,pad=0.4', fc=(0, 0, 0, 0.45), ec='none'))
 fig.colorbar(plt.cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax, shrink=0.85, pad=0.01, label='steady-state density ρ(t=10T) (sqrt scale)')
-fig.suptitle('S2 streamlines of the probability flux J = ρv at steady state (t = 10T) (line width ∝ |J|; not drawn where |J| < 3% of the reference maximum): vortices present / vortices absent', fontsize=12)
+fig.suptitle('Steady-state probability flux J = ρv at t = 10T (Fokker–Planck with circulation; line width ∝ |J|; not drawn where |J| < 3% of the reference maximum): vortices present / vortices absent', fontsize=12)
 p = os.path.join(OUT, f'{tag}_flux_streamlines_t10T.png'); fig.savefig(p, bbox_inches='tight'); plt.close(fig)
 print('  wrote', p)
 
@@ -115,7 +115,7 @@ for i, (m, rho, J) in enumerate(P):
     sc = a.scatter(x0, y0, s=12, c=col, edgecolors='black', linewidths=0.3, zorder=3)
     axs.append(a); scs.append(sc); lcs.append(lc)
 txt = fig.text(0.5, 0.035, '', ha='center', fontsize=11)
-fig.suptitle(f'S2 tracer particles advected in each model\'s own steady velocity field v = J/ρ (same {NP} initial positions; colour = initial azimuth)', fontsize=12)
+fig.suptitle(f'Tracer particles (Fokker–Planck with circulation) advected in each model\'s own steady velocity field v = J/ρ (same {NP} initial positions; colour = initial azimuth)', fontsize=12)
 frames = []
 for k in range(nfr):
     for i in range(3):
@@ -143,6 +143,6 @@ for i, (m, rho, J) in enumerate(P):
             a.set_title(f's = {s}', fontsize=10)
         if j == 0:
             a.set_ylabel(wrap_label(LAB[m]), fontsize=9.5, fontweight='bold', color=LCOL[m] if m != 'truth' else '#111')
-fig.suptitle('S2 tracer particles filmstrip (steady velocity field v = J/ρ, particle time s; trail = last 1 time unit)', fontsize=11.5)
+fig.suptitle('Tracer particles (Fokker–Planck with circulation) filmstrip (steady velocity field v = J/ρ, particle time s; trail = last 1 time unit)', fontsize=11.5)
 p = os.path.join(OUT, f'{tag}_tracers_filmstrip.png'); fig.savefig(p, bbox_inches='tight'); plt.close(fig)
 print('  wrote', p)

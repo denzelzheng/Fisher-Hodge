@@ -23,35 +23,35 @@ The operator `dᵀ Θ d` is the Hodge block of Riemannian Hodge Message Passing 
 
 All rollouts train on one time unit (`T = 1`, 20 steps) and are tested out to `10 T`. The green frame marks the training window. Cyan and magenta cells are negative densities. The two numbers in each panel are the total mass and the minimum density.
 
-### Non-equilibrium Fokker–Planck (potential plus divergence-free drift)
+### Fokker–Planck with circulation (S2): potential plus divergence-free drift
 
-![S2 rollout](assets/s2_rollout.gif)
+![Non-equilibrium Fokker–Planck rollout](assets/s2_rollout.gif)
 
 The Fisher–Hodge operator stays on top of the reference solution for the whole rollout, with total mass equal to one and no negative cells. The Euclidean gradient-flow GNN produces negative densities inside the training window. The unstructured GNN-ODE roughly doubles the total mass by `10 T`.
 
-![S2 filmstrip](assets/s2_rollout_filmstrip.png)
+![Non-equilibrium Fokker–Planck filmstrip](assets/s2_rollout_filmstrip.png)
 
-### Steady-state circulation
+### Steady-state circulation (S2)
 
-![S2 flux streamlines](assets/s2_flux_streamlines.png)
+![Steady-state flux streamlines](assets/s2_flux_streamlines.png)
 
 At `10 T` the density no longer changes, but probability still flows around closed loops. The streamlines of the probability flux `J = ρ v` show these loops in the reference solution and in the Fisher–Hodge operator (peak flux 1.05 times the reference). A free-energy model that assumes reversible dynamics, trained in the style of Rancati, Maas and Locatello (2026), has a steady flux of one percent of the reference, so its panel is empty.
 
-![S2 tracers](assets/s2_tracers.gif)
+![Tracer particles](assets/s2_tracers.gif)
 
 The same point, seen through tracer particles advected by each model's own steady velocity field `v = J/ρ`. Particles in the reference and in the Fisher–Hodge field orbit the same loops. Particles in the reversible model barely move.
 
-### Reaction–diffusion (Fisher–KPP)
+### Fisher–KPP reaction–diffusion (S3)
 
-![S3 reaction](assets/s3_reaction.gif)
+![Reaction–diffusion rollout](assets/s3_reaction.gif)
 
 Green marks densities above the true carrying capacity of one. A free reaction network overshoots to 1.5, because the training trajectories never reach saturation and the carrying capacity is not identifiable from them. The Fisher–Rao reaction term saturates at 1.00 and recovers the carrying capacity and the growth rate from the same data. The GNN-ODE never grows and develops a negative pocket.
 
-![S3 filmstrip](assets/s3_reaction_filmstrip.png)
+![Reaction–diffusion filmstrip](assets/s3_reaction_filmstrip.png)
 
-### Mobility outside the model class
+### Crowding mobility, outside the model class (S5)
 
-![S5 misspecified](assets/s5_misspecified.gif)
+![Crowding mobility rollout](assets/s5_misspecified.gif)
 
 The reference solver here uses a crowding mobility `ρ(1 − ρ)`, which the operator cannot represent exactly. Its error grows from 0.003 to 0.02, and mass conservation and positivity still hold. The Euclidean gradient-flow model drifts in mass and goes negative as before.
 
@@ -69,14 +69,14 @@ Relative L2 error at `10 T`, median over 16 test trajectories, mean over three s
 
 | System | Fisher–Hodge | Euclidean gradient-flow GNN | GNN-ODE | Reversible free energy (JKO) |
 |---|---|---|---|---|
-| S1 Fokker–Planck | 0.0034 / 0.017 / 0.0026 | 0.25 / 0.27 / 0.15 | 0.29 / 1.48 / 0.32 | 0.0086 / 0.017 / 0.0093 |
-| S2 with circulation | 0.0033 / 0.014 / 0.0032 | 0.030 / 0.069 / 0.031 | 0.26 / 0.96 / 0.30 | 0.25 / 0.46 / 0.25 |
-| S3 Fisher–KPP | 0.017 / 0.016 / 0.013 | 3.6 / 3.8 / 3.7 | 0.90 / 2.4 / 0.90 | – |
-| S5 crowding mobility (one seed) | 0.020 / 0.022 / 0.016 | 0.096 / 0.195 / 0.162 | – | – |
+| Fokker–Planck (S1) | 0.0034 / 0.017 / 0.0026 | 0.25 / 0.27 / 0.15 | 0.29 / 1.48 / 0.32 | 0.0086 / 0.017 / 0.0093 |
+| Fokker–Planck with circulation (S2) | 0.0033 / 0.014 / 0.0032 | 0.030 / 0.069 / 0.031 | 0.26 / 0.96 / 0.30 | 0.25 / 0.46 / 0.25 |
+| Fisher–KPP reaction–diffusion (S3) | 0.017 / 0.016 / 0.013 | 3.6 / 3.8 / 3.7 | 0.90 / 2.4 / 0.90 | – |
+| Crowding mobility, outside the model class (S5, one seed) | 0.020 / 0.022 / 0.016 | 0.096 / 0.195 / 0.162 | – | – |
 
 Mass drift of the Fisher–Hodge operator is below 4e-7 in every run, and no test trajectory contains a negative cell. Full tables are in `results/`.
 
-Two caveats. The GNN-ODE baseline was trained for 4000 steps and its loss was still falling. A longer run was interrupted at 7000 steps with a loss three times lower, so the GNN-ODE column overstates the gap. The reference solvers for S1 to S3 lie inside the operator's model class. The S4 and S5 systems are the first tests outside it, and a system with non-local interactions has not been run.
+Two caveats. The GNN-ODE baseline was trained for 4000 steps and its loss was still falling. A longer run was interrupted at 7000 steps with a loss three times lower, so the GNN-ODE column overstates the gap. The reference solvers for the three main systems (S1 to S3) lie inside the operator's model class. The nonlinear-mobility systems (S4, S5) are the first tests outside it, and the non-local system (S6) has not been run.
 
 ## What the Hodge structure contributes, and where the gaps come from
 
@@ -92,22 +92,22 @@ K = dᵀ H d
 H_e(ρ) = κ_e · Λ(ρ_i, ρ_j),      Λ(a, b) = (a − b) / (log a − log b),
 ```
 
-where `Λ` is the logarithmic mean of the two endpoint densities and `κ_e > 0` is learned. The same difference in potential therefore drives different amounts of flow at different densities. This choice of `H` is the Otto metric of discrete Wasserstein transport (Maas 2011). The circulation term adds a second driving field on the edges. The S2 model reads
+where `Λ` is the logarithmic mean of the two endpoint densities and `κ_e > 0` is learned. The same difference in potential therefore drives different amounts of flow at different densities. This choice of `H` is the Otto metric of discrete Wasserstein transport (Maas 2011). The circulation term adds a second driving field on the edges. For Fokker–Planck with circulation (S2) the model reads
 
 ```
 dρ/dt = − dᵀ [ κ Λ(ρ) d μ   +   Λ(ρ) c_θ ].
             gradient transport    extra drive
 ```
 
-A reversible JKO model has only the first term, so its net flow vanishes at a true steady state. The S2 reference system keeps a non-zero probability current at steady state, and the second term is what lets the Fisher–Hodge operator represent it. Against the reversible baseline, the first thing the method settles is therefore whether the true dynamics can be expressed at all.
+A reversible JKO model has only the first term, so its net flow vanishes at a true steady state. The reference system with circulation (S2) keeps a non-zero probability current at steady state, and the second term is what lets the Fisher–Hodge operator represent it. Against the reversible baseline, the first thing the method settles is therefore whether the true dynamics can be expressed at all.
 
 Three points keep this comparison honest.
 
-First, the JKO baseline uses the same logarithmic-mean mobility. Both model classes carry the same transport geometry, so the large gap on S2 cannot be read as "Fisher–Hodge has information geometry and JKO does not". The gap on S2 comes from the circulation term. On S1, where no circulation exists, the two models are within a factor of three of each other.
+First, the JKO baseline uses the same logarithmic-mean mobility. Both model classes carry the same transport geometry, so the large gap on Fokker–Planck with circulation (S2) cannot be read as "Fisher–Hodge has information geometry and JKO does not". That gap comes from the circulation term. On plain Fokker–Planck (S1), where no circulation exists, the two models are within a factor of three of each other.
 
 Second, the diffusion law is written into the structure, which makes the learning problem easier. The chemical potential contains `log ρ`, and the logarithmic mean satisfies `Λ(ρ_i, ρ_j) (log ρ_j − log ρ_i) = ρ_j − ρ_i`. This term alone produces the standard discrete diffusion operator. The network learns the coefficients `κ`, a correction to the potential, and how the drive acts. The inputs also include the true potential `U` and the two fields `dpsi` and `psin` that generate the drive, so the task is to learn the evolution given these fields. The baselines receive the same inputs.
 
-Third, conservation and positivity help long rollouts. Because the flows are assembled through `dᵀ`, the total mass of S2 is conserved exactly. The integrator uses adaptive substeps to keep the density positive. Both mechanisms reduce mass drift and numerical blow-up far beyond the training window. The GNN and Euclidean baselines integrate differently, and the GNN was not trained to convergence, so the gap to them mixes model structure, numerics and optimisation.
+Third, conservation and positivity help long rollouts. Because the flows are assembled through `dᵀ`, the total mass is conserved exactly. The integrator uses adaptive substeps to keep the density positive. Both mechanisms reduce mass drift and numerical blow-up far beyond the training window. The GNN and Euclidean baselines integrate differently, and the GNN was not trained to convergence, so the gap to them mixes model structure, numerics and optimisation.
 
 The evidence supports the following attribution.
 
@@ -137,6 +137,17 @@ results/        summary tables of the first round, the stress tests and the Mark
 
 ## Running
 
+In the code the systems carry short names, which the text above gives in parentheses:
+
+| Name in code | System |
+|---|---|
+| `S1` | Fokker–Planck with a random smooth potential |
+| `S2` | Fokker–Planck plus a divergence-free drift (steady circulation) |
+| `S3` | Fisher–KPP reaction–diffusion |
+| `S4` | nonlinear mobility `ρ^1.5` |
+| `S5` | crowding mobility `ρ(1 − ρ)` |
+| `S6` | non-local interaction (not run yet) |
+
 Set `FH_ROOT` to the repository root. Data and checkpoints go to `$FH_ROOT/runs/`.
 
 ```bash
@@ -155,7 +166,7 @@ To make the figures, first cache full rollouts of the trained checkpoints, then 
 
 ```bash
 python viz/rollout_all.py S2
-python viz/viz_grid.py S2 S2 test_oodpot 0 fisher_hodge,euclid_gf,gnn_ode "S2"
+python viz/viz_grid.py S2 S2 test_oodpot 0 fisher_hodge,euclid_gf,gnn_ode "Fokker–Planck with circulation"
 python viz/viz_s2_flow.py test_oodpot 0
 python viz/viz_markov_hodge.py
 ```

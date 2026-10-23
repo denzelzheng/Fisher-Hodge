@@ -55,7 +55,7 @@ pax.set_xlabel('x (profile along the white dashed line in the heat maps; shape o
 for sp in ['top', 'right']:
     pax.spines[sp].set_visible(False)
 pax.legend(loc='upper left', bbox_to_anchor=(1.01, 1.0), fontsize=8.5, frameon=False)
-fig.suptitle('S3 Fisher–KPP front propagation (OOD growth-rate field): free reaction MLP overshoots to ~1.5, Fisher–Rao reaction saturates at 1', fontsize=12.5, y=0.985)
+fig.suptitle('Fisher–KPP reaction–diffusion (OOD growth-rate field): free reaction MLP overshoots to ~1.5, Fisher–Rao reaction saturates at 1', fontsize=12.5, y=0.985)
 banner = fig.text(0.5, 0.925, '', ha='center', fontsize=10.5, fontweight='bold')
 tl = Timeline(fig, [0.06, 0.03, 0.6, 0.035])
 frames = []
@@ -106,6 +106,6 @@ for j, (k, lab) in enumerate(TS):
 fig.legend(handles=[Patch(color='#c8ff9e', label='ρ ≈ 1.05'), Patch(color='#00b300', label='ρ ≥ 1.6'), Patch(color=NEG_SOFT, label='ρ < 0'), Patch(color=NEG_HARD, label='ρ ≪ 0')] +
            [plt.Line2D([], [], color=LC3[m], lw=2, label=LAB3[m]) for m, _ in P], loc='lower center', ncol=4, fontsize=8.5,
            frameon=False, bbox_to_anchor=(0.5, 0.045))
-fig.suptitle('S3 Fisher–KPP front propagation filmstrip (last row = profile along the white dashed line; green = above carrying capacity 1, darker = higher)', fontsize=12, y=0.92)
+fig.suptitle('Fisher–KPP reaction–diffusion filmstrip (last row = profile along the white dashed line; green = above carrying capacity 1, darker = higher)', fontsize=12, y=0.92)
 p = os.path.join(OUT, f'{tag}_filmstrip.png'); fig.savefig(p, bbox_inches='tight'); plt.close(fig)
 print('  wrote', p)
