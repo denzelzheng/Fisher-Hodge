@@ -27,7 +27,8 @@ def test_conservation(name):
     m, drive, c0 = case(name)
     R, _ = rollout(m, drive, c0)
     L = m.hg.on(R.device, R.dtype)['L']
-    assert L.shape[1] >= 1
+    if L.shape[1] == 0:
+        pytest.skip('open system without conserved moieties')
     q = R @ L
     err = (torch.linalg.vector_norm(q - q[:, :1], dim=-1) / torch.linalg.vector_norm(q[:, :1], dim=-1)).max()
     assert err < 1e-13, err
@@ -94,6 +95,36 @@ def test_curl_basis_equals_null_space():
     assert Zc.shape == Zs.shape == (2 * n * n, n * n + 1)
     assert np.abs(Zc @ Zc.T - Zs @ Zs.T).max() < 1e-10
     assert np.abs(hg_c.S @ grid_curl_basis(n)).max() < 1e-12
+
+
+def test_reaction_transport_builds_c1_exactly():
+    from conftest import load_legacy
+    O = load_legacy('hyper_legacy', 'hyper/hyperme.py')
+    g = O.build_graph_np(8)
+    hg = Hypergraph.crn_phosphorylation_grid(8)
+    assert np.array_equal(hg.Np.toarray(), g['Np']) and np.array_equal(hg.Nm.toarray(), g['Nm'])
+    assert np.array_equal(hg.meta['typ'], g['typ'])
+
+
+def test_reaction_transport_many_to_many_and_chemostats():
+    # Brusselator on a 3 x 3 torus: A -> X, 2X + Y -> 3X, B + X -> Y + D, X -> E; chemostats A, B, D, E
+    sp_ = ['X', 'Y', 'A', 'B', 'D', 'E']
+    rx = [({'A': 1}, {'X': 1}), ({'X': 2, 'Y': 1}, {'X': 3}), ({'B': 1, 'X': 1}, {'Y': 1, 'D': 1}), ({'X': 1}, {'E': 1})]
+    hg = Hypergraph.reaction_transport(sp_, rx, grid_n=3, diffusing=['X', 'Y'], chemostats=['A', 'B', 'D', 'E'])
+    V, E = 9, 18
+    assert hg.M == 2 * V and hg.H == 4 * V + 2 * E and not hg.binary
+    S = hg.S
+    v = 4
+    assert S[v, 1 * V + v] == 1 and S[V + v, 1 * V + v] == -1           # 2X + Y -> 3X: X +1, Y -1
+    assert S[v, 0 * V + v] == 1 and S[v, 3 * V + v] == -1
+    mu = torch.tensor([[1.0, 2.0, 0.5, 0.25]], dtype=torch.float64)       # mu_A, mu_B, mu_D, mu_E
+    f = hg.chemostat_force(mu)[0].numpy()
+    assert np.allclose(f[0 * V + v], 1.0) and np.allclose(f[2 * V + v], 2.0 - 0.5) and np.allclose(f[3 * V + v], -0.25)
+    assert np.allclose(f[4 * V:], 0.0)
+    assert hg.L.shape[1] == 0                                              # open system
+    # the reaction network itself: the cycle A -> X -> E carries the chemostat affinity mu_A - mu_E
+    z = np.zeros(hg.H); z[0 * V + v] = 1; z[3 * V + v] = 1
+    assert np.abs(S @ z).max() == 0 and np.isclose(z @ f, 1.0 - 0.25)
 
 
 def test_moieties_of_c1():

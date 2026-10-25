@@ -92,6 +92,8 @@ def evaluate(problem, model, data, sets=None):
 
 
 def run(problem, seed, iters, device, out, legacy_steps=False, sets=None):
+    from .gpu_guard import require_free
+    require_free(device)
     build, load = PRESETS[problem]
     torch.manual_seed(seed); np.random.seed(seed)
     model = build().to(device)
@@ -118,7 +120,7 @@ def run(problem, seed, iters, device, out, legacy_steps=False, sets=None):
 if __name__ == '__main__':
     p = argparse.ArgumentParser()
     p.add_argument('--problem', default='s2_tcme'); p.add_argument('--seed', type=int, default=0)
-    p.add_argument('--iters', type=int, default=None); p.add_argument('--device', default='cuda')
+    p.add_argument('--iters', type=int, default=None); p.add_argument('--device', default='cpu')
     p.add_argument('--out', default=os.path.join(ROOT, 'runs', 'hyperme'))
     p.add_argument('--legacy_steps', action='store_true')
     a = p.parse_args()

@@ -35,10 +35,12 @@ def timeit(fn, dev, reps):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument('--problem', default='s2_tcme'); p.add_argument('--device', default='cuda')
+    p.add_argument('--problem', default='s2_tcme'); p.add_argument('--device', default='cpu')
     p.add_argument('--reps', type=int, default=3); p.add_argument('--sparse', action='store_true')
     a = p.parse_args()
     dev = a.device
+    from .gpu_guard import require_free
+    require_free(dev)
     if a.problem == 's2_tcme':
         T = load_module('models_tcme', os.path.join(ROOT, 'fisher_hodge', 'models_tcme.py'), os.path.join(ROOT, 'fisher_hodge'))
         sd = torch.load(os.path.join(ROOT, 'runs', 'tcme', 'S2_tcme_s0.pt'), map_location=dev)

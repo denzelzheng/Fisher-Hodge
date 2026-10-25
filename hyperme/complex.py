@@ -11,8 +11,10 @@ species-major (index m = s * V + v).  From (nu_plus, nu_minus) we build
 and the gather / scatter index arrays used by the model.  Hypergraphs with H * M <= DENSE_MAX use dense matmuls
 instead, which are faster at that size; larger ones never touch a dense (H, M) matrix in the forward pass.  Transport of one species along a graph edge i -> j is the hyperedge {X@i} -> {X@j}.
 
-Builders: Hypergraph.from_reactions, Hypergraph.from_graph, Hypergraph.grid_transport (periodic grid, edge order of
-fisher_hodge/common.py), Hypergraph.crn_phosphorylation_grid (benchmark C1, hyperedge order of hyper/hyperme.py).
+Builders: Hypergraph.reaction_transport (the main one: a many-to-many reaction list copied at every site of a
+spatial graph, species-selective transport, chemostatted species as a drive), Hypergraph.from_reactions
+(well-mixed), Hypergraph.from_graph and Hypergraph.grid_transport (pure transport; periodic grid in the edge order
+of fisher_hodge/common.py), Hypergraph.crn_phosphorylation_grid (benchmark C1, hyperedge order of hyper/hyperme.py).
 On the periodic grid the cycle basis can also be built from the face coboundary d1^T plus the two harmonic
 1-cochains ('curl' basis); the d0 / d1 operators are the roll implementations of fisher_hodge/common.py.
 """
@@ -254,25 +256,81 @@ class Hypergraph:
         """moiety coordinates c @ L, (B, l)"""
         return c @ s.on(c.device, c.dtype)['L']
 
+    def chemostat_force(s, mu_chem):
+        """drive on every hyperedge from the chemical potentials of the chemostatted species,
+        force_h = <nu+_h - nu-_h, mu_Y> over the chemostats Y.  mu_chem: (B, n_chem) uniform in space or
+        (B, n_chem * V) per site.  Returns (B, H)."""
+        Y = s.meta.get('chem_S')
+        assert Y is not None, 'no chemostatted species in this hypergraph'
+        nC = len(s.meta['chemostats'])
+        if mu_chem.shape[1] == nC and s.V > 1:
+            mu_chem = mu_chem.repeat_interleave(s.V, 1)
+        Yt = torch.as_tensor(Y.toarray(), dtype=mu_chem.dtype, device=mu_chem.device)      # (H, nC * V) = nu- - nu+
+        return -mu_chem @ Yt.T
+
     # ---------------------------------------------------------------- builders
     @classmethod
-    def from_reactions(cls, reactions, species, n_sites=1, **kw):
-        """reactions: list of (reactants, products) dicts {species name: coefficient}, applied at one site.
-        With n_sites > 1 every reaction is copied to every site (well-mixed compartments, no transport)."""
-        sidx = {nm: i for i, nm in enumerate(species)}
-        NS, V = len(species), n_sites
-        H = len(reactions) * V
-        Np = sp.lil_matrix((H, NS * V)); Nm = sp.lil_matrix((H, NS * V))
-        typ = np.zeros(H, dtype=np.int64)
+    def reaction_transport(cls, species, reactions, edges=None, n_sites=None, diffusing=(), chemostats=(),
+                           grid_n=None, **kw):
+        """Reaction-transport hypergraph: a reaction network copied at every site of a spatial graph, plus transport
+        of selected species along the graph edges.
+          species     names of all species, including chemostatted ones
+          reactions   list of (reactants, products), each a dict {species: coefficient}; many-to-many and
+                      coefficients > 1 are allowed, e.g. ({'A': 1, 'X': 2}, {'X': 3})
+          edges       (E, 2) directed (tail, head) site pairs; grid_n = n uses the n x n periodic grid instead
+          diffusing   species that move along the edges (each one gets its own transport hyperedges)
+          chemostats  species held at fixed chemical potential by a reservoir.  They are removed from the state and
+                      from S, and their potentials enter as a drive through chemostat_force().
+        Hyperedge order: reaction r at site v -> r * V + v, then transport of the d-th diffusing species along
+        edge e -> R * V + d * E + e.  State order: the d-th non-chemostatted species at site v -> d * V + v.
+        meta: typ (reaction index, or R + d for transport), odd (transport), site (reactions), et / eh (transport)."""
+        if grid_n is not None:
+            edges, n_sites = grid_edge_list(grid_n), grid_n * grid_n
+        edges = np.zeros((0, 2), dtype=np.int64) if edges is None else np.asarray(edges, dtype=np.int64)
+        V = int(n_sites if n_sites is not None else (edges.max() + 1 if len(edges) else 1))
+        state = [x for x in species if x not in chemostats]
+        sidx = {nm: i for i, nm in enumerate(state)}
+        cidx = {nm: i for i, nm in enumerate(chemostats)}
+        assert all(d in sidx for d in diffusing), 'diffusing species must be part of the state'
+        R, E, Dn, NS, NC = len(reactions), len(edges), len(diffusing), len(state), len(chemostats)
+        H = R * V + Dn * E
+        trip = dict(p=([], [], []), m=([], [], []), y=([], [], []))          # (row, col, value) lists, summed below
+
+        def add(key, rows, cols, val):
+            trip[key][0].append(rows); trip[key][1].append(cols); trip[key][2].append(np.full(len(rows), float(val)))
+        typ = np.zeros(H, dtype=np.int64); site = np.full(H, -1); et = np.full(H, -1); eh = np.full(H, -1)
+        v = np.arange(V)
         for r, (lhs, rhs) in enumerate(reactions):
-            for v in range(V):
-                h = r * V + v
-                for nm, k in lhs.items():
-                    Np[h, sidx[nm] * V + v] += k
-                for nm, k in rhs.items():
-                    Nm[h, sidx[nm] * V + v] += k
-                typ[h] = r
-        return cls(Np, Nm, n_species=NS, species_names=list(species), meta=dict(typ=typ, site=np.tile(np.arange(V), len(reactions))), **kw)
+            rows = r * V + v
+            for side, key, sgn in ((lhs, 'p', -1.0), (rhs, 'm', 1.0)):
+                for nm, k in side.items():
+                    if nm in cidx:
+                        add('y', rows, cidx[nm] * V + v, sgn * k)
+                    else:
+                        add(key, rows, sidx[nm] * V + v, k)
+            typ[rows] = r; site[rows] = v
+        for d, nm in enumerate(diffusing):
+            rows = R * V + d * E + np.arange(E)
+            add('p', rows, sidx[nm] * V + edges[:, 0], 1); add('m', rows, sidx[nm] * V + edges[:, 1], 1)
+            typ[rows] = R + d; et[rows] = edges[:, 0]; eh[rows] = edges[:, 1]
+
+        def mat(key, ncol):
+            r, c, x = trip[key]
+            if not r:
+                return sp.csr_matrix((H, ncol))
+            return sp.coo_matrix((np.concatenate(x), (np.concatenate(r), np.concatenate(c))), shape=(H, ncol)).tocsr()
+        Np, Nm, Yc = mat('p', NS * V), mat('m', NS * V), mat('y', max(NC, 1) * V)
+        meta = dict(typ=typ, odd=typ >= R, site=site, et=et, eh=eh, n_reactions=R, diffusing=list(diffusing))
+        if grid_n is not None:
+            meta['grid_n'] = grid_n
+        if NC:
+            meta['chemostats'] = list(chemostats); meta['chem_S'] = Yc
+        return cls(Np, Nm, n_species=NS, species_names=state, meta=meta, **kw)
+
+    @classmethod
+    def from_reactions(cls, reactions, species, n_sites=1, chemostats=(), **kw):
+        """well-mixed compartments: every reaction copied to each of n_sites sites, no transport."""
+        return cls.reaction_transport(species, reactions, n_sites=n_sites, chemostats=chemostats, **kw)
 
     @classmethod
     def from_graph(cls, edges, n_nodes, n_species=1, **kw):
@@ -312,19 +370,10 @@ class Hypergraph:
     def crn_phosphorylation_grid(cls, n):
         """Benchmark C1 (hyper/gen_crn.py): species X, Xp, E on an n x n torus, hyperedges
         [R1_v: X+E -> Xp+E] (V), [R2_v: Xp -> X] (V), [TX_e: X@i -> X@j] (2V), [TXp_e: Xp@i -> Xp@j] (2V)."""
-        V = n * n; E2 = 2 * V; H = 2 * V + 2 * E2; NS = 3
-        Ed = grid_edge_list(n); tail, head = Ed[:, 0], Ed[:, 1]
-        Np = np.zeros((H, NS * V)); Nm = np.zeros((H, NS * V))
-        v = np.arange(V)
-        r1 = np.arange(V); r2 = V + v; tx = 2 * V + np.arange(E2); txp = 2 * V + E2 + np.arange(E2)
-        X, XP, EN = 0, 1, 2
-        Np[r1, X * V + v] = 1; Np[r1, EN * V + v] = 1; Nm[r1, XP * V + v] = 1; Nm[r1, EN * V + v] = 1
-        Np[r2, XP * V + v] = 1; Nm[r2, X * V + v] = 1
-        Np[tx, X * V + tail] = 1; Nm[tx, X * V + head] = 1
-        Np[txp, XP * V + tail] = 1; Nm[txp, XP * V + head] = 1
-        typ = np.zeros(H, dtype=np.int64); typ[r2], typ[tx], typ[txp] = 1, 2, 3
-        site = np.full(H, -1); site[r1] = v; site[r2] = v
-        et = np.full(H, -1); eh = np.full(H, -1); et[tx] = tail; eh[tx] = head; et[txp] = tail; eh[txp] = head
-        zloc = np.zeros((V, H)); zloc[v, r1] = 1; zloc[v, r2] = 1          # local R1 + R2 cycle at every site
-        meta = dict(typ=typ, odd=typ >= 2, site=site, et=et, eh=eh, grid_n=n, zloc=zloc, r1=r1, r2=r2, tx=tx, txp=txp)
-        return cls(Np, Nm, n_species=NS, meta=meta, species_names=['X', 'Xp', 'E'])
+        hg = cls.reaction_transport(['X', 'Xp', 'E'], [({'X': 1, 'E': 1}, {'Xp': 1, 'E': 1}), ({'Xp': 1}, {'X': 1})],
+                                    grid_n=n, diffusing=['X', 'Xp'])
+        V = n * n; E2 = 2 * V; v = np.arange(V)
+        r1 = v; r2 = V + v; tx = 2 * V + np.arange(E2); txp = 2 * V + E2 + np.arange(E2)
+        zloc = np.zeros((V, hg.H)); zloc[v, r1] = 1; zloc[v, r2] = 1          # local R1 + R2 cycle at every site
+        hg.meta.update(zloc=zloc, r1=r1, r2=r2, tx=tx, txp=txp)
+        return hg

@@ -118,6 +118,14 @@ The evidence supports the following attribution.
 
 Separating these contributions, with a converged GNN and a mass-conserving positive GNN baseline, is the next step before the method's own contribution can be stated cleanly.
 
+## Where the geometry lives
+
+The whole model rests on one relation between flux and force on each hyperedge, `J = Λ(a, b) · f` with `Λ(a, b) = (a − b) / (log a − log b)`.
+
+On the node side, the geometry depends on how mass moves. A transport edge moves mass from one node to a neighbour and keeps the total fixed. This is the discrete Wasserstein geometry of Maas (2011). A reaction hyperedge converts mass in place according to its stoichiometry. This is the Hessian geometry of chemical reaction networks (Mielke 2011), which is of Fisher–Rao type. The code treats both with the same `Λ`, so the two geometries combine into one Wasserstein–Fisher–Rao structure.
+
+On the edge side, the information geometry is present even for pure transport. The forward and backward rates form an exponential family in the chemical potential `μ` and the drive `A`. The concentrations are the mixture coordinates and the potentials are the natural coordinates of a dually flat structure, whose Bregman divergence is the relative entropy and serves as the Lyapunov function. The coefficient `Λ(a, b)` equals `∫₀¹ a^{1−s} b^{s} ds`, the Fisher information of the jump count with respect to its log rate, averaged along the exponential geodesic from the forward rate to the backward rate. At equilibrium it reduces to the Fisher information itself. The Hodge decomposition weighted by `Λ`, which splits the dissipation into relaxation and steady circulation, is the Pythagorean theorem of this Fisher metric. The identifiability statement below is a statement about the dual spaces: forces live in the natural coordinates, currents in the mixture coordinates, and `ker S` is orthogonal to `im Sᵀ` in the `Λ` metric. The closed-form coarse-graining rule follows from the closure of exponential families under state merging.
+
 ## Second round: a learned master equation on hypergraphs
 
 The first round left a gap. The neural operator uses the logarithmic mean of the two endpoint densities, while the Markov-chain analysis uses the logarithmic mean of the forward and backward jump rates. The two agree only when the potential is the same at both ends of an edge. The second round closes the gap by learning the rates themselves.
@@ -166,35 +174,37 @@ A model lives on a hypergraph. Hyperedge `h` turns the reactants `ν_h⁺` into 
 import torch
 from hyperme import Hypergraph, HyperME, integrators
 
-hg = Hypergraph.grid_transport(16)                  # one species on a 16×16 torus
-model = HyperME.build(hg)                           # free energy, kinetics and drive map
-drive = dict(U=torch.randn(4, 256), force=torch.randn(4, hg.H))
-c = torch.rand(4, 256) + 0.5                        # a batch of 4 states
-dcdt = model(c, drive)                              # S (a − b)
-out = model.readouts(c, drive)                      # J, f, ℓ, σ, excess, housekeeping, cycle affinities, moieties
+rx = [({'A': 1, 'X': 2}, {'X': 3}), ({'X': 1}, {'B': 1})]           # Schlögl model at every site
+hg = Hypergraph.reaction_transport(['X', 'A', 'B'], rx, grid_n=16, diffusing=['X'], chemostats=['A', 'B'])
+model = HyperME.build(hg)                                           # free energy, kinetics and drive map
+drive = dict(U=torch.randn(4, 256), force=hg.chemostat_force(torch.tensor([[2.0, 0.0]] * 4)))
+c = torch.rand(4, 256) + 0.5                                        # a batch of 4 states
+dcdt = model(c, drive)                                              # S (a − b)
+out = model.readouts(c, drive)            # J, f, ℓ, σ, excess, housekeeping, cycle affinities, moieties
 c, nsub = integrators.positive_ssp_rk2(model, c, model.prepare(drive), Dt=0.05)
 ```
 
 | File | Contents |
 |---|---|
-| `complex.py` | `Hypergraph`. It holds the stoichiometric matrix `S` and orthonormal bases of `ker S` (cycles) and `ker Sᵀ` (moieties). Builders for reaction lists, graphs, the periodic grid and the C1 network. On the grid the cycle basis can be built from `d₁ᵀ` and the two harmonic cochains. |
+| `complex.py` | `Hypergraph`. It holds the stoichiometric matrix `S` and orthonormal bases of `ker S` (cycles) and `ker Sᵀ` (moieties). The main builder `reaction_transport` copies a reaction list to every site of a spatial graph. Reactions may be many-to-many with any integer coefficients. Each listed species gets its own transport edges, and chemostatted species leave the state and enter as a drive. Smaller builders cover well-mixed networks, pure transport on a graph or periodic grid, and the C1 network. On the grid the cycle basis can be built from `d₁ᵀ` and the two harmonic cochains. |
 | `model.py` | `HyperME` and its three learned parts. `FreeEnergy` is `log c + αU` plus an MLP correction, optionally with non-local features `W∗c`. `Kinetics` gives a symmetric `k > 0` from hyperedge features and, if asked, from `c`. The drive map turns the force into `A` and projects it onto `ker S`. Methods: `rates`, `flux`, `readouts`, `generator`. |
 | `integrators.py` | Explicit SSP-RK2 with positivity-preserving substeps. Implicit Euler with conjugate gradients for linear master equations. A variational implicit step in flux space. The matrix exponential. |
 | `stochastic.py` | Gillespie and chemical Langevin samplers that use the learned rates. Occupation variance and current fluctuations. |
 | `coarse.py` | Projected generator and lag `τ` propagator. Both check that the coarse stationary state and currents are the block sums of the fine ones and that `σ̄ ≤ σ`. |
-| `baselines.py` | Flux-GNN, GNN-ODE, CRNN, reversible JKO and FINN with the same interface. |
+| `baselines.py` | Flux-GNN, GNN-ODE, CRNN, reversible JKO and FINN with the same interface. FINN models transport only and treats reactions as a learned source term. |
 | `presets.py`, `train.py`, `bench.py` | The S2 TC-ME and C1 models in this form, their data, the training protocol and a speed test. |
 
 The substeps keep one step size per trajectory as a tensor. They talk to the host once per sampling interval instead of twice per substep. On S2 with the trained TC-ME on one GPU, a 200-step evaluation of 16 trajectories runs 3.1 times faster than the prototype loop, and a training step runs 2.1 times faster. On the CPU there is no host sync to save, so the CPU path keeps the loop.
 
-The tests run on the GPU server.
+The tests run on the CPU. A GPU is used only when no other user has a process on it, and `hyperme.gpu_guard` checks this before anything starts.
 
 ```bash
-python -m pytest hyperme/tests -m "not slow"     # about a minute
-python -m pytest hyperme/tests -m slow           # retrains S2 TC-ME and C1 HyperME, two seeds each
+python -m pytest hyperme/tests -m "not slow"          # about a minute
+python -m pytest hyperme/tests -m slow                # retrains C1 HyperME, two seeds
+bash hyperme/tests/run_gpu_regression.sh              # waits for a free GPU, retrains S2 TC-ME, two seeds
 ```
 
-The fast tests check five properties on random models over four hypergraphs. Every moiety is conserved, concentrations stay positive, `σ ≥ 0`, `F` decreases when `A = 0`, and `S A = 0`. They also load the prototype checkpoints and reproduce their rates and errors. The slow tests retrain from scratch with the prototype seeds and follow the prototype loss curves to the printed digit. TC-ME on S2 reaches a 10T error of 3.18e-3, the mean of 3.30e-3 and 3.06e-3 (prototype 3.18e-3). HyperME on C1 reaches 0.0224, the mean of 0.0232 and 0.0216 (prototype 0.0224), and its 65 moieties stay constant to a relative error of 1.4e-15.
+The fast tests check five properties on random models over five hypergraphs, from the C1 and Schlögl networks with reactions and transport to pure transport. Every moiety is conserved, concentrations stay positive, `σ ≥ 0`, `F` decreases when `A = 0`, and `S A = 0`. They also load the prototype checkpoints and reproduce their rates and errors. The slow tests retrain from scratch with the prototype seeds and follow the prototype loss curves to the printed digit. HyperME on C1 reaches a 10T error of 0.0224, the mean of 0.0232 and 0.0216 (prototype 0.0224), and its 65 moieties stay constant to a relative error of 1.4e-15. TC-ME on S2 reaches 3.18e-3, the mean of 3.30e-3 and 3.06e-3 (prototype 3.18e-3).
 
 ## Layout
 

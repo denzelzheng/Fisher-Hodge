@@ -30,4 +30,11 @@ def load_legacy(name, relpath, extra_path=None):
 
 @pytest.fixture(scope='session')
 def device():
-    return 'cuda' if torch.cuda.is_available() else 'cpu'
+    """CPU unless HYPERME_DEVICE=cuda is set, and then only on a GPU without other users' processes."""
+    dev = os.environ.get('HYPERME_DEVICE', 'cpu')
+    if dev.startswith('cuda'):
+        from hyperme.gpu_guard import is_free
+        phys = int(os.environ.get('CUDA_VISIBLE_DEVICES', '0').split(',')[0])
+        if not torch.cuda.is_available() or not is_free(phys):
+            pytest.skip(f'GPU {phys} is not free of other users; run hyperme/tests/run_gpu_regression.sh')
+    return dev

@@ -62,6 +62,15 @@ def case(name, B=4, seed=0, reversible=False):
             drive = dict(U=0.3 * torch.randn(B, hg.M, generator=g, dtype=torch.float64),
                          force=torch.randn(B, hg.H, generator=g, dtype=torch.float64))
             c0 = torch.rand(B, hg.M, generator=g, dtype=torch.float64) + 1e-3
+        elif name == 'schlogl':
+            # Schloegl model on a 5 x 5 torus: A + 2X <-> 3X, X <-> B with chemostats A, B; X diffuses.
+            # No conserved moiety; the chemostats drive the local cycle through chemostat_force().
+            hg = Hypergraph.reaction_transport(['X', 'A', 'B'], [({'A': 1, 'X': 2}, {'X': 3}), ({'X': 1}, {'B': 1})],
+                                               grid_n=5, diffusing=['X'], chemostats=['A', 'B'])
+            m = HyperME.build(hg, hidden=32, step=dict(dt_max=0.01))
+            mu = torch.stack([1.0 + torch.rand(B, generator=g, dtype=torch.float64), torch.zeros(B, dtype=torch.float64)], 1)
+            drive = dict(U=0.3 * smooth(B, 5, g).reshape(B, -1), force=hg.chemostat_force(mu))
+            c0 = torch.rand(B, hg.M, generator=g, dtype=torch.float64) + 0.2
         elif name == 'tcme':
             n = 8
             m = presets.s2_tcme(n=n, hidden=32)
@@ -75,4 +84,4 @@ def case(name, B=4, seed=0, reversible=False):
     return m, drive, c0
 
 
-CASES = ['c1', 'grid_nonlocal', 'reactions', 'tcme']
+CASES = ['c1', 'schlogl', 'reactions', 'grid_nonlocal', 'tcme']

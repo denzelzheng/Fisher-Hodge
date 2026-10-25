@@ -1,4 +1,4 @@
-"""Regression against the prototype numbers.
+"""Regression against the prototype numbers (C1 first, S2 second).
 
 Fast: the prototype checkpoints loaded into the presets give the same rates and the same 10T errors as the stored
 results.  Slow (-m slow): retraining the presets from scratch reproduces the published numbers,
@@ -93,6 +93,8 @@ def _train(problem, seeds, device, iters):
 @pytest.mark.slow
 def test_s2_tcme_retrain(device):
     need('runs/data/S2.pt')
+    if device == 'cpu' and os.environ.get('HYPERME_REUSE') != '1':
+        pytest.skip('S2 retraining needs a GPU without other users: hyperme/tests/run_gpu_regression.sh')
     res = _train('s2_tcme', [0, 1], device, 2500)
     e = [r['sets']['test_id']['relerr_median']['200'] for r in res]
     assert abs(np.mean(e) - TCME_10T) / TCME_10T < TOL, e

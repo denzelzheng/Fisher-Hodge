@@ -10,9 +10,10 @@ CRNN           known stoichiometry with mass action and independent forward / ba
 JKOReversible  reversible Wasserstein gradient flow of F = sum_m beta c_m log c_m + V_theta c_m with logarithmic-mean
                mobility, J = -kappa Lambda(c^{nu+}, c^{nu-}) S^T mu, trained by the JKO first-order condition
                (Rancati, Maas and Locatello, arXiv:2604.11311); A = 0 by construction.
-FINN           finite volume neural network (Praditia et al. 2021; Karlbauer et al. 2022): on every transport hyperedge a
-               learned diffusion coefficient D_theta(c) times the two-point stencil plus a learned upwind advection,
-               assembled conservatively; reactions are a learned node-local source R_theta (no stoichiometry).
+FINN           finite volume neural network (Praditia et al. 2021; Karlbauer et al. 2022).  TRANSPORT ONLY, REACTIONS AS A
+               SOURCE TERM: on every transport hyperedge a learned diffusion coefficient D_theta(c) times the two-point
+               stencil plus a learned upwind advection, assembled conservatively; the reaction hyperedges are ignored
+               and replaced by a learned node-local source R_theta (no stoichiometry, so moieties are not conserved).
 """
 import math
 import numpy as np
