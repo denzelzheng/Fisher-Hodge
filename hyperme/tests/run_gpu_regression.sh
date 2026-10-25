@@ -2,6 +2,7 @@
 # S2 TC-ME retrain regression (two seeds) on a GPU that no other user is using.
 # Waits until such a GPU exists, then runs only on it.  Usage, from the repository root:
 #   PY=~/spectralmarl_venv/bin/python bash hyperme/tests/run_gpu_regression.sh
+# On machine 49 we may share with yixunhu:  HYPERME_GPU_SHARE_WITH=yixunhu PY=... bash hyperme/tests/run_gpu_regression.sh
 set -e
 PY=${PY:-python}
 cd "$(dirname "$0")/../.."
