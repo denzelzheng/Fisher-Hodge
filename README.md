@@ -156,6 +156,46 @@ The closed-form coarse model is not good at transients. The 2×2 blocks are not 
 
 Two limitations stand. Near-irreversible reactions have affinities that no density or current observable resolves well, because the affinity is the logarithm of a ratio near zero. In this benchmark the reverse phosphatase rate is one percent of the forward rate, and the learned affinity recovers only 0.6 to 1.5 of the true 3.9. And on plain accuracy the mass-conserving positive flux GNN is as good as the structured models, so accuracy is not the argument. The argument is the readouts, the identifiability statement and the coarse-graining rule.
 
+## API
+
+The prototype code is now collected in one library, `hyperme/`. The scripts in `fisher_hodge/` and `hyper/` are unchanged and give the same numbers as before.
+
+A model lives on a hypergraph. Hyperedge `h` turns the reactants `ν_h⁺` into the products `ν_h⁻`. Transport along a graph edge is a hyperedge with one reactant and one product. The state `c` holds one concentration per species and site. The drive holds the external potential `U` and a force on every hyperedge. For a transport edge the force is the line integral of the driving field along the edge. For a chemostatted reaction it is the chemical potential difference of the chemostats.
+
+```python
+import torch
+from hyperme import Hypergraph, HyperME, integrators
+
+hg = Hypergraph.grid_transport(16)                  # one species on a 16×16 torus
+model = HyperME.build(hg)                           # free energy, kinetics and drive map
+drive = dict(U=torch.randn(4, 256), force=torch.randn(4, hg.H))
+c = torch.rand(4, 256) + 0.5                        # a batch of 4 states
+dcdt = model(c, drive)                              # S (a − b)
+out = model.readouts(c, drive)                      # J, f, ℓ, σ, excess, housekeeping, cycle affinities, moieties
+c, nsub = integrators.positive_ssp_rk2(model, c, model.prepare(drive), Dt=0.05)
+```
+
+| File | Contents |
+|---|---|
+| `complex.py` | `Hypergraph`. It holds the stoichiometric matrix `S` and orthonormal bases of `ker S` (cycles) and `ker Sᵀ` (moieties). Builders for reaction lists, graphs, the periodic grid and the C1 network. On the grid the cycle basis can be built from `d₁ᵀ` and the two harmonic cochains. |
+| `model.py` | `HyperME` and its three learned parts. `FreeEnergy` is `log c + αU` plus an MLP correction, optionally with non-local features `W∗c`. `Kinetics` gives a symmetric `k > 0` from hyperedge features and, if asked, from `c`. The drive map turns the force into `A` and projects it onto `ker S`. Methods: `rates`, `flux`, `readouts`, `generator`. |
+| `integrators.py` | Explicit SSP-RK2 with positivity-preserving substeps. Implicit Euler with conjugate gradients for linear master equations. A variational implicit step in flux space. The matrix exponential. |
+| `stochastic.py` | Gillespie and chemical Langevin samplers that use the learned rates. Occupation variance and current fluctuations. |
+| `coarse.py` | Projected generator and lag `τ` propagator. Both check that the coarse stationary state and currents are the block sums of the fine ones and that `σ̄ ≤ σ`. |
+| `baselines.py` | Flux-GNN, GNN-ODE, CRNN, reversible JKO and FINN with the same interface. |
+| `presets.py`, `train.py`, `bench.py` | The S2 TC-ME and C1 models in this form, their data, the training protocol and a speed test. |
+
+The substeps keep one step size per trajectory as a tensor. They talk to the host once per sampling interval instead of twice per substep. On S2 with the trained TC-ME on one GPU, a 200-step evaluation of 16 trajectories runs 3.1 times faster than the prototype loop, and a training step runs 2.1 times faster. On the CPU there is no host sync to save, so the CPU path keeps the loop.
+
+The tests run on the GPU server.
+
+```bash
+python -m pytest hyperme/tests -m "not slow"     # about a minute
+python -m pytest hyperme/tests -m slow           # retrains S2 TC-ME and C1 HyperME, two seeds each
+```
+
+The fast tests check five properties on random models over four hypergraphs. Every moiety is conserved, concentrations stay positive, `σ ≥ 0`, `F` decreases when `A = 0`, and `S A = 0`. They also load the prototype checkpoints and reproduce their rates and errors. The slow tests retrain from scratch with the prototype seeds and follow the prototype loss curves to the printed digit. TC-ME on S2 reaches a 10T error of 3.18e-3, the mean of 3.30e-3 and 3.06e-3 (prototype 3.18e-3). HyperME on C1 reaches 0.0224, the mean of 0.0232 and 0.0216 (prototype 0.0224), and its 65 moieties stay constant to a relative error of 1.4e-15.
+
 ## Layout
 
 ```
@@ -165,12 +205,14 @@ fisher_hodge/   models, data generators, training and evaluation
   models2.py    FluxGNN, JKOAmort, JKOInst, FisherHodgeWFR and other stress-test models
   models_tcme.py, train_tcme.py   learned master equation on the grid (second round)
   rg_coarse.py, rg_lag.py, train_coarse.py   closed-form coarse-graining and the coarse baselines
-hyper/          learned master equation on hypergraphs: hyperme.py, the phosphorylation-cycle benchmark gen_crn.py,
-                baselines, the identifiability experiment obs_hyper.py
   gen_data.py   reference solutions for S1, S2, S3 (64×64 finite volume, averaged to 32×32)
   gen_data2.py  reference solutions for S4, S5, S6 and the S3b training set
   train.py      train and evaluate one (system, model, seed)
   train2.py     same for the stress-test models
+hyper/          learned master equation on hypergraphs: hyperme.py, the phosphorylation-cycle benchmark gen_crn.py,
+                baselines, the identifiability experiment obs_hyper.py
+hyperme/        the library: complex, model, integrators, stochastic, coarse, baselines, presets, train, bench
+  tests/        structure, integrator, sampler, coarse-graining, baseline and regression tests
 analysis/       Onsager–Fisher weighted Hodge decomposition of Markov chains (numpy)
 viz/            scripts that make the figures above
 assets/         figures and animations used in this file
