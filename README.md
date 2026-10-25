@@ -118,6 +118,44 @@ The evidence supports the following attribution.
 
 Separating these contributions, with a converged GNN and a mass-conserving positive GNN baseline, is the next step before the method's own contribution can be stated cleanly.
 
+## Second round: a learned master equation on hypergraphs
+
+The first round left a gap. The neural operator uses the logarithmic mean of the two endpoint densities, while the Markov-chain analysis uses the logarithmic mean of the forward and backward jump rates. The two agree only when the potential is the same at both ends of an edge. The second round closes the gap by learning the rates themselves.
+
+For a hypergraph with hyperedges `h`, each with reactant and product stoichiometry `ν_h⁺` and `ν_h⁻`, the model is
+
+```
+a_h = k_h · exp(⟨ν_h⁺, μ⟩ + A_h/2),   b_h = k_h · exp(⟨ν_h⁻, μ⟩ − A_h/2),   dc/dt = S (a − b)
+```
+
+with `S = ν⁻ − ν⁺` the stoichiometric matrix. A transport edge is the hyperedge `X at i → X at j`, so transport and reactions share one formula. The learned objects are the chemical potential `μ = ∂F_θ/∂c`, a symmetric kinetic prefactor `k_h > 0`, and a drive `A` in the cycle space `ker S`. When `μ = log c + U`, the rate `a_h` is the mass-action law. Every conserved moiety in `ker Sᵀ` is conserved exactly, concentrations stay positive, the free energy decreases when `A = 0`, and the entropy production `σ = Σ_h (a_h − b_h) log(a_h / b_h)` is non-negative. On transport edges the logarithmic mean of `(a_h, b_h)` is the Maas transport metric, and on reaction hyperedges it is the Hessian metric of chemical reaction networks. Code: `fisher_hodge/models_tcme.py` (graphs) and `hyper/hyperme.py` (hypergraphs). Tables: `results/tcme_summary.md`, `results/crn_summary.md`.
+
+Four things came out of this round.
+
+**The learned rates give correct thermodynamic readouts.** On Fokker–Planck with circulation (S2), the learned master equation matches the Fisher–Hodge operator in accuracy (10T error 0.003 in distribution, 0.016 on new potentials). Its stationary flux is within 0.9 percent of the reference, the curl of the flux within 1.2 percent, and the entropy production within 1 percent of the exact 64×64 steady state. The weighted Hodge split of the learned force gives an excess part of 1e-16 at the steady state. The same split with Euclidean weights misassigns 8 to 18 percent of the entropy production.
+
+**Density data cannot see dissipation, and the blind spot has a dimension.** Because `dc/dt = S J`, any current in `ker S` leaves the densities unchanged. Entropy production and cycle affinities live exactly there. On a chemostatted phosphorylation cycle on an 8×8 grid (`hyper/`), `ker S` has dimension 257. A reversible model fits the trajectories as well as the full model but reports an entropy production that decays to zero, against a true value near 300. Adding one global observable, the ATP turnover rate, makes exactly one more direction identifiable. Adding four local currents makes four. When a reversible model is forced to fit the current observable, its trajectory error jumps from 2 to 30 percent. A CRNN-style baseline given the same observable fits the current but its affinities and entropy production do not improve.
+
+![CRN steady state](assets/crn_ness_flux_map.png)
+
+Steady state of the phosphorylation cycle: reaction loops at each site, transport arrows between sites, colour is the local entropy production. The learned model recovers the currents (correlation 0.95 to 0.98) and underestimates the local dissipation, for the reason just given.
+
+![Identifiability](assets/crn_identifiability.png)
+
+Entropy production over time without observables (dotted), with one global current (orange) and with four local currents (green). The right panel shows that the reversible model (red, green dotted) cannot hold a non-zero turnover.
+
+**The learned model can be coarse-grained in closed form.** Merging states is a Markov morphism. The family of rates above is closed under the stationary-weighted projection `Q̄_ab = Σ_{i∈a} (π_i/π_a) Σ_{j∈b} Q_ij`, which is the standard coarse-graining of stochastic thermodynamics. The coarse free energy is the log-sum-exp of the fine one, the coarse kinetics is the stationary-weighted average, and the coarse affinities are the log ratios of block currents. Starting from a model trained on 32×32, the 16×16 model obtained this way, with no coarse data, has a stationary distribution and stationary flux equal to the block sums of the fine ones to machine precision, and its entropy production decreases monotonically along 32 → 16 → 8 for every trajectory. Models trained from scratch on 16×16 data miss the fine stationary flux by 3 to 4 percent, and their entropy production is not ordered across scales.
+
+![Coarse-grained flux](assets/rg_steady_flux_match.png)
+
+The closed-form coarse model is not good at transients. The 2×2 blocks are not lumpable, so the projected generator relaxes about twice too fast, and the error at the end of the training window is 0.30 against 0.014 for a model trained on coarse data. Coarse-graining the propagator at a lag `τ` instead of the generator, the usual Markov-state-model construction, brings the transient error down to 0.028 at `τ = 0.2` while keeping the stationary readouts exact. The coarse object is then a Markov chain at lag `τ`, and it cannot be written back as a generator of the same family. Every Markov coarse-graining also lowers the entropy production, so coarse values are lower bounds.
+
+![Coarse transient](assets/rg_transient.png)
+
+**With eight training trajectories instead of 64**, the learned master equation reaches an error of 0.027 on new potentials, against 0.051 for the Fisher–Hodge operator and 0.053 for the mass-conserving flux GNN. Part of this comes from the physical initialisation of the rates.
+
+Two limitations stand. Near-irreversible reactions have affinities that no density or current observable resolves well, because the affinity is the logarithm of a ratio near zero. In this benchmark the reverse phosphatase rate is one percent of the forward rate, and the learned affinity recovers only 0.6 to 1.5 of the true 3.9. And on plain accuracy the mass-conserving positive flux GNN is as good as the structured models, so accuracy is not the argument. The argument is the readouts, the identifiability statement and the coarse-graining rule.
+
 ## Layout
 
 ```
@@ -125,6 +163,10 @@ fisher_hodge/   models, data generators, training and evaluation
   common.py     32×32 periodic grid, incidence operators d and dᵀ
   models.py     FisherHodge, EuclidGF, GNNODE
   models2.py    FluxGNN, JKOAmort, JKOInst, FisherHodgeWFR and other stress-test models
+  models_tcme.py, train_tcme.py   learned master equation on the grid (second round)
+  rg_coarse.py, rg_lag.py, train_coarse.py   closed-form coarse-graining and the coarse baselines
+hyper/          learned master equation on hypergraphs: hyperme.py, the phosphorylation-cycle benchmark gen_crn.py,
+                baselines, the identifiability experiment obs_hyper.py
   gen_data.py   reference solutions for S1, S2, S3 (64×64 finite volume, averaged to 32×32)
   gen_data2.py  reference solutions for S4, S5, S6 and the S3b training set
   train.py      train and evaluate one (system, model, seed)
