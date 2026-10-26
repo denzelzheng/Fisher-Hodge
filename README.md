@@ -17,7 +17,7 @@ Three properties hold for every parameter value, so training never has to learn 
 - Densities stay positive, because the logarithmic-mean mobility vanishes at zero density.
 - The free energy decreases along the flow, `dF/dt = −‖d μ‖²_Θ ≤ 0`.
 
-The operator `dᵀ Θ d` is the Hodge block of Riemannian Hodge Message Passing (RHMP) with the cochain metric set to the Otto metric of the current density. This repository contains the mechanism experiments, the Markov-chain analysis and the scripts that make the figures below.
+The operator `dᵀ Θ d` is a weighted Hodge Laplacian whose edge metric is the Otto metric of the current density. This repository contains the mechanism experiments, the Markov-chain analysis and the scripts that make the figures below.
 
 ## What the figures show
 
@@ -348,5 +348,4 @@ python e1.py && python e2.py && python e3.py && python report.py
 - Chow, Huang, Li, Zhou, *Fokker–Planck equations for a free energy functional or Markov process on a graph*, ARMA 2012.
 - Dechant, Sasa, Ito, *Geometric decomposition of entropy production*, Phys. Rev. Research 2022. The excess and housekeeping split used in the Markov analysis.
 - Rancati, Maas, Locatello, *Learning discrete diffusion of graphs via free-energy gradient flows*, arXiv:2604.11311. The reversible free-energy baseline.
-- Zheng, Allen-Blanchette, *Learning discrete Riemannian metrics for physical fields with cochain-frame equivariance* (RHMP), NeurIPS 2026. The Hodge block `dᵀ H d` with a learned cochain metric.
 - Zheng, Zhong, Allen-Blanchette, *Topology-preserving neural operator learning via Hodge decomposition* (HSD), ICML 2026.
