@@ -95,3 +95,22 @@ def test_mode_switch_and_api():
     assert torch.allclose(k0[1], 2 * k0[0])                                                         # k = k_ref T
     out = m_w.readouts(c, drive)
     assert (out['sigma'] >= 0).all()
+
+
+def test_chemostats_enter_as_mass_action_species():
+    """A + ATP <-> B + ADP with mass action: a = kf A ATP, b = kb B ADP.  The wired model with k_ref = sqrt(kf kb) and
+    standard potentials mu0_A - mu0_B = log(kf / kb) reproduces both one-way rates for any ATP, ADP (the chemostats
+    carry the symmetric factor sqrt(ATP ADP) as well as the force log(ATP / ADP))."""
+    kf, kb = 3.0, 0.2
+    hg = Hypergraph.reaction_transport(['A', 'B', 'ATP', 'ADP'], [({'A': 1, 'ATP': 1}, {'B': 1, 'ADP': 1})], n_sites=1,
+                                       chemostats=['ATP', 'ADP'])
+    with presets.default_dtype(torch.float64):
+        m = HyperME(hg, k_ref=float(np.sqrt(kf * kb)), learn_mu0=True, T_exponent=0.0).double()
+    with torch.no_grad():
+        m.free_energy.mu0.copy_(torch.tensor([np.log(kf / kb), 0.0]))
+    g = torch.Generator().manual_seed(0)
+    lc = torch.randn(5, 2, generator=g, dtype=torch.float64)
+    c = torch.rand(5, 2, generator=g, dtype=torch.float64) + 0.1
+    a, b = m.rates(c, dict(chem_logc=lc))
+    assert torch.allclose(a[:, 0], kf * c[:, 0] * lc[:, 0].exp(), rtol=1e-12)
+    assert torch.allclose(b[:, 0], kb * c[:, 1] * lc[:, 1].exp(), rtol=1e-12)

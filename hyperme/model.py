@@ -49,6 +49,17 @@ class MLP(nn.Module):
         return s.net(x)
 
 
+class LinearLog(nn.Module):
+    """zero-initialised bias-free linear map to one output (log k as a linear function of the features)."""
+    def __init__(s, i):
+        super().__init__()
+        s.net = nn.Sequential(nn.Linear(i, 1, bias=False))
+        nn.init.zeros_(s.net[0].weight)
+
+    def forward(s, x):
+        return s.net(x)
+
+
 class Context(dict):
     """the drive-dependent, state-independent part of a model (features, static k, A); built by model.prepare."""
 
@@ -327,10 +338,12 @@ class WiredFreeEnergy(nn.Module):
                        L starts at 1e-3 I, i.e. close to ideal
       'debye_huckel'   dmu_s = -z_s^2 a sqrt(I) / (1 + sqrt(I)),  I = 1/2 sum_s z_s^2 c_s  (a starts at 0)
     """
-    def __init__(s, hg, nonideal='none', charges=None):
+    def __init__(s, hg, nonideal='none', charges=None, learn_mu0=False):
         super().__init__()
         assert nonideal in ('none', 'virial', 'debye_huckel')
         s.hg, s.nonideal, s.NS, s.V = hg, nonideal, hg.n_species, hg.V
+        # standard chemical potential of every species (energy), learned when the species' chemistry is unknown
+        s.mu0 = nn.Parameter(torch.zeros(s.NS)) if learn_mu0 else None
         if nonideal == 'virial':
             s.L = nn.Parameter(1e-3 * torch.eye(s.NS))
         elif nonideal == 'debye_huckel':
@@ -345,6 +358,8 @@ class WiredFreeEnergy(nn.Module):
     def potential(s, feats):
         U = feats['U']; B = U.shape[0]
         Um = U if U.shape[1] == s.hg.M else U.repeat(1, s.NS)
+        if s.mu0 is not None:
+            Um = Um + s.mu0.to(Um.dtype).repeat_interleave(s.V)[None]
         return Um / feats['T'][:, None]
 
     def correction(s, c, ctx):
@@ -380,15 +395,29 @@ class WiredKinetics(nn.Module):
     p = 1 is the Einstein relation (mobility at fixed friction), p = 0 keeps k independent of temperature."""
     split, rho_dependent = True, False
 
-    def __init__(s, n_edge_feats, hidden=32, k_ref=1.0, T_exponent=1.0):
+    def __init__(s, n_edge_feats, hidden=32, k_ref=1.0, T_exponent=1.0, hg=None, table=False):
         super().__init__()
-        s.mlp = MLP(n_edge_feats, hidden, 1, last='zero')
+        # table=True: log k linear in the features (a table when they are a one-hot hyperedge type); better conditioned
+        # than the MLP when the rates span decades
+        s.mlp = LinearLog(n_edge_feats) if table else MLP(n_edge_feats, hidden, 1, last='zero')
         s.register_buffer('k_ref', torch.as_tensor(k_ref, dtype=torch.get_default_dtype()))
         s.p = T_exponent
+        s.hg = hg
 
     def forward(s, feats, hg=None, c=None):
         k = s.k_ref.to(feats['edge_sym'].dtype) * torch.exp(s.mlp(feats['edge_sym']).squeeze(-1))
-        return k * feats['T'][:, None] ** s.p if s.p else k
+        if s.p:
+            k = k * feats['T'][:, None] ** s.p
+        hg = hg or s.hg
+        if hg is not None and feats.get('chem_logc') is not None and 'chem_Np' in hg.meta:
+            # chemostats are mass-action species with known activity: besides the force they carry the symmetric
+            # factor exp(<nu+ + nu-, log c_chem> / 2) (e.g. sqrt(ATP ADP)), so that a ~ c_ATP and b ~ c_ADP c_Pi exactly
+            lc = feats['chem_logc']
+            nC = len(hg.meta['chemostats'])
+            lcv = lc.repeat_interleave(hg.V, 1) if lc.shape[1] == nC else lc
+            Ysum = torch.as_tensor((hg.meta['chem_Np'] + hg.meta['chem_Nm']).toarray(), dtype=lc.dtype, device=lc.device)
+            k = k * torch.exp(0.5 * lcv @ Ysum.T)
+        return k
 
 
 class WiredDrive(nn.Module):
@@ -396,10 +425,12 @@ class WiredDrive(nn.Module):
     Not projected: the external force and the chemostats enter exactly (a gradient part of the force acts like a
     potential).  Learned: the global scale s_A (starts at 1) and one coefficient per harmonic cochain in
     hg.meta['harmonic'] (start at 0)."""
-    def __init__(s, hg, harmonic=True):
+    def __init__(s, hg, harmonic=True, learn_chem_mu0=False):
         super().__init__()
         s.hg = hg
         s.s_A = nn.Parameter(torch.tensor(1.0))
+        nC = len(hg.meta.get('chemostats', []))
+        s.chem_mu0 = nn.Parameter(torch.zeros(nC)) if (learn_chem_mu0 and nC) else None
         Hm = hg.meta.get('harmonic') if harmonic else None
         if Hm is not None and Hm.shape[1]:
             s.register_buffer('Hm', torch.as_tensor(Hm, dtype=torch.get_default_dtype()))
@@ -419,6 +450,8 @@ class WiredDrive(nn.Module):
             mu = feats['chem_logc']
             if feats.get('chem_mu0') is not None:
                 mu = mu + feats['chem_mu0'] / T
+            if s.chem_mu0 is not None:
+                mu = mu + s.chem_mu0.to(mu.dtype)[None] / T
             A = A + s.hg.chemostat_force(mu)
         return A
 
@@ -449,11 +482,11 @@ class HyperME(nn.Module):
 
     @classmethod
     def build_wired(cls, hg, hidden=32, k_ref=1.0, T_exponent=1.0, nonideal='none', charges=None, harmonic=True,
-                    featurizer=None, step=None):
+                    featurizer=None, step=None, learn_mu0=False, learn_chem_mu0=False, kinetics_table=False):
         feat = featurizer or wired_featurizer(hg)
-        kin = WiredKinetics(feat.n_edge_sym, hidden, k_ref=k_ref, T_exponent=T_exponent)
-        fe = WiredFreeEnergy(hg, nonideal, charges)
-        dr = WiredDrive(hg, harmonic)
+        kin = WiredKinetics(feat.n_edge_sym, hidden, k_ref=k_ref, T_exponent=T_exponent, hg=hg, table=kinetics_table)
+        fe = WiredFreeEnergy(hg, nonideal, charges, learn_mu0)
+        dr = WiredDrive(hg, harmonic, learn_chem_mu0)
         return cls(hg, fe, kin, dr, feat, step)
 
     @classmethod

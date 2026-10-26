@@ -60,7 +60,7 @@ class _Base(nn.Module):
     def forward(s, c, drive):
         return s.rhs(c, drive)
 
-    def advance(s, c, drive, Dt):
+    def advance(s, c, drive, Dt, **kw):
         return heun_fixed(s, c, s.context(drive), Dt, s.nsub)
 
     def escape_ratio(s, c, a, b):
@@ -140,7 +140,7 @@ class FluxGNN(_Base):
     def rhs(s, c, drive):
         return s.hg.apply_S(s.flux(c, drive))
 
-    def advance(s, c, drive, Dt):
+    def advance(s, c, drive, Dt, **kw):
         return positive_ssp_rk2(s, c, s.context(drive), Dt, **s.step)
 
 
@@ -161,16 +161,28 @@ class GNNODE(_Base):
 class CRNN(_Base):
     name = 'crnn'
 
-    def __init__(s, hg, n_edge_in, featurizer=None, hidden=64, scale=1.0, nsub=8, oriented=True):
+    def __init__(s, hg, n_edge_in, featurizer=None, hidden=64, scale=1.0, nsub=8, oriented=True, chem=False, table=False):
         super().__init__(hg, featurizer, 1.0, nsub, scale)
         s.oriented = oriented                  # False: hyperedge features only (hyper/crn2.py CRNN2), n_edge_in excludes ori
-        s.kmlp = MLP(n_edge_in, hidden, 2, last_bias=0.5)
+        s.chem = chem                          # True: chemostat concentrations enter as exact mass-action factors
+        s.table = table                        # True: log kf, log kb linear in the features (a table for one-hot types)
+        if table:
+            s.kmlp = nn.Linear(n_edge_in, 2, bias=False); nn.init.zeros_(s.kmlp.weight)
+        else:
+            s.kmlp = MLP(n_edge_in, hidden, 2, last_bias=0.5)
 
     def prepare(s, drive):
         ctx = super().prepare(drive)
         x = s.edge_inputs(ctx) if s.oriented else ctx['feats']['edge_sym']
-        kk = s.scale * Fn.softplus(s.kmlp(x)) + 1e-6
+        kk = s.scale * (torch.exp(s.kmlp(x)) if s.table else Fn.softplus(s.kmlp(x)) + 1e-6)
         ctx['kf'], ctx['kb'] = kk[..., 0], kk[..., 1]
+        if s.chem:
+            lc = ctx['feats']['chem_logc']
+            Y = torch.as_tensor(s.hg.meta['chem_S'].toarray(), dtype=lc.dtype, device=lc.device)      # (H, nC V) = nu- - nu+
+            nC = len(s.hg.meta['chemostats'])
+            lcv = lc.repeat_interleave(s.hg.V, 1) if lc.shape[1] == nC else lc
+            ctx['kf'] = ctx['kf'] * torch.exp(lcv @ (-Y).clamp_min(0).T)       # chemostats consumed forward
+            ctx['kb'] = ctx['kb'] * torch.exp(lcv @ Y.clamp_min(0).T)          # chemostats consumed backward
         return ctx
 
     def rates(s, c, drive):
@@ -228,7 +240,7 @@ class JKOReversible(_Base):
         ctx = s.context(drive)
         return (s.beta() * c * torch.log(c) + ctx['V'] * c).sum(-1)
 
-    def advance(s, c, drive, Dt):
+    def advance(s, c, drive, Dt, **kw):
         from .integrators import positive_heun_rhs
         return positive_heun_rhs(s, c, s.context(drive), Dt, **s.step)
 

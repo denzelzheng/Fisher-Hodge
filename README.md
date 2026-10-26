@@ -186,6 +186,14 @@ For these rates the product of the forward and backward rate on an edge does not
 
 Inverse design is shorter still. To make a given density ρ* stationary, the wired model needs U = −log ρ*, which is exact (error 2e-15). The same target reached by optimising through Flux-GNN takes 20 minutes and is off by 3.2 percent in the true system.
 
+## Application: a signalling cascade
+
+The test case is a MAPK cascade with the structure of Huang and Ferrell. It has three tiers with dual phosphorylation and explicit enzyme–substrate complexes, all mass action, with ATP, ADP and Pi as chemostats, on a 4×4 grid where only MAPK diffuses. The rate constants are dimensionless example values chosen to keep the stiffness near 1e2. They are not the parameters of the BioModels entry BIOMD0000000009. Tables: `results/ws6_mapk.md`.
+
+The wired model is exact for this system. With the true parameters it reproduces the truth to 4e-11, for ATP inside and outside the training range. This needed one correction to the wired design: a chemostat also scales the symmetric rate prefactor, by sqrt(ATP·ADP) for a kinase step, besides entering the force. Trained from scratch, the wired model has 49 parameters and the right structure. All 97 moieties are conserved to 8e-15, concentrations stay positive, and the entropy production is within 18 to 36 percent. At low ATP, below the training range, it has the lowest error (2.7 percent). The flexible model, which sees ATP only as a feature, is at 7.6 percent there and a CRNN with ATP as an input at 22 percent. In distribution the flexible model is more accurate (1.2 percent against 3.8), and at high ATP an oracle mass-action model is the most accurate (2.1 percent). A GNN-ODE fits the training window but drifts to 63 to 76 percent at the end of the test horizon, with negative concentrations. Training the exact class from scratch needed a log-rate table for the kinetics. With an MLP of the hyperedge type, both the wired model and the oracle mass-action model stall far from the truth.
+
+![MAPK cascade](assets/ws6_mapk_cascade.png)
+
 ## API
 
 The prototype code is now collected in one library, `hyperme/`. The scripts in `fisher_hodge/` and `hyper/` are unchanged and give the same numbers as before.

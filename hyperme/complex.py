@@ -313,7 +313,7 @@ class Hypergraph:
         assert all(d in sidx for d in diffusing), 'diffusing species must be part of the state'
         R, E, Dn, NS, NC = len(reactions), len(edges), len(diffusing), len(state), len(chemostats)
         H = R * V + Dn * E
-        trip = dict(p=([], [], []), m=([], [], []), y=([], [], []))          # (row, col, value) lists, summed below
+        trip = dict(p=([], [], []), m=([], [], []), y=([], [], []), yp=([], [], []), ym=([], [], []))   # (row, col, value), summed below
 
         def add(key, rows, cols, val):
             trip[key][0].append(rows); trip[key][1].append(cols); trip[key][2].append(np.full(len(rows), float(val)))
@@ -324,7 +324,7 @@ class Hypergraph:
             for side, key, sgn in ((lhs, 'p', -1.0), (rhs, 'm', 1.0)):
                 for nm, k in side.items():
                     if nm in cidx:
-                        add('y', rows, cidx[nm] * V + v, sgn * k)
+                        add('y', rows, cidx[nm] * V + v, sgn * k); add('yp' if sgn < 0 else 'ym', rows, cidx[nm] * V + v, k)
                     else:
                         add(key, rows, sidx[nm] * V + v, k)
             typ[rows] = r; site[rows] = v
@@ -339,6 +339,7 @@ class Hypergraph:
                 return sp.csr_matrix((H, ncol))
             return sp.coo_matrix((np.concatenate(x), (np.concatenate(r), np.concatenate(c))), shape=(H, ncol)).tocsr()
         Np, Nm, Yc = mat('p', NS * V), mat('m', NS * V), mat('y', max(NC, 1) * V)
+        Yp, Ym = mat('yp', max(NC, 1) * V), mat('ym', max(NC, 1) * V)
         meta = dict(typ=typ, odd=typ >= R, site=site, et=et, eh=eh, n_reactions=R, diffusing=list(diffusing))
         if grid_n is not None:
             meta['grid_n'] = grid_n
@@ -350,6 +351,7 @@ class Hypergraph:
             meta['harmonic'] = Hm
         if NC:
             meta['chemostats'] = list(chemostats); meta['chem_S'] = Yc
+            meta['chem_Np'], meta['chem_Nm'] = Yp, Ym          # chemostat coefficients on the reactant / product side
         return cls(Np, Nm, n_species=NS, species_names=state, meta=meta, **kw)
 
     @classmethod
