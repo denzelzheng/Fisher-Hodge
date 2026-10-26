@@ -164,6 +164,18 @@ The closed-form coarse model is not good at transients. The 2×2 blocks are not 
 
 Two limitations stand. Near-irreversible reactions have affinities that no density or current observable resolves well, because the affinity is the logarithm of a ratio near zero. In this benchmark the reverse phosphatase rate is one percent of the forward rate, and the learned affinity recovers only 0.6 to 1.5 of the true 3.9. And on plain accuracy the mass-conserving positive flux GNN is as good as the structured models, so accuracy is not the argument. The argument is the readouts, the identifiability statement and the coarse-graining rule.
 
+## Fluctuations of the learned process
+
+A learned master equation also defines a stochastic process. We sampled it with the Gillespie algorithm and compared its fluctuations with those of the true system, on the phosphorylation cycle (C1) and the Brusselator (C3). Tables: `results/ws3_fluctuations.md`.
+
+Occupation-number fluctuations agree with the truth for every model, the reversible one included. The Fano factors of all species at all sites are within 4 percent at system sizes 50, 200 and 1000. They carry no information about the drive.
+
+The fluctuation relation P(Σ)/P(−Σ) = e^Σ for the entropy of the local reaction loop holds for every learned model when Σ is computed from that model's own rates. The black-box CRNN passes as well, because this is an identity of any Markov jump process. The informative version evaluates Σ with the true forces on the paths a model generates. The truth gives a slope of 0.89 (below 1 because Σ covers one loop only). HyperME and the CRNN give 0.27 to 0.36, and HyperME trained with four local current observables gives 0.46. The learned paths have about a third of the true irreversibility. This is the same blind spot as before: the nearly irreversible R2 has a force of 4.9 in the truth and 1.4 in both learned models.
+
+![Fluctuation relation](assets/ws3_fluctuation_theorem.png)
+
+On the Brusselator limit cycle in a well-mixed volume of size 200, HyperME is closer to the truth than the CRNN. The period is 7.05 ± 0.96 in the truth, 7.19 ± 1.16 for HyperME and 7.93 ± 1.53 for the CRNN. The phase diffusion coefficient is 40 percent too high for HyperME and 81 percent too high for the CRNN. On the 8×8 grid the homogeneous cycle does not survive the noise in any model or in the truth. It breaks into a Turing pattern within two periods.
+
 ## API
 
 The prototype code is now collected in one library, `hyperme/`. The scripts in `fisher_hodge/` and `hyper/` are unchanged and give the same numbers as before.
@@ -189,7 +201,7 @@ c, nsub = integrators.positive_ssp_rk2(model, c, model.prepare(drive), Dt=0.05)
 | `complex.py` | `Hypergraph`. It holds the stoichiometric matrix `S` and orthonormal bases of `ker S` (cycles) and `ker Sᵀ` (moieties). The main builder `reaction_transport` copies a reaction list to every site of a spatial graph. Reactions may be many-to-many with any integer coefficients. Each listed species gets its own transport edges, and chemostatted species leave the state and enter as a drive. Smaller builders cover well-mixed networks, pure transport on a graph or periodic grid, and the C1 network. On the grid the cycle basis can be built from `d₁ᵀ` and the two harmonic cochains. |
 | `model.py` | `HyperME` and its three learned parts. `FreeEnergy` is `log c + αU` plus an MLP correction, optionally with non-local features `W∗c`. `Kinetics` gives a symmetric `k > 0` from hyperedge features and, if asked, from `c`. The drive map turns the force into `A` and projects it onto `ker S`. Methods: `rates`, `flux`, `readouts`, `generator`. |
 | `integrators.py` | Explicit SSP-RK2 with positivity-preserving substeps. Modified Patankar schemes (Patankar–Euler and MPRK22), which are linearly implicit, positive and conserving at any step size and can be trained through. Implicit Euler with conjugate gradients for linear master equations. A variational implicit step in flux space. The matrix exponential. |
-| `stochastic.py` | Gillespie and chemical Langevin samplers that use the learned rates. Occupation variance and current fluctuations. |
+| `stochastic.py` | Gillespie, tau-leaping and chemical Langevin samplers that use the learned rates. They record firing counts and the entropy of every channel. `ws3.py` runs the fluctuation study. |
 | `coarse.py` | Projected generator and lag `τ` propagator. Both check that the coarse stationary state and currents are the block sums of the fine ones and that `σ̄ ≤ σ`. |
 | `baselines.py` | Flux-GNN, GNN-ODE, CRNN, reversible JKO and FINN with the same interface. FINN models transport only and treats reactions as a learned source term. |
 | `presets.py`, `train.py`, `bench.py` | The S2 TC-ME and C1 models in this form, their data, the training protocol and a speed test. |

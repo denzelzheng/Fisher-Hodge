@@ -41,6 +41,28 @@ def test_gillespie_multinomial_and_current():
     assert (st['current_diffusion'] > 0).all()
 
 
+def test_tau_leap_matches_multinomial_and_counts_entropy():
+    m, drive = ring_model(seed=4)
+    ctx = m.prepare(drive)
+    Q = m.generator(torch.ones(1, 4, dtype=torch.float64), ctx)[0].T.detach().numpy()
+    pi = stationary(Q)
+    omega, B = 100, 64
+    big = ctx.expand(B)
+    rates = lambda c: m.rates(c, big, zero_safe=True)
+    n0 = torch.zeros(B, 4, dtype=torch.float64); n0[:, 0] = omega
+    res = St.tau_leap(rates, m.hg, n0, omega, t_end=40.0, dt_rec=0.5, tau=0.01, generator=torch.Generator().manual_seed(5),
+                      t_burn=10.0, ref_rates=rates)
+    assert (res['n'].sum(-1) == omega).all() and (res['n'] >= 0).all()
+    st = St.fluctuation_stats(res, t_burn=10.0)
+    assert np.allclose(st['occ_mean'].numpy(), omega * pi, rtol=0.08)
+    assert np.allclose(st['occ_var'].numpy(), omega * pi * (1 - pi), rtol=0.25)
+    # medium entropy of the ring = (firings) x (edge force); with the reference equal to the sampler, S = Sref
+    assert torch.allclose(res['S'], res['Sref'])
+    T = 30.0
+    a, b = res['Ia'].mean(0) / T, res['Ib'].mean(0) / T
+    assert np.allclose(st['current_mean'].numpy(), (a - b).numpy(), rtol=0.1)
+
+
 def test_chemical_langevin_mean():
     m, drive = ring_model(seed=2)
     ctx = m.prepare(drive)

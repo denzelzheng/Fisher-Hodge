@@ -147,9 +147,10 @@ def load_c1(root=ROOT, device='cpu', tag=''):
 C3_RX = [({'A': 1}, {'X': 1}), ({'X': 2, 'Y': 1}, {'X': 3}), ({'B': 1, 'X': 1}, {'Y': 1, 'D': 1}), ({'X': 1}, {'E': 1})]
 
 
-def c3_featurizer(hg):
-    """drive = dict(drv (B, 2) normalised (log a, log b)) -> features of hyper/crn2.edge_feats."""
-    ntyp = int(hg.meta['typ'].max()) + 1
+def c3_featurizer(hg, ntyp=None):
+    """drive = dict(drv (B, 2) normalised (log a, log b)) -> features of hyper/crn2.edge_feats.  ntyp = 6 keeps the
+    feature layout of the grid model on a hypergraph without transport (well-mixed)."""
+    ntyp = ntyp or int(hg.meta['typ'].max()) + 1
 
     def feat(F):
         drv = F['drv']
@@ -164,12 +165,18 @@ def c3_featurizer(hg):
     return feat
 
 
-def c3(n=8, hidden=64, use_A=True, method='ssp', nsub=1):
+def c3(n=8, hidden=64, use_A=True, method='ssp', nsub=1, well_mixed=False):
     """Brusselator C3 (hyper/gen_brusselator.py): state X, Y; A, B, D, E chemostatted (absorbed into k and A);
-    the HyperME2 of hyper/crn2.py.  method='mprk22' integrates with the Patankar scheme (nsub steps per DT)."""
-    hg = Hypergraph.reaction_transport(['X', 'Y', 'A', 'B', 'D', 'E'], C3_RX, grid_n=n, diffusing=['X', 'Y'],
-                                       chemostats=['A', 'B', 'D', 'E'])
-    feat = c3_featurizer(hg)
+    the HyperME2 of hyper/crn2.py.  method='mprk22' integrates with the Patankar scheme (nsub steps per DT).
+    well_mixed=True: one site and no transport, with the same parameters (the grid model restricted to homogeneous
+    states: k, G and the projected A coincide)."""
+    if well_mixed:
+        hg = Hypergraph.reaction_transport(['X', 'Y', 'A', 'B', 'D', 'E'], C3_RX, n_sites=1,
+                                           chemostats=['A', 'B', 'D', 'E'])
+    else:
+        hg = Hypergraph.reaction_transport(['X', 'Y', 'A', 'B', 'D', 'E'], C3_RX, grid_n=n, diffusing=['X', 'Y'],
+                                           chemostats=['A', 'B', 'D', 'E'])
+    feat = c3_featurizer(hg, ntyp=len(C3_RX) + 2)
     with default_dtype(torch.float64):
         kin = Kinetics(feat.n_edge_sym, hidden, last='default', last_bias=0.5, eps=1e-6)
         dr = ProjectedDrive(hg, feat.n_edge_sym, hidden, mlp=True, oriented=False, transport_zero=True)
@@ -209,7 +216,7 @@ def load_c3(root=ROOT, device='cpu', name='brus'):
         B, T = d['c'].shape[:2]
         out[k] = dict(c=d['c'].reshape(B, T, -1).double().to(device),
                       drive=dict(drv=((d['drv'].double() - dm) / ds).to(device)))
-        for extra in ('sigma', 'homog'):
+        for extra in ('sigma', 'homog', 'k', 'A'):
             if extra in d:
                 out[k][extra] = d[extra]
     return out

@@ -161,13 +161,15 @@ class GNNODE(_Base):
 class CRNN(_Base):
     name = 'crnn'
 
-    def __init__(s, hg, n_edge_in, featurizer=None, hidden=64, scale=1.0, nsub=8):
+    def __init__(s, hg, n_edge_in, featurizer=None, hidden=64, scale=1.0, nsub=8, oriented=True):
         super().__init__(hg, featurizer, 1.0, nsub, scale)
+        s.oriented = oriented                  # False: hyperedge features only (hyper/crn2.py CRNN2), n_edge_in excludes ori
         s.kmlp = MLP(n_edge_in, hidden, 2, last_bias=0.5)
 
     def prepare(s, drive):
         ctx = super().prepare(drive)
-        kk = s.scale * Fn.softplus(s.kmlp(s.edge_inputs(ctx))) + 1e-6
+        x = s.edge_inputs(ctx) if s.oriented else ctx['feats']['edge_sym']
+        kk = s.scale * Fn.softplus(s.kmlp(x)) + 1e-6
         ctx['kf'], ctx['kb'] = kk[..., 0], kk[..., 1]
         return ctx
 
