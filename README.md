@@ -176,6 +176,16 @@ The fluctuation relation P(Σ)/P(−Σ) = e^Σ for the entropy of the local reac
 
 On the Brusselator limit cycle in a well-mixed volume of size 200, HyperME is closer to the truth than the CRNN. The period is 7.05 ± 0.96 in the truth, 7.19 ± 1.16 for HyperME and 7.93 ± 1.53 for the CRNN. The phase diffusion coefficient is 40 percent too high for HyperME and 81 percent too high for the CRNN. On the 8×8 grid the homogeneous cycle does not survive the noise in any model or in the truth. It breaks into a Turing pattern within two periods.
 
+## Minimum-dissipation control
+
+The same metric that defines the dynamics also defines the cheapest way to steer it. We moved a density on the 32×32 torus from one test state to another in time τ = 2 with a time-dependent potential, and minimised the entropy production by differentiating through the model's rollout. Tables: `results/ws5_control.md`.
+
+For these rates the product of the forward and backward rate on an edge does not depend on the potential. So no protocol can beat the discrete Benamou–Brenier energy W²/τ with the geometric-mean mobility. The bound is reached by the Wasserstein geodesic, driven by the potential U = −ψ − log ρ, where ψ is the Kantorovich potential. Protocols optimised on the wired model reach 1.010 times the bound (untrained) and 1.015 (trained on 16 trajectories) when run in the true system. Their potentials match the geodesic one with correlation 0.999. The protocol optimised on the black-box Flux-GNN, which has no entropy production and minimises a kinetic-energy proxy, reaches the target but dissipates 1.087 times the bound. A sudden quench costs 1.46 times the bound and misses the target.
+
+![Control protocols](assets/ws5_protocol.png)
+
+Inverse design is shorter still. To make a given density ρ* stationary, the wired model needs U = −log ρ*, which is exact (error 2e-15). The same target reached by optimising through Flux-GNN takes 20 minutes and is off by 3.2 percent in the true system.
+
 ## API
 
 The prototype code is now collected in one library, `hyperme/`. The scripts in `fisher_hodge/` and `hyper/` are unchanged and give the same numbers as before.

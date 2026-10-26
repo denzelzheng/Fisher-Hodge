@@ -104,7 +104,7 @@ def evaluate(problem, model, data, sets=None):
     return res
 
 
-def run(problem, seed, iters, device, out, legacy_steps=False, sets=None, tag='', **preset_kw):
+def run(problem, seed, iters, device, out, legacy_steps=False, sets=None, tag='', ntrain=0, **preset_kw):
     from .gpu_guard import require_free
     require_free(device)
     build, load = PRESETS[problem]
@@ -118,7 +118,8 @@ def run(problem, seed, iters, device, out, legacy_steps=False, sets=None, tag=''
     def log(*a):
         s = ' '.join(str(x) for x in a); print(s, flush=True); logf.write(s + '\n'); logf.flush()
     log(f'{name}: params={sum(p.numel() for p in model.parameters())} iters={iters} device={device} preset={preset_kw}')
-    info = train(model, data['train'], iters, seed, DTS[problem], log=log, legacy_steps=legacy_steps)
+    tr = data['train'] if ntrain <= 0 else dict(c=data['train']['c'][:ntrain], drive={k: v[:ntrain] for k, v in data['train']['drive'].items()})
+    info = train(model, tr, iters, seed, DTS[problem], log=log, legacy_steps=legacy_steps)
     torch.save(model.state_dict(), os.path.join(out, name + '.pt'))
     model.eval()
     ev = evaluate(problem, model, data, sets)
@@ -141,9 +142,11 @@ if __name__ == '__main__':
     p.add_argument('--method', default=None, help='c3 only: ssp | mprk22 | patankar')
     p.add_argument('--nsub', type=int, default=1)
     p.add_argument('--threads', type=int, default=4)
+    p.add_argument('--ntrain', type=int, default=0, help='>0: use only the first ntrain training trajectories')
     a = p.parse_args()
     iters = a.iters or dict(s2_tcme=2500, s2_wired=2500, c1=2000, c3=2000)[a.problem]
     if a.device == 'cpu':
         torch.set_num_threads(a.threads)
     kw = dict(method=a.method, nsub=a.nsub) if a.method else {}
-    run(a.problem, a.seed, iters, a.device, a.out, a.legacy_steps, tag=f'_{a.method}{a.nsub}' if a.method else '', **kw)
+    tag = (f'_{a.method}{a.nsub}' if a.method else '') + (f'_n{a.ntrain}' if a.ntrain > 0 else '')
+    run(a.problem, a.seed, iters, a.device, a.out, a.legacy_steps, tag=tag, ntrain=a.ntrain, **kw)
