@@ -8,6 +8,7 @@ The presets create their parameters in the same order and with the same initiali
 given torch seed gives the same initial weights, and load_legacy() maps a prototype checkpoint onto the preset.
 """
 import os
+import math
 import contextlib
 import torch
 from .complex import Hypergraph, GridOps as G
@@ -219,6 +220,7 @@ def c3(n=8, hidden=64, use_A=True, method='ssp', nsub=1, well_mixed=False):
 
 
 C3_DT = 0.2
+C3_CYCLE_AE = math.log(1.0 * 1.0 / 1e-3 ** 2)          # mu0_A - mu0_E = log(k1 k4 / eps^2) of hyper/gen_brusselator.py
 
 
 def c3_wired_featurizer(hg):
@@ -228,17 +230,19 @@ def c3_wired_featurizer(hg):
     return chem_featurizer(hg)
 
 
-def c3_wired(n=8, method='mprk22', nsub=8, chem_prefactor=True, well_mixed=False, nonideal_residual=False):
+def c3_wired(n=8, method='mprk22', nsub=8, chem_prefactor=True, well_mixed=False, nonideal_residual=False, known_cycle=None):
     """Brusselator C3 in the wired mode: mu = log c + mu0 (learned mu0 for X, Y), A = chemostat force of (a, b, d, e)
     plus learned chemostat mu0, log k a table over the hyperedge types, and (chem_prefactor) the chemostat mass-action
     factor in k.  With the true parameters (c3_true_wired) this is the generating model for every (a, b)."""
+    # known_cycle = v wires the standard affinity of the A -> E reservoir pair, mu0_A - mu0_E = v (true value C3_CYCLE_AE)
     kw = dict(n_sites=1) if well_mixed else dict(grid_n=n, diffusing=['X', 'Y'])
     hg = Hypergraph.reaction_transport(['X', 'Y', 'A', 'B', 'D', 'E'], C3_RX, chemostats=['A', 'B', 'D', 'E'], **kw)
     step = dict(dt_max=C3_DT / 4, theta0=0.5, theta1=0.5, max_sub=2000, t_tol=1e-12) if method == 'ssp' else dict(method=method, nsub=nsub)
     with default_dtype(torch.float64):
         m = HyperME.build_wired(hg, k_ref=1.0, T_exponent=0.0, harmonic=False, featurizer=c3_wired_featurizer(hg), step=step,
                                 learn_mu0=True, learn_chem_mu0=True, kinetics_table=True, chem_prefactor=chem_prefactor,
-                                nonideal_residual=nonideal_residual)
+                                nonideal_residual=nonideal_residual,
+                                chem_mu0_known=None if known_cycle is None else ([[1.0, 0.0, 0.0, -1.0]], [known_cycle]))
     return m.double()
 
 

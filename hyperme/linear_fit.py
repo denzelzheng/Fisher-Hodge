@@ -18,6 +18,7 @@ import itertools
 import time
 import numpy as np
 import scipy.linalg
+import scipy.optimize
 from scipy.optimize import nnls
 import torch
 
@@ -110,6 +111,10 @@ def assemble(model, tr, dt, rule='simpson', batch=16):
     G = torch.zeros(R, R, dtype=torch.float64, device=dev)
     h = torch.zeros(R, dtype=torch.float64, device=dev)
     yy = torch.zeros((), dtype=torch.float64, device=dev)
+    obs = tr.get('obs')
+    if obs is not None:                            # observed flux functionals obs = J @ obs_w.T, relative error as in train()
+        assert not fixed.any()
+        Wo = tr['obs_w'].double().to(dev)
     for s0 in range(0, B, batch):
         idx = torch.arange(s0, min(B, s0 + batch), device=dev)
         ctx = model.prepare(_take(tr['drive'], idx))
@@ -117,6 +122,14 @@ def assemble(model, tr, dt, rule='simpson', batch=16):
         ab = [model.rates(Cb[:, t], ctx) for t in range(T1)]
         a = torch.stack([x[0] for x in ab], 1).double(); b = torch.stack([x[1] for x in ab], 1).double()
         Cb = Cb.double()
+        if obs is not None:
+            yo = obs[idx].double().reshape(-1, Wo.shape[0])
+            wt = 1.0 / torch.linalg.vector_norm(yo, dim=-1)
+            Ap, Am = a.reshape(-1, hg.H) * wt[:, None], b.reshape(-1, hg.H) * wt[:, None]
+            Xo = torch.zeros(Ap.shape[0], Wo.shape[0], R, dtype=torch.float64, device=dev)
+            Xo.index_add_(2, rp_t, Ap[:, None, :] * Wo[None]); Xo.index_add_(2, rm_t, -Am[:, None, :] * Wo[None])
+            Xf, Yf = Xo.reshape(-1, R), (yo * wt[:, None]).reshape(-1)
+            G += Xf.T @ Xf; h += Xf.T @ Yf; yy += (Yf ** 2).sum()
         if rule == 'simpson':
             quad = lambda x: dt / 3 * (x[:, :-2] + 4 * x[:, 1:-1] + x[:, 2:])
             dC = Cb[:, 2:] - Cb[:, :-2]
@@ -170,6 +183,19 @@ def fit_linear(model, data, dt, rule='simpson', floor=1e-6, batch=16, log=print)
     tgt = np.log(np.maximum(kap, floor))
     delta, *_ = np.linalg.lstsq(U[free], tgt[free], rcond=1e-10)
     proj_err = float(np.abs(U[free] @ delta - tgt[free]).max()) if free.any() else 0.0
+    if proj_err > 1e-8:
+        # the classes are coupled (fewer independent directions in theta than classes, e.g. a wired standard
+        # affinity): weight the projection by the curvature of the residual, G_rr kappa_r^2, so that classes the data
+        # barely see do not dominate, then minimise the residual itself over theta
+        w = np.sqrt(np.diag(G)[free] * np.maximum(kap[free], floor) ** 2) + 1e-300
+        delta, *_ = np.linalg.lstsq(w[:, None] * U[free], w * tgt[free], rcond=1e-10)
+
+        def f(dl):
+            k = np.where(free, np.exp(U @ dl), 1.0)
+            g = (2 * (G @ k) - 2 * h) / yy
+            return res(k), U.T @ (np.where(free, k, 0.0) * g)
+        delta = scipy.optimize.minimize(f, delta, jac=True, method='L-BFGS-B', options=dict(maxiter=2000, ftol=1e-15, gtol=1e-12)).x
+        proj_err = float(np.abs(U[free] @ delta - tgt[free]).max())
     k_eff = np.where(free, np.exp(U @ delta), 1.0)
     off = 0
     for p in params:

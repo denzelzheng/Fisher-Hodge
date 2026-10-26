@@ -27,6 +27,7 @@ Typical use:
 import copy
 import math
 import numpy as np
+import scipy.linalg
 import torch
 import torch.nn as nn
 import torch.nn.functional as Fn
@@ -501,13 +502,24 @@ class WiredDrive(nn.Module):
     """A_h = s_A int_e F . dl / T + <nu+ - nu-, mu_chem> + sum_k b_k h_k / T, with mu_chem = log c_chem + mu0 / T.
     Not projected: the external force and the chemostats enter exactly (a gradient part of the force acts like a
     potential).  Learned: the global scale s_A (starts at 1) and one coefficient per harmonic cochain in
-    hg.meta['harmonic'] (start at 0)."""
-    def __init__(s, hg, harmonic=True, learn_chem_mu0=False):
+    hg.meta['harmonic'] (start at 0).
+    chem_mu0_known = (C, v): linear combinations of the chemostat standard potentials that are known physical data,
+    C mu0_chem = v (e.g. the standard affinity mu0_A - mu0_E of a reservoir pair).  They are wired: the learned
+    potentials are mu0_chem = mu_p + N z with N a basis of ker C, and only z (chem_mu0_free) is learned."""
+    def __init__(s, hg, harmonic=True, learn_chem_mu0=False, chem_mu0_known=None):
         super().__init__()
         s.hg = hg
         s.s_A = nn.Parameter(torch.tensor(1.0))
         nC = len(hg.meta.get('chemostats', []))
-        s.chem_mu0 = nn.Parameter(torch.zeros(nC)) if (learn_chem_mu0 and nC) else None
+        s.chem_mu0 = nn.Parameter(torch.zeros(nC)) if (learn_chem_mu0 and nC and chem_mu0_known is None) else None
+        s.chem_mu0_free = None
+        if chem_mu0_known is not None:
+            Cm = np.atleast_2d(np.asarray(chem_mu0_known[0], np.float64)); cv = np.atleast_1d(np.asarray(chem_mu0_known[1], np.float64))
+            assert learn_chem_mu0 and Cm.shape[1] == nC
+            s.register_buffer('mu0_p', torch.as_tensor(np.linalg.pinv(Cm) @ cv, dtype=torch.get_default_dtype()))
+            N = scipy.linalg.null_space(Cm)
+            s.register_buffer('mu0_N', torch.as_tensor(N, dtype=torch.get_default_dtype()))
+            s.chem_mu0_free = nn.Parameter(torch.zeros(N.shape[1]))
         Hm = hg.meta.get('harmonic') if harmonic else None
         if Hm is not None and Hm.shape[1]:
             s.register_buffer('Hm', torch.as_tensor(Hm, dtype=torch.get_default_dtype()))
@@ -527,10 +539,17 @@ class WiredDrive(nn.Module):
             mu = feats['chem_logc']
             if feats.get('chem_mu0') is not None:
                 mu = mu + feats['chem_mu0'] / T
-            if s.chem_mu0 is not None:
-                mu = mu + s.chem_mu0.to(mu.dtype)[None] / T
+            m0 = s.chem_mu0_value()
+            if m0 is not None:
+                mu = mu + m0.to(mu.dtype)[None] / T
             A = A + s.hg.chemostat_force(mu)
         return A
+
+    def chem_mu0_value(s):
+        """the learned chemostat standard potentials (None when they are not learned)"""
+        if s.chem_mu0_free is not None:
+            return s.mu0_p + s.mu0_N @ s.chem_mu0_free
+        return s.chem_mu0
 
 
 # ------------------------------------------------------------------------------------------ the model
@@ -560,14 +579,15 @@ class HyperME(nn.Module):
     @classmethod
     def build_wired(cls, hg, hidden=32, k_ref=1.0, T_exponent=1.0, nonideal='none', charges=None, harmonic=True,
                     featurizer=None, step=None, learn_mu0=False, learn_chem_mu0=False, kinetics_table=False,
-                    chem_prefactor=True, kinetics_core='type', kinetics_split=True, nonideal_residual=False, rho_scale=1.0):
+                    chem_prefactor=True, kinetics_core='type', kinetics_split=True, nonideal_residual=False, rho_scale=1.0,
+                    chem_mu0_known=None):
         """kinetics_table=True: log k is the core table alone (no feature residual); kinetics_core='edge': one log rate
         per hyperedge; nonideal_residual=True: dmu = family + gated monotone residual (see WiredFreeEnergy)."""
         feat = featurizer or wired_featurizer(hg)
         kin = WiredKinetics(feat.n_edge_sym, hidden, k_ref=k_ref, T_exponent=T_exponent, hg=hg, table=kinetics_table,
                             chem_prefactor=chem_prefactor, core=kinetics_core, split=kinetics_split)
         fe = WiredFreeEnergy(hg, nonideal, charges, learn_mu0, residual=nonideal_residual, rho_scale=rho_scale)
-        dr = WiredDrive(hg, harmonic, learn_chem_mu0)
+        dr = WiredDrive(hg, harmonic, learn_chem_mu0, chem_mu0_known)
         return cls(hg, fe, kin, dr, feat, step)
 
     @classmethod
@@ -591,7 +611,7 @@ class HyperME(nn.Module):
         if s.mode != 'wired':
             return []
         out = [s.kinetics.core]
-        out += [p for p in (s.free_energy.mu0, s.drive.chem_mu0) if p is not None]
+        out += [p for p in (s.free_energy.mu0, s.drive.chem_mu0, s.drive.chem_mu0_free) if p is not None]
         return out
 
     def fit_linear(s, data, dt, **kw):

@@ -255,6 +255,25 @@ Three things follow from the rule, and each has a number behind it (`results/`, 
 
 Five undriven relaxation trajectories at chemostat settings where both cycle affinities vanish, 9 percent of the training set, recover the reverse rates of two reactions, but the entropy production error stays near 0.3. The reverse of a third reaction balances only when Y is a thousand times rarer than X, and the split of the X decay between two channels is invisible in any concentration data. What the driven data do support is a lower bound, since the smallest entropy production among the models that fit within 10 percent of the best fit is 0.58 of the true value and the true value lies above it at every test point (`results/c3_equilibrium_anchor.md`).
 
+## Comparison with published methods
+
+The baselines above (Flux-GNN, GNN-ODE, the Euclidean gradient flow, the reversible free-energy model, the CRNN) are our own ablations. This section compares against one published method from each of four families, under one protocol: the same training data, the same number of gradient steps, and the default hyperparameters of each method. GENERIC-FNO and the non-reciprocal GNN are our own implementations from the papers (`fisher_hodge/ext/`), because their code has no usable license. HelmFluid and NEEP use the authors' code, which is not included here. Tables and adaptation notes are in `runs/external/`.
+
+**Density tasks.** Relative L2 error at 10T, median over 16 test trajectories, two seeds.
+
+| Method | S2 ID | S2 new potential | S2 drive ×4 | C3 ID | C3 OOD | C5 ID | C5 OOD |
+|---|---|---|---|---|---|---|---|
+| This work (wired) | 0.0035 | 0.022 | 0.041 | 0.0026 | 0.0032 | 0.030 | 0.127 |
+| HelmFluid (Xing et al., ICML 2024) | 0.27 | 0.52 | 0.36 | n/a | n/a | n/a | n/a |
+| GENERIC-FNO (Sulskis and Ravi, 2026) | 1.5 to 2.6 | 1.2 to 1.9 | 1.6 to 3.0 | 0.73 | 0.71 | 1.12 | 0.56 |
+| No change, u(t) = u(0) | 1.91 | 1.50 | 2.14 | 0.73 | 0.71 | 1.12 | 0.56 |
+
+HelmFluid is a transport model, so the reaction tasks do not apply. It produces negative densities on 4 to 14 of 16 trajectories and loses 19 to 42 percent of the mass. GENERIC-FNO assumes a closed system, as its authors state. Its normalisation layers keep the spatial mean of every update at zero, so it cannot change total concentrations and reduces to the identity on the reaction tasks. On its own heat task our implementation matches the reported rollout error (0.10 against 0.092). Most of our margin here comes from the model class: the untrained wired model already reaches 0.0041 on S2.
+
+**Entropy production from trajectories, against NEEP (Kim et al., PRL 2020).** On NEEP's flashing ratchet with equal data, both methods have 3.4 percent error with one trajectory, and with 4, 16 and 64 trajectories ours is 1.1, 0.8 and 0.2 percent against 1.7, 1.4 and 0.5 percent. On a phosphorylation cycle with channel labels ours is 1.5 to 0.1 percent and NEEP 32 to 1.4 percent. When the ATP drive doubles, ours predicts the new entropy production without new data to 0.1 percent, while NEEP retrained on new data stays at 18 to 26 percent. When only the state is observed, a birth-death chain has zero entropy production, so NEEP and direct counting both report zero. Ours reports the correct value because the chemostat potentials are wired in.
+
+**Collective motion, against the non-reciprocal GNN (Uwamichi et al., NeurIPS 2024).** We bin the two-species particle system into 16 × 16 × 2 densities. The GNN works on particles and is aggregated afterwards. The density errors at 10T are close (0.705 against 0.719 in distribution, 0.726 against 0.678 at a new species ratio, noise floor 0.633). The GNN predicts the flux much better (error 0.46 against 0.96) and reproduces the rotation of clusters (correlation 0.86 against 0). The rotation is carried by particle orientation, which a scalar density does not contain. This marks where a density model stops being the right representation. Our GNN reached the best validation loss at epoch 3014 and then diverged, against 20000 epochs in the paper, so it is partly trained.
+
 ## Layout
 
 ```

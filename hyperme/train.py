@@ -22,6 +22,9 @@ def take(drive, idx):
 
 
 def train(model, tr, iters, seed, dt, batch=8, lr=1e-3, kmin=4, kmax=8, log=print, legacy_steps=False):
+    """rollout training.  If tr has 'obs' (B, T+1, k) and 'obs_w' (k, H), the observables obs = J @ obs_w.T (linear
+    functionals of the net fluxes, e.g. the turnover of a reservoir) add their relative error to the loss with weight 1."""
+    obs, Wo = tr.get('obs'), tr.get('obs_w')
     rng = np.random.default_rng(10_000 + seed)
     C = tr['c']; ntr = C.shape[0]
     opt = torch.optim.Adam(model.parameters(), lr=lr)
@@ -41,6 +44,10 @@ def train(model, tr, iters, seed, dt, batch=8, lr=1e-3, kmin=4, kmax=8, log=prin
             ns = ns + (n.float().mean() if torch.is_tensor(n) else n)
             y = C[idx, st + k]
             loss = loss + (((c - y) ** 2).sum(-1) / (y ** 2).sum(-1)).mean()
+            if obs is not None:
+                a, b = model.rates(c, ctx)
+                yo = obs[idx, st + k]
+                loss = loss + ((((a - b) @ Wo.T - yo) ** 2).sum(-1) / (yo ** 2).sum(-1)).mean()
         loss = loss / K
         subs.append(ns / K)
         if not torch.isfinite(loss):
