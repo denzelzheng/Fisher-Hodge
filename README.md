@@ -1,6 +1,6 @@
 # Fisher–Hodge
 
-Learning where a material sits on the manifold of thermodynamic generators.
+**Physics-as-Coordinates: Thermodynamic Neural Charts.** Learning where a material sits on the manifold of thermodynamic generators.
 
 ## The idea
 
@@ -18,7 +18,7 @@ The two coordinates play different roles.
 - **`f` is fixed by thermodynamics.** Local detailed balance makes `f` a linear function of the chemical potentials, the temperature, the external field and the chemostat concentrations. These conditions are the natural parameters of an exponential family, so they are known coordinates on the manifold.
 - **`k` is where the material enters.** Under the same conditions two materials differ only in `k`. It sets the Onsager coefficient `Λ(a, b) = (a − b) / (log a − log b)`, which is the metric of the manifold.
 
-A Fisher–Hodge model is a map from a local material descriptor `ξ` to `k(ξ)`. Joined with the thermodynamic coordinates `f(θ)` of the conditions `θ`, it lands on one point of the manifold, which is a complete generator. The network never sees coordinates in space. It sees the local microstructure and returns a transport or reaction coefficient, a learned constitutive law.
+A thermodynamic neural chart is a map from a local material descriptor `ξ` to `k(ξ)`. Joined with the thermodynamic coordinates `f(θ)` of the conditions `θ`, it lands on one point of the manifold, which is a complete generator. The network never sees coordinates in space. It sees the local microstructure and returns a transport or reaction coefficient, a learned constitutive law.
 
 The usual question in scientific machine learning is how to learn a dynamics. The question here is where a material sits on a manifold that thermodynamics has already laid out. Once the point is right, the structure of the manifold comes with it.
 

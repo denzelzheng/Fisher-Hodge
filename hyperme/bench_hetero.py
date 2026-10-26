@@ -797,7 +797,8 @@ class UDEClosure(nn.Module):
 
     def rates(s, c, drive):
         J = s.flux(c, drive)
-        return Fn.relu(J), Fn.relu(-J)
+        a = J.clamp_min(0)
+        return a, a - J                     # one-way parts with a - b = J exactly (also in the gradient at J = 0)
 
     def forward(s, c, drive):
         return s.hg.apply_S(s.flux(c, drive))
