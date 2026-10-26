@@ -1,23 +1,39 @@
-# Fisher–Hodge operators
+# Fisher–Hodge
 
-Neural operators for density dynamics on graphs and meshes, written in the geometry the densities live in.
+Learning where a material sits on the manifold of thermodynamic generators.
 
-A density field on a graph evolves by moving mass along edges. We write the learned dynamics as a discrete Wasserstein gradient flow of a learned free energy, plus a learned circulation term and a learned reaction term:
+## The idea
+
+Fix the network of possible events: which species exist, how they react, and which sites they can move between. Call this hypergraph `S`. Every stochastic dynamics on `S` that obeys local detailed balance is a point on one manifold of generators. On each hyperedge the pair of forward and backward rates `(a, b)` is the same information as the pair
 
 ```
-dρ/dt = − dᵀ Θ(ρ) d μ_θ(ρ)   −   dᵀ ( Θ(ρ) c_θ )   −   ρ ⊙ r_θ(ρ)
-          gradient flow            circulation           reaction
+f = log(a / b)        the thermodynamic force
+k = sqrt(a · b)       the symmetric kinetic factor
 ```
 
-Here `d` is the fixed incidence matrix of the graph (node to edge), `Θ(ρ)` is the edge mobility given by the logarithmic mean of the two endpoint densities times a learned edge coefficient, and `μ_θ = ∂F_θ/∂ρ` is the chemical potential of a learned free energy `F_θ`. The first term is the Maas metric form of a Fokker–Planck equation. The second term lives in the cycle space of the graph and carries non-equilibrium circulation. The third term is a Fisher–Rao reaction written as an Otto flux to a reservoir node, which reduces to logistic growth when `F` is the entropy.
+so that `a = k e^{f/2}` and `b = k e^{-f/2}`.
 
-Three properties hold for every parameter value, so training never has to learn them:
+The two coordinates play different roles.
 
-- Total mass is conserved, because `1ᵀ dᵀ = 0`.
-- Densities stay positive, because the logarithmic-mean mobility vanishes at zero density.
-- The free energy decreases along the flow, `dF/dt = −‖d μ‖²_Θ ≤ 0`.
+- **`f` is fixed by thermodynamics.** Local detailed balance makes `f` a linear function of the chemical potentials, the temperature, the external field and the chemostat concentrations. These conditions are the natural parameters of an exponential family, so they are known coordinates on the manifold.
+- **`k` is where the material enters.** Under the same conditions two materials differ only in `k`. It sets the Onsager coefficient `Λ(a, b) = (a − b) / (log a − log b)`, which is the metric of the manifold.
 
-The operator `dᵀ Θ d` is a weighted Hodge Laplacian whose edge metric is the Otto metric of the current density. This repository contains the mechanism experiments, the Markov-chain analysis and the scripts that make the figures below.
+A Fisher–Hodge model is a map from a local material descriptor `ξ` to `k(ξ)`. Joined with the thermodynamic coordinates `f(θ)` of the conditions `θ`, it lands on one point of the manifold, which is a complete generator. The network never sees coordinates in space. It sees the local microstructure and returns a transport or reaction coefficient, a learned constitutive law.
+
+The usual question in scientific machine learning is how to learn a dynamics. The question here is where a material sits on a manifold that thermodynamics has already laid out. Once the point is right, the structure of the manifold comes with it.
+
+| Structure of the manifold | What every model on it inherits |
+|---|---|
+| `f` is a natural-parameter coordinate | a change of temperature, field or chemostat moves along a known coordinate, so the model extrapolates across conditions without retraining |
+| `Λ ≥ 0` on every hyperedge | the second law holds edge by edge for any learned law, with no penalty term |
+| the flux `J = 2k sinh(f/2)` is linear in `k` | fitting `k` is a convex problem, and which parts of `k` the data determine is given by a theorem |
+| the cycle space `ker S` | densities cannot see currents in it, and the theorem says which observation closes each blind direction |
+| closure under merging of states | a trained model can be coarse-grained in closed form |
+| the dissipation functional | minimum-dissipation control and inverse design |
+
+Theorem 0 in `results/theory_notes.md` states the converse under the assumption of local detailed balance. Among gray-box models whose learned part does not read the conditions, the only split that gives the second law by construction, exact transfer across conditions and a convex fit at once is this one: fix `f` by thermodynamics and learn `k`. The manifold itself is known structure from stochastic thermodynamics. What is new is to pose learning as placing a material on it.
+
+The rest of this file follows the order in which the work was done. The first round studies transport on a grid. Later rounds generalise to reactions on hypergraphs, compare with published methods and test materials the model has not seen.
 
 ## What the figures show
 
@@ -251,7 +267,7 @@ Three things follow from the rule, and each has a number behind it (`results/`, 
 
 **What the structure does not buy.** In distribution and with enough data the black-box master equation is as accurate. Occupancy fluctuations and the fluctuation theorem hold for any Markov process, so they do not separate the models. The affinity of a reaction whose reverse rate is one percent of the forward rate is limited by the Cramér–Rao bound `Var(Â) ≥ 1/(aT) + 1/(bT)` when the prefactor is unknown, and no method recovers it from densities. A free learned nonlinearity in the free energy destroys both identifiability and extrapolation. The proofs of the identifiability statement, the bound, the coarse-graining rule and the extrapolation rule are in `results/theory_notes.md`.
 
-**Training from scratch needs no curriculum.** The runs above started the crowding system from the ideal fit and stalled on the Brusselator from a neutral start. Both were optimisation problems, and the fix belongs to the model, not to the training protocol. In the wired mode the chemical potential and the force are wired, so the rate constants enter the rates linearly. Fitting them to the training trajectories is a non-negative least-squares problem with a global optimum, and `model.fit()` solves it in closed form before the usual rollout training. The corrections, the non-ideal term and the feature dependence of the rates, sit behind gates that start at zero. The model therefore starts as its core, and at first only the gates receive a gradient. Every model then gets the same 2000 Adam iterations with the same integrator, and the CRNN baseline gets the same closed-form step. On the Brusselator the error on unseen drive strengths falls from 12 percent to 0.3 percent, below the 0.7 percent of the true constants under the same integrator. On the crowding Schlögl system the minimum that switched the reactions off is gone. The model reaches 0.25 percent in distribution and 3.6 percent out of distribution, and its learned activity curve lies on the true one (RMSE 0.009, slope 1.01). The earlier warm start needed three times the iterations for 0.67 and 11.5 percent. The mass-action CRNN with the same step reaches 0.3 percent on the Brusselator, level with the wired model, and stays at 17 and 52 percent on the crowding system. The entropy production of the Brusselator is still off by 22 to 28 percent, because two channels that both remove X at a rate proportional to x cannot be told apart from concentrations. Details are in `results/convex_training.md`.
+**Training from scratch needs no curriculum.** The runs above started the crowding system from the ideal fit and stalled on the Brusselator from a neutral start. Both were optimisation problems. The fix belongs to the model, and the training protocol stays the same for every method. In the wired mode the chemical potential and the force are wired, so the rate constants enter the rates linearly. Fitting them to the training trajectories is a non-negative least-squares problem with a global optimum, and `model.fit()` solves it in closed form before the usual rollout training. The corrections, the non-ideal term and the feature dependence of the rates, sit behind gates that start at zero. The model therefore starts as its core, and at first only the gates receive a gradient. Every model then gets the same 2000 Adam iterations with the same integrator, and the CRNN baseline gets the same closed-form step. On the Brusselator the error on unseen drive strengths falls from 12 percent to 0.3 percent, below the 0.7 percent of the true constants under the same integrator. On the crowding Schlögl system the minimum that switched the reactions off is gone. The model reaches 0.25 percent in distribution and 3.6 percent out of distribution, and its learned activity curve lies on the true one (RMSE 0.009, slope 1.01). The earlier warm start needed three times the iterations for 0.67 and 11.5 percent. The mass-action CRNN with the same step reaches 0.3 percent on the Brusselator, level with the wired model, and stays at 17 and 52 percent on the crowding system. The entropy production of the Brusselator is still off by 22 to 28 percent, because two channels that both remove X at a rate proportional to x cannot be told apart from concentrations. Details are in `results/convex_training.md`.
 
 Five undriven relaxation trajectories at chemostat settings where both cycle affinities vanish, 9 percent of the training set, recover the reverse rates of two reactions, but the entropy production error stays near 0.3. The reverse of a third reaction balances only when Y is a thousand times rarer than X, and the split of the X decay between two channels is invisible in any concentration data. What the driven data do support is a lower bound, since the smallest entropy production among the models that fit within 10 percent of the best fit is 0.58 of the true value and the true value lies above it at every test point (`results/c3_equilibrium_anchor.md`).
 
