@@ -234,7 +234,7 @@ def c3_wired_featurizer(hg):
     return feat
 
 
-def c3_wired(n=8, method='mprk22', nsub=8, chem_prefactor=True, well_mixed=False):
+def c3_wired(n=8, method='mprk22', nsub=8, chem_prefactor=True, well_mixed=False, nonideal_residual=False):
     """Brusselator C3 in the wired mode: mu = log c + mu0 (learned mu0 for X, Y), A = chemostat force of (a, b, d, e)
     plus learned chemostat mu0, log k a table over the hyperedge types, and (chem_prefactor) the chemostat mass-action
     factor in k.  With the true parameters (c3_true_wired) this is the generating model for every (a, b)."""
@@ -243,7 +243,8 @@ def c3_wired(n=8, method='mprk22', nsub=8, chem_prefactor=True, well_mixed=False
     step = dict(dt_max=C3_DT / 4, theta0=0.5, theta1=0.5, max_sub=2000, t_tol=1e-12) if method == 'ssp' else dict(method=method, nsub=nsub)
     with default_dtype(torch.float64):
         m = HyperME.build_wired(hg, k_ref=1.0, T_exponent=0.0, harmonic=False, featurizer=c3_wired_featurizer(hg), step=step,
-                                learn_mu0=True, learn_chem_mu0=True, kinetics_table=True, chem_prefactor=chem_prefactor)
+                                learn_mu0=True, learn_chem_mu0=True, kinetics_table=True, chem_prefactor=chem_prefactor,
+                                nonideal_residual=nonideal_residual)
     return m.double()
 
 
@@ -262,8 +263,7 @@ def c3_true_wired(model, k=(1.0, 1.0, 1.0, 1.0), eps=1e-3, DX=0.4, DY=3.6):
     assert torch.allclose(nu @ mu0, x, atol=1e-12)
     model.free_energy.mu0.copy_(mu0[:2]); model.drive.chem_mu0.copy_(mu0[2:])
     lk = torch.cat([0.5 * torch.log(torch.as_tensor(k, dtype=torch.float64) * eps), torch.log(torch.tensor([DX, DY], dtype=torch.float64))])
-    W = model.kinetics.mlp.net[0].weight
-    W.copy_(lk[None, :W.shape[1]])
+    model.kinetics.core.copy_(lk)
     return model
 
 
@@ -295,4 +295,92 @@ def load_c3(root=ROOT, device='cpu', name='brus'):
     return out
 
 
-PRESETS = dict(s2_tcme=(s2_tcme, load_s2), s2_wired=(s2_wired, load_s2), c1=(c1, load_c1), c3=(c3, load_c3), c3_wired=(c3_wired, load_c3))
+# ------------------------------------------------------------------------------------------ C2 / C5 Schlogl
+C2_RX = [({'A': 1, 'X': 2}, {'X': 3}), ({'X': 1}, {'B': 1})]
+C2_DT = 0.05
+C2_TRUE = dict(kf=(1.0, 5.0), kb=(0.5, 1.0), D=(1.0,))       # hyper/gen_schlogl.py: k1, k2; k1', k2'; D
+
+
+def schlogl_hg(n=8):
+    """A + 2X <-> 3X, X <-> B at every site of the n x n torus, X diffuses, A and B chemostatted (hyper/gen_schlogl.py)."""
+    return Hypergraph.reaction_transport(['X', 'A', 'B'], C2_RX, grid_n=n, diffusing=['X'], chemostats=['A', 'B'])
+
+
+def chem_featurizer(hg):
+    """drive = dict(logab (B, k) raw log concentrations of the first k chemostats; the others are at 1) -> wired
+    features with chem_logc and the hyperedge type as the only kinetic feature."""
+    from .model import wired_featurizer
+    base, nC = wired_featurizer(hg), len(hg.meta['chemostats'])
+
+    def feat(F):
+        lab = F['logab']
+        if lab.shape[1] < nC:
+            lab = torch.cat([lab, torch.zeros(lab.shape[0], nC - lab.shape[1], dtype=lab.dtype, device=lab.device)], -1)
+        return base(dict(chem_logc=lab))
+    feat.n_edge_sym = base.n_edge_sym
+    return feat
+
+
+def schlogl_wired(n=8, method='mprk22', nsub=8, nonideal_residual=True, split=False):
+    """Schlogl C2 (ideal) and C5 (crowding) in the wired mode: mu = log x + mu0 + s_mu r(x) (gated monotone residual,
+    zero at initialisation), A = chemostat force with learned chemostat mu0, log k a table over the 3 hyperedge types,
+    activity-form rates (split=False, the rate law of hyper/crn2.HyperME2).  The same model for both benchmarks."""
+    hg = schlogl_hg(n)
+    step = dict(dt_max=C2_DT / 4, theta0=0.5, theta1=0.5, max_sub=2000, t_tol=1e-12) if method == 'ssp' else dict(method=method, nsub=nsub)
+    with default_dtype(torch.float64):
+        m = HyperME.build_wired(hg, k_ref=1.0, T_exponent=0.0, harmonic=False, featurizer=chem_featurizer(hg), step=step,
+                                learn_mu0=True, learn_chem_mu0=True, kinetics_table=True, kinetics_split=split,
+                                nonideal_residual=nonideal_residual)
+    return m.double()
+
+
+def crnn_chem(hg, method='mprk22', nsub=8):
+    """CRNN-chem: independent forward / backward rate constants, a log table over the hyperedge types, chemostats as
+    exact mass-action factors (the oracle class for ideal mass action), Patankar time stepping like the wired model."""
+    from .baselines import CRNN
+    f = chem_featurizer(hg)
+    with default_dtype(torch.float64):
+        m = CRNN(hg, f.n_edge_sym, f, oriented=False, chem=True, table=True, step=dict(method=method, nsub=nsub))
+    return m.double()
+
+
+def mass_action_rates(hg, logab, c, kf, kb, D):
+    """one-way rates of an ideal reaction-transport generator: reaction r forward kf_r (x its chemostat reactants),
+    backward kb_r (x its chemostat products), transport of the d-th diffusing species D_d both ways."""
+    typ = torch.as_tensor(hg.meta['typ'])
+    kF = torch.tensor(list(kf) + list(D), dtype=torch.float64)[typ]
+    kB = torch.tensor(list(kb) + list(D), dtype=torch.float64)[typ]
+    nC = len(hg.meta['chemostats'])
+    lc = torch.cat([logab, torch.zeros(logab.shape[0], nC - logab.shape[1], dtype=logab.dtype)], -1).repeat_interleave(hg.V, 1)
+    Yp = torch.as_tensor(hg.meta['chem_Np'].toarray()); Ym = torch.as_tensor(hg.meta['chem_Nm'].toarray())
+    return (kF * torch.exp(lc @ Yp.T) * hg.mass_action(c, '+'), kB * torch.exp(lc @ Ym.T) * hg.mass_action(c, '-'))
+
+
+@torch.no_grad()
+def set_true_mass_action(model, kf, kb, D, logab=None):
+    """set the linear parameters of a wired or CRNN-chem model to an ideal mass-action generator (exact when the class
+    contains it; returns the largest log-rate error at a random state)."""
+    from .linear_fit import set_to_rates
+    hg = model.hg
+    g = torch.Generator().manual_seed(1)
+    c = torch.rand(1, hg.M, generator=g, dtype=torch.float64) + 0.5
+    logab = torch.tensor([[0.3, -0.2]], dtype=torch.float64) if logab is None else logab
+    a, b = mass_action_rates(hg, logab, c, kf, kb, D)
+    return set_to_rates(model, c, dict(logab=logab), a[0], b[0])
+
+
+def load_schlogl(root=ROOT, device='cpu', name='schlogl'):
+    """C2 (name='schlogl') or C5 (name='schlogl_ni'): train / test_id / test_ood (/ test_front), c (B, T + 1, 64)."""
+    return load_c3(root, device, name)
+
+
+def c5_wired(**kw):
+    return schlogl_wired(**kw)
+
+
+def load_c5(root=ROOT, device='cpu'):
+    return load_schlogl(root, device, 'schlogl_ni')
+
+
+PRESETS = dict(s2_tcme=(s2_tcme, load_s2), s2_wired=(s2_wired, load_s2), c1=(c1, load_c1), c3=(c3, load_c3), c3_wired=(c3_wired, load_c3),
+               c2_wired=(schlogl_wired, load_schlogl), c5_wired=(c5_wired, load_c5))

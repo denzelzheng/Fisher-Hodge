@@ -4,6 +4,8 @@ hyper/train_c23.py: multi-step rollout loss with K in [kmin, kmax], Adam, cosine
     python -m hyperme.train --problem c1 --seed 0 --iters 2000 --out runs/hyperme
     python -m hyperme.train --problem s2_tcme --seed 0 --iters 2500 --device cuda --out runs/hyperme
     python -m hyperme.train --problem c3 --seed 0 --method mprk22 --nsub 1      (Patankar integrator)
+Models with a linear part (the wired presets, CRNN with a rate table) first get the closed-form least-squares fit of
+hyperme.linear_fit (skip with --no_linear_init); the rollout training is the same for every model.
 Writes <out>/<problem><tag>_s<seed>.json (and .pt, .log)."""
 import argparse, json, os, time
 import numpy as np
@@ -11,8 +13,8 @@ import torch
 from .presets import PRESETS, T_TRAIN, ROOT
 
 EVAL_SETS = dict(s2_tcme=['test_id', 'test_oodpot', 'test_oodinit'], s2_wired=['test_id', 'test_oodpot', 'test_oodinit'], c1=['test_id', 'test_oodG', 'test_oodU'],
-                 c3=['test_id', 'test_ood'], c3_wired=['test_id', 'test_ood'])
-DTS = dict(s2_tcme=0.05, s2_wired=0.05, c1=0.05, c3=0.2, c3_wired=0.2)
+                 c3=['test_id', 'test_ood'], c3_wired=['test_id', 'test_ood'], c2_wired=['test_id', 'test_ood'], c5_wired=['test_id', 'test_ood'])
+DTS = dict(s2_tcme=0.05, s2_wired=0.05, c1=0.05, c3=0.2, c3_wired=0.2, c2_wired=0.05, c5_wired=0.05)
 
 
 def take(drive, idx):
@@ -51,7 +53,8 @@ def train(model, tr, iters, seed, dt, batch=8, lr=1e-3, kmin=4, kmax=8, log=prin
             log(f'it {it:5d} loss {np.mean(hist[-100:]):.4e} gnorm {float(gn):.2e} K {K} '
                 f'substeps/DT {float(np.mean([float(x) for x in subs[-100:]])):.1f} skipped {nskip} t {time.time() - t0:.0f}s')
     return dict(train_time_s=time.time() - t0, final_train_loss=float(np.mean(hist[-100:])) if hist else None, train_nskip=nskip,
-                train_substeps_per_DT=float(np.mean([float(x) for x in subs])) if subs else None)
+                train_substeps_per_DT=float(np.mean([float(x) for x in subs])) if subs else None,
+                loss_curve=[float(np.mean(hist[i:i + 100])) for i in range(0, len(hist), 100)])
 
 
 @torch.no_grad()
@@ -81,7 +84,7 @@ def evaluate(problem, model, data, sets=None):
     for name in sets or EVAL_SETS[problem]:
         sd = data[name]; Y = sd['c']
         t0 = time.time()
-        R, ns, smin = rollout(model, sd['drive'], Y[:, 0], Y.shape[1] - 1, DTS[problem], sigma=problem.startswith('c3'))
+        R, ns, smin = rollout(model, sd['drive'], Y[:, 0], Y.shape[1] - 1, DTS[problem], sigma=problem[:2] in ('c2', 'c3', 'c5'))
         S = dict(infer_time_s=time.time() - t0, substeps_per_DT=ns, min_c=float(R.min()),
                  n_traj_negative=int((R.flatten(1) < 0).any(1).sum()))
         if problem == 'c1':
@@ -96,15 +99,16 @@ def evaluate(problem, model, data, sets=None):
                 S['mass_err_max'] = float((R.mean(-1) - 1.0).abs().max())
             else:
                 S['sigma_min'] = smin
-                h = np.asarray(sd['homog']).astype(bool)
-                S['relerr_10T_median_homog'] = float(np.median(e[h, -1])); S['relerr_10T_median_spatial'] = float(np.median(e[~h, -1]))
+                if 'homog' in sd:
+                    h = np.asarray(sd['homog']).astype(bool)
+                    S['relerr_10T_median_homog'] = float(np.median(e[h, -1])); S['relerr_10T_median_spatial'] = float(np.median(e[~h, -1]))
         S['relerr_median'] = {str(t): float(np.median(e[:, t])) for t in (20, 40, 100, 200) if t < e.shape[1]}
         S['relerr_10T_per_traj'] = e[:, -1].tolist()
         res[name] = S
     return res
 
 
-def run(problem, seed, iters, device, out, legacy_steps=False, sets=None, tag='', ntrain=0, lr=1e-3, **preset_kw):
+def run(problem, seed, iters, device, out, legacy_steps=False, sets=None, tag='', ntrain=0, lr=1e-3, linear_init=True, **preset_kw):
     from .gpu_guard import require_free
     require_free(device)
     build, load = PRESETS[problem]
@@ -119,7 +123,8 @@ def run(problem, seed, iters, device, out, legacy_steps=False, sets=None, tag=''
         s = ' '.join(str(x) for x in a); print(s, flush=True); logf.write(s + '\n'); logf.flush()
     log(f'{name}: params={sum(p.numel() for p in model.parameters())} iters={iters} lr={lr} device={device} preset={preset_kw}')
     tr = data['train'] if ntrain <= 0 else dict(c=data['train']['c'][:ntrain], drive={k: v[:ntrain] for k, v in data['train']['drive'].items()})
-    info = train(model, tr, iters, seed, DTS[problem], lr=lr, log=log, legacy_steps=legacy_steps)
+    from .linear_fit import fit
+    info = fit(model, dict(train=tr), iters, DTS[problem], seed=seed, linear_init=linear_init, lr=lr, log=log, legacy_steps=legacy_steps)
     torch.save(model.state_dict(), os.path.join(out, name + '.pt'))
     model.eval()
     ev = evaluate(problem, model, data, sets)
@@ -128,7 +133,7 @@ def run(problem, seed, iters, device, out, legacy_steps=False, sets=None, tag=''
                  f' | mass {v["mass_err_max"]:.1e}' if 'mass_err_max' in v else f' | sigma min {v["sigma_min"]:.2e}')
         log(f'[{k}] relerr@T,2T,5T,10T median = ' + ', '.join(f'{x:.3e}' for x in v['relerr_median'].values())
             + f' | min c {v["min_c"]:.2e}' + extra + f' | substeps {v["substeps_per_DT"]:.1f} | infer {v["infer_time_s"]:.1f}s')
-    res = dict(problem=problem, seed=seed, iters=iters, lr=lr, preset=preset_kw, **info, sets=ev)
+    res = dict(problem=problem, seed=seed, iters=iters, lr=lr, linear_init=linear_init, preset=preset_kw, **info, sets=ev)
     json.dump(res, open(os.path.join(out, name + '.json'), 'w'))
     return res
 
@@ -145,13 +150,14 @@ if __name__ == '__main__':
     p.add_argument('--ntrain', type=int, default=0, help='>0: use only the first ntrain training trajectories')
     p.add_argument('--lr', type=float, default=1e-3)
     p.add_argument('--no_chem_prefactor', action='store_true', help='c3_wired only: chemostats enter the force but not k')
+    p.add_argument('--no_linear_init', action='store_true', help='skip the closed-form least-squares step of fit()')
     a = p.parse_args()
-    iters = a.iters or dict(s2_tcme=2500, s2_wired=2500, c1=2000, c3=2000, c3_wired=2000)[a.problem]
+    iters = a.iters or dict(s2_tcme=2500, s2_wired=2500, c1=2000, c3=2000, c3_wired=2000, c2_wired=2000, c5_wired=2000)[a.problem]
     if a.device == 'cpu':
         torch.set_num_threads(a.threads)
     kw = dict(method=a.method, nsub=a.nsub) if a.method else {}
     if a.no_chem_prefactor:
         kw['chem_prefactor'] = False
     tag = ((f'_{a.method}{a.nsub}' if a.method else '') + (f'_n{a.ntrain}' if a.ntrain > 0 else '')
-           + (f'_lr{a.lr:g}' if a.lr != 1e-3 else '') + ('_nochemk' if a.no_chem_prefactor else ''))
-    run(a.problem, a.seed, iters, a.device, a.out, a.legacy_steps, tag=tag, ntrain=a.ntrain, lr=a.lr, **kw)
+           + (f'_lr{a.lr:g}' if a.lr != 1e-3 else '') + ('_nochemk' if a.no_chem_prefactor else '') + ('_nolin' if a.no_linear_init else ''))
+    run(a.problem, a.seed, iters, a.device, a.out, a.legacy_steps, tag=tag, ntrain=a.ntrain, lr=a.lr, linear_init=not a.no_linear_init, **kw)

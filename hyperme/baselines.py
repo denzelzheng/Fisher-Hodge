@@ -161,8 +161,10 @@ class GNNODE(_Base):
 class CRNN(_Base):
     name = 'crnn'
 
-    def __init__(s, hg, n_edge_in, featurizer=None, hidden=64, scale=1.0, nsub=8, oriented=True, chem=False, table=False):
+    def __init__(s, hg, n_edge_in, featurizer=None, hidden=64, scale=1.0, nsub=8, oriented=True, chem=False, table=False,
+                 step=None):
         super().__init__(hg, featurizer, 1.0, nsub, scale)
+        s.step = step                          # None: fixed Heun substeps; dict(method='mprk22', nsub=8): Patankar
         s.oriented = oriented                  # False: hyperedge features only (hyper/crn2.py CRNN2), n_edge_in excludes ori
         s.chem = chem                          # True: chemostat concentrations enter as exact mass-action factors
         s.table = table                        # True: log kf, log kb linear in the features (a table for one-hot types)
@@ -199,6 +201,20 @@ class CRNN(_Base):
     def cycle_affinity(s, drive):
         ctx = s.context(drive)
         return s.hg.project_cycles(torch.log(ctx['kf'] / ctx['kb']))
+
+    def advance(s, c, drive, Dt, **kw):
+        if s.step is None or s.step.get('method', 'heun') == 'heun':
+            return heun_fixed(s, c, s.context(drive), Dt, s.nsub)
+        from .integrators import mprk
+        return mprk(s, c, s.context(drive), Dt, nsub=s.step.get('nsub', 1), order=2 if s.step['method'] == 'mprk22' else 1)
+
+    def linear_parameters(s):
+        """with table=True log kf and log kb are linear in the table: the closed-form fit applies"""
+        return [s.kmlp.weight] if s.table else []
+
+    def fit_linear(s, data, dt, **kw):
+        from .linear_fit import fit_linear
+        return fit_linear(s, data, dt, **kw)
 
 
 class JKOReversible(_Base):

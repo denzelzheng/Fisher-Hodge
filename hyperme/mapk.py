@@ -278,24 +278,7 @@ def evaluate(model, data, hg):
     return res
 
 
-def warm_start(model, tr, iters, log, lr=2e-2):
-    """one-step derivative matching: dc/dt of the model at the midpoint of consecutive snapshots against the finite
-    difference (c_{t+1} - c_t) / DT, relative squared error, full batch, no integrator.  Uses only training data."""
-    C = tr['c']; B, T1, M = C.shape
-    mid = 0.5 * (C[:, 1:] + C[:, :-1]); tgt = (C[:, 1:] - C[:, :-1]) / DT
-    drive = {k: v.repeat_interleave(T1 - 1, 0) for k, v in tr['drive'].items()}
-    x, y = mid.reshape(-1, M), tgt.reshape(-1, M)
-    opt = torch.optim.Adam(model.parameters(), lr=lr)
-    t0 = time.time()
-    for it in range(iters):
-        ctx = model.prepare(drive)
-        loss = (((model.rhs(x, ctx) - y) ** 2).sum(-1) / (y ** 2).sum(-1)).mean()
-        opt.zero_grad(); loss.backward(); torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0); opt.step()
-        if it % 200 == 0 or it == iters - 1:
-            log(f'warm {it:5d} derivative loss {float(loss):.4e} t {time.time() - t0:.0f}s')
-
-
-def stage_train(kind, seed=0, iters=2000, device='cpu', lr=1e-3, tag='', warm=0):
+def stage_train(kind, seed=0, iters=2000, device='cpu', lr=1e-3, tag=''):
     from .train import train
     torch.manual_seed(seed); np.random.seed(seed)
     hg = build_hg()
@@ -307,8 +290,6 @@ def stage_train(kind, seed=0, iters=2000, device='cpu', lr=1e-3, tag='', warm=0)
     def log(*a):
         s = ' '.join(str(x) for x in a); print(s, flush=True); logf.write(s + '\n'); logf.flush()
     log(f'{name}: params={sum(p.numel() for p in model.parameters())}')
-    if warm:
-        warm_start(model, data['train'], warm, log)
     info = train(model, data['train'], iters, seed, DT, lr=lr, log=log)
     torch.save(model.state_dict(), os.path.join(OUT, name + '.pt'))
     model.eval()
@@ -543,7 +524,6 @@ if __name__ == '__main__':
     p.add_argument('--seed', type=int, default=0); p.add_argument('--iters', type=int, default=2000)
     p.add_argument('--threads', type=int, default=4); p.add_argument('--device', default='cpu')
     p.add_argument('--lr', type=float, default=1e-3); p.add_argument('--tag', default='')
-    p.add_argument('--warm', type=int, default=0, help='iterations of one-step derivative matching before the rollout training')
     a = p.parse_args()
     torch.set_num_threads(a.threads)
     os.makedirs(OUT, exist_ok=True)
@@ -554,7 +534,7 @@ if __name__ == '__main__':
     if a.stage == 'data':
         stage_data()
     elif a.stage == 'train':
-        stage_train(a.model, a.seed, a.iters, a.device, a.lr, a.tag, a.warm)
+        stage_train(a.model, a.seed, a.iters, a.device, a.lr, a.tag)
     elif a.stage == 'predict':
         stage_predict(a.model.split(','))
     elif a.stage == 'gillespie':

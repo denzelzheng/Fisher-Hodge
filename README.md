@@ -251,6 +251,8 @@ Three things follow from the rule, and each has a number behind it (`results/`, 
 
 **What the structure does not buy.** In distribution and with enough data the black-box master equation is as accurate. Occupancy fluctuations and the fluctuation theorem hold for any Markov process, so they do not separate the models. The affinity of a reaction whose reverse rate is one percent of the forward rate is limited by the Cramér–Rao bound `Var(Â) ≥ 1/(aT) + 1/(bT)` when the prefactor is unknown, and no method recovers it from densities. A free learned nonlinearity in the free energy destroys both identifiability and extrapolation. The proofs of the identifiability statement, the bound, the coarse-graining rule and the extrapolation rule are in `results/theory_notes.md`.
 
+**Training from scratch needs no curriculum.** The runs above started the crowding system from the ideal fit and stalled on the Brusselator from a neutral start. Both were optimisation problems, and the fix belongs to the model, not to the training protocol. In the wired mode the chemical potential and the force are wired, so the rate constants enter the rates linearly. Fitting them to the training trajectories is a non-negative least-squares problem with a global optimum, and `model.fit()` solves it in closed form before the usual rollout training. The corrections, the non-ideal term and the feature dependence of the rates, sit behind gates that start at zero. The model therefore starts as its core, and at first only the gates receive a gradient. Every model then gets the same 2000 Adam iterations with the same integrator, and the CRNN baseline gets the same closed-form step. On the Brusselator the error on unseen drive strengths falls from 12 percent to 0.3 percent, below the 0.7 percent of the true constants under the same integrator. On the crowding Schlögl system the minimum that switched the reactions off is gone. The model reaches 0.25 percent in distribution and 3.6 percent out of distribution, and its learned activity curve lies on the true one (RMSE 0.009, slope 1.01). The earlier warm start needed three times the iterations for 0.67 and 11.5 percent. The mass-action CRNN with the same step reaches 0.3 percent on the Brusselator, level with the wired model, and stays at 17 and 52 percent on the crowding system. The entropy production of the Brusselator is still off by 22 to 28 percent, because two channels that both remove X at a rate proportional to x cannot be told apart from concentrations. Details are in `results/convex_training.md`.
+
 ## Layout
 
 ```
@@ -266,7 +268,7 @@ fisher_hodge/   models, data generators, training and evaluation
   train2.py     same for the stress-test models
 hyper/          learned master equation on hypergraphs: hyperme.py, the phosphorylation-cycle benchmark gen_crn.py,
                 baselines, the identifiability experiment obs_hyper.py
-hyperme/        the library: complex, model, integrators, stochastic, coarse, baselines, presets, train, bench
+hyperme/        the library: complex, model, linear_fit, integrators, stochastic, coarse, baselines, presets, train, bench
   tests/        structure, integrator, sampler, coarse-graining, baseline and regression tests
 analysis/       Onsager–Fisher weighted Hodge decomposition of Markov chains (numpy)
 viz/            scripts that make the figures above

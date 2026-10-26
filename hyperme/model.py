@@ -337,8 +337,12 @@ class WiredFreeEnergy(nn.Module):
       'virial'         G = 1/2 sum_v c_v^T B c_v,  B = L^T L (positive semidefinite, so F stays convex);
                        L starts at 1e-3 I, i.e. close to ideal
       'debye_huckel'   dmu_s = -z_s^2 a sqrt(I) / (1 + sqrt(I)),  I = 1/2 sum_s z_s^2 c_s  (a starts at 0)
+    residual=True adds a gated residual to the family, dmu = core + s_mu * r(c) with one gate s_mu per species that
+    starts at zero.  r_s(c_s) = mean_j softplus(alpha_sj) tanh(softplus(beta_sj) c_s / rho_scale + delta_sj) is
+    separable and non-decreasing, i.e. the gradient of a convex local excess free energy; its weights start at a
+    generic non-zero value, so at s_mu = 0 only the gates receive a gradient (ResNet-style zero initialisation).
     """
-    def __init__(s, hg, nonideal='none', charges=None, learn_mu0=False):
+    def __init__(s, hg, nonideal='none', charges=None, learn_mu0=False, residual=False, residual_units=16, rho_scale=1.0):
         super().__init__()
         assert nonideal in ('none', 'virial', 'debye_huckel')
         s.hg, s.nonideal, s.NS, s.V = hg, nonideal, hg.n_species, hg.V
@@ -350,10 +354,36 @@ class WiredFreeEnergy(nn.Module):
             z = torch.as_tensor(charges if charges is not None else [1.0] * s.NS, dtype=torch.get_default_dtype())
             s.register_buffer('z2', z ** 2)
             s.a = nn.Parameter(torch.zeros(()))
+        s.residual, s.RS = residual, rho_scale
+        if residual:
+            J = residual_units
+            s.r_alpha = nn.Parameter(torch.zeros(s.NS, J))
+            s.r_beta = nn.Parameter(torch.zeros(s.NS, J))
+            s.r_delta = nn.Parameter(torch.linspace(-3.0, 1.0, J).repeat(s.NS, 1))
+            s.s_mu = nn.Parameter(torch.zeros(s.NS))
 
     @property
     def c_dependent(s):
-        return s.nonideal != 'none'
+        return s.nonideal != 'none' or s.residual
+
+    def _res_parts(s, cs):
+        """per-unit pieces of the residual for cs (B, NS, V): amplitude (NS, J), slope (NS, J) and the argument (B, NS, V, J)"""
+        al, be = Fn.softplus(s.r_alpha).to(cs.dtype), Fn.softplus(s.r_beta).to(cs.dtype) / s.RS
+        x = be[None, :, None, :] * cs[..., None] + s.r_delta.to(cs.dtype)[None, :, None, :]
+        return al / al.shape[-1], be, x
+
+    def residual_mu(s, cs):
+        """the ungated residual r(c) (B, NS, V)"""
+        al, _, x = s._res_parts(cs)
+        return (al[None, :, None, :] * torch.tanh(x)).sum(-1)
+
+    def _residual_G(s, cs):
+        """int_0^c s_mu r per site and species, summed, (B,)"""
+        al, be, x = s._res_parts(cs)
+        x0 = s.r_delta.to(cs.dtype)[None, :, None, :]
+        lc = lambda z: z.abs() + Fn.softplus(-2 * z.abs()) - math.log(2.0)          # log cosh
+        G = ((al / be)[None, :, None, :] * (lc(x) - lc(x0))).sum(-1)               # (B, NS, V)
+        return (s.s_mu.to(cs.dtype)[None, :, None] * G).sum((1, 2))
 
     def potential(s, feats):
         U = feats['U']; B = U.shape[0]
@@ -363,21 +393,26 @@ class WiredFreeEnergy(nn.Module):
         return Um / feats['T'][:, None]
 
     def correction(s, c, ctx):
-        if s.nonideal == 'none':
-            return torch.zeros_like(c)
         cs = c.view(c.shape[0], s.NS, s.V)
+        out = torch.zeros_like(cs)
         if s.nonideal == 'virial':
             Bm = s.L.T @ s.L
-            return torch.einsum('st,btv->bsv', Bm.to(c.dtype), cs).reshape(c.shape)
-        z2 = s.z2.to(c.dtype)
-        sI = torch.sqrt(0.5 * (z2[None, :, None] * cs).sum(1, keepdim=True))
-        return (-z2[None, :, None] * s.a * sI / (1 + sI)).expand_as(cs).reshape(c.shape)
+            out = torch.einsum('st,btv->bsv', Bm.to(c.dtype), cs)
+        elif s.nonideal == 'debye_huckel':
+            z2 = s.z2.to(c.dtype)
+            sI = torch.sqrt(0.5 * (z2[None, :, None] * cs).sum(1, keepdim=True))
+            out = (-z2[None, :, None] * s.a * sI / (1 + sI)).expand_as(cs)
+        if s.residual:
+            out = out + s.s_mu.to(c.dtype)[None, :, None] * s.residual_mu(cs)
+        return out.reshape(c.shape)
 
     def phi(s, c, ctx):
         return ctx['Ufull'] + s.correction(c, ctx)
 
     def value(s, c, ctx):
         F = (c * (torch.log(c) - 1 + ctx['Ufull'])).sum(-1)
+        if s.residual:
+            F = F + s._residual_G(c.view(c.shape[0], s.NS, s.V))
         if s.nonideal == 'virial':
             cs = c.view(c.shape[0], s.NS, s.V)
             F = F + 0.5 * torch.einsum('bsv,st,btv->b', cs, (s.L.T @ s.L).to(c.dtype), cs)
@@ -390,25 +425,64 @@ class WiredFreeEnergy(nn.Module):
 
 
 class WiredKinetics(nn.Module):
-    """k_h = k_ref * T^p * exp(kappa_theta(local features)), symmetric, split (SQRA) form.  kappa starts at zero, so the
-    untrained model runs at the reference rates (for transport on a grid k_ref = D / h^2 gives the SQRA scheme).
+    """k_h = k_ref * T^p * exp(kappa_h), symmetric.  kappa_h = core + s_k * r_theta(local features of h):
+      core     one log rate per hyperedge type (core='type') or per hyperedge (core='edge', e.g. transport with
+               unknown local geometry), zero at initialisation;
+      r_theta  an MLP of the orientation-invariant hyperedge features, gated by the scalar s_k, which starts at zero
+               while the MLP has a generic initialisation (ResNet-style zero gate: at s_k = 0 only s_k has a gradient).
+               residual=False drops it.
+    The untrained model runs at the reference rates (for transport on a grid k_ref = D / h^2 gives the SQRA scheme).
     p = 1 is the Einstein relation (mobility at fixed friction), p = 0 keeps k independent of temperature.
     chem_prefactor=True (default): chemostatted reactants and products also multiply k by their mass-action factor
-    exp(<nu+ + nu-, log c_chem> / 2); False keeps only their force in A (the earlier design, exact only at fixed c_chem)."""
-    split, rho_dependent = True, False
+    exp(<nu+ + nu-, log c_chem> / 2); False keeps only their force in A (the earlier design, exact only at fixed c_chem).
+    split=True (default) is the SQRA form a_h = k_h c^{nu+} exp((<nu+ - nu-, phi> + A_h) / 2); split=False the
+    activity form a_h = k_h exp(<nu+, mu> + A_h / 2).  For an ideal free energy they differ only by the
+    c-independent factor exp(<nu+ + nu-, U / T> / 2) in k."""
+    rho_dependent = False
 
-    def __init__(s, n_edge_feats, hidden=32, k_ref=1.0, T_exponent=1.0, hg=None, table=False, chem_prefactor=True):
+    def __init__(s, n_edge_feats, hidden=32, k_ref=1.0, T_exponent=1.0, hg=None, table=False, chem_prefactor=True,
+                 core='type', residual=None, split=True):
         super().__init__()
-        s.chem_prefactor = chem_prefactor
-        # table=True: log k linear in the features (a table when they are a one-hot hyperedge type); better conditioned
-        # than the MLP when the rates span decades
-        s.mlp = LinearLog(n_edge_feats) if table else MLP(n_edge_feats, hidden, 1, last='zero')
+        assert core in ('type', 'edge') and hg is not None
+        s.chem_prefactor, s.split, s.core_kind = chem_prefactor, split, core
+        n_core = hg.H if core == 'edge' else int(hg.meta['typ'].max()) + 1
+        s.core = nn.Parameter(torch.zeros(n_core))
+        # residual=None: the gated feature residual unless table=True (a pure log-rate table, better conditioned
+        # than an MLP when the rates span decades)
+        s.residual = MLP(n_edge_feats, hidden, 1) if (residual if residual is not None else not table) else None
+        s.s_k = nn.Parameter(torch.zeros(())) if s.residual is not None else None
         s.register_buffer('k_ref', torch.as_tensor(k_ref, dtype=torch.get_default_dtype()))
         s.p = T_exponent
         s.hg = hg
 
+    def _load_from_state_dict(s, sd, prefix, *args, **kw):
+        """checkpoints of the earlier layout (kappa = mlp(features), or a bias-free linear table over a one-hot type):
+        an MLP becomes the residual with s_k = 1 and core = 0; a table over the type one-hot becomes the core."""
+        old = [k for k in sd if k.startswith(prefix + 'mlp.')]
+        if old:
+            if prefix + 'mlp.net.2.weight' in sd:
+                assert s.residual is not None, 'an MLP checkpoint needs residual=True'
+                for k in old:
+                    sd[prefix + 'residual.' + k[len(prefix + 'mlp.'):]] = sd.pop(k)
+                sd[prefix + 's_k'] = torch.ones((), dtype=s.s_k.dtype)
+                sd.setdefault(prefix + 'core', torch.zeros_like(s.core))
+            else:
+                W = sd.pop(prefix + 'mlp.net.0.weight')[0]
+                assert s.core_kind == 'type' and (W.shape[0] == s.core.shape[0] or (W[s.core.shape[0]:] == 0).all())
+                sd[prefix + 'core'] = W[:s.core.shape[0]].clone()
+        super()._load_from_state_dict(sd, prefix, *args, **kw)
+
+    def log_k(s, feats):
+        """kappa (B, H), without k_ref, T and the chemostat factor"""
+        x = feats['edge_sym']
+        core = s.core.to(x.dtype)
+        kap = (core[s.hg.on(x.device, x.dtype)['typ']] if s.core_kind == 'type' else core)[None].expand(x.shape[0], -1)
+        if s.residual is not None:
+            kap = kap + s.s_k.to(x.dtype) * s.residual(x).squeeze(-1)
+        return kap
+
     def forward(s, feats, hg=None, c=None):
-        k = s.k_ref.to(feats['edge_sym'].dtype) * torch.exp(s.mlp(feats['edge_sym']).squeeze(-1))
+        k = s.k_ref.to(feats['edge_sym'].dtype) * torch.exp(s.log_k(feats))
         if s.p:
             k = k * feats['T'][:, None] ** s.p
         hg = hg or s.hg
@@ -486,11 +560,13 @@ class HyperME(nn.Module):
     @classmethod
     def build_wired(cls, hg, hidden=32, k_ref=1.0, T_exponent=1.0, nonideal='none', charges=None, harmonic=True,
                     featurizer=None, step=None, learn_mu0=False, learn_chem_mu0=False, kinetics_table=False,
-                    chem_prefactor=True):
+                    chem_prefactor=True, kinetics_core='type', kinetics_split=True, nonideal_residual=False, rho_scale=1.0):
+        """kinetics_table=True: log k is the core table alone (no feature residual); kinetics_core='edge': one log rate
+        per hyperedge; nonideal_residual=True: dmu = family + gated monotone residual (see WiredFreeEnergy)."""
         feat = featurizer or wired_featurizer(hg)
         kin = WiredKinetics(feat.n_edge_sym, hidden, k_ref=k_ref, T_exponent=T_exponent, hg=hg, table=kinetics_table,
-                            chem_prefactor=chem_prefactor)
-        fe = WiredFreeEnergy(hg, nonideal, charges, learn_mu0)
+                            chem_prefactor=chem_prefactor, core=kinetics_core, split=kinetics_split)
+        fe = WiredFreeEnergy(hg, nonideal, charges, learn_mu0, residual=nonideal_residual, rho_scale=rho_scale)
         dr = WiredDrive(hg, harmonic, learn_chem_mu0)
         return cls(hg, fe, kin, dr, feat, step)
 
@@ -507,6 +583,26 @@ class HyperME(nn.Module):
                         nonlocal_kernel=nonlocal_kernel)
         dr = NoDrive() if drive == 'none' else ProjectedDrive(hg, ne, hidden, gain_init=force_gain_init)
         return cls(hg, fe, kin, dr, feat, step)
+
+    # ---------------------------------------------------------------- estimator
+    def linear_parameters(s):
+        """the parameters that enter log a and log b additively and independently of c (wired mode: the log-rate core,
+        the learned standard potentials); empty for the flexible mode."""
+        if s.mode != 'wired':
+            return []
+        out = [s.kinetics.core]
+        out += [p for p in (s.free_energy.mu0, s.drive.chem_mu0) if p is not None]
+        return out
+
+    def fit_linear(s, data, dt, **kw):
+        """closed-form non-negative least-squares fit of the rate constants (hyperme.linear_fit.fit_linear)."""
+        from .linear_fit import fit_linear
+        return fit_linear(s, data, dt, **kw)
+
+    def fit(s, data, iters, dt, linear_init=True, **kw):
+        """the default estimator: fit_linear, then the rollout training of hyperme.train.train (hyperme.linear_fit.fit)."""
+        from .linear_fit import fit
+        return fit(s, data, iters, dt, linear_init=linear_init, **kw)
 
     def edit(s, T=None, drive_scale=None):
         """a copy of the model (sharing its parameters) with the temperature fixed to T and / or the drive A
