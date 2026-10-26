@@ -188,19 +188,19 @@ c, nsub = integrators.positive_ssp_rk2(model, c, model.prepare(drive), Dt=0.05)
 |---|---|
 | `complex.py` | `Hypergraph`. It holds the stoichiometric matrix `S` and orthonormal bases of `ker S` (cycles) and `ker Sᵀ` (moieties). The main builder `reaction_transport` copies a reaction list to every site of a spatial graph. Reactions may be many-to-many with any integer coefficients. Each listed species gets its own transport edges, and chemostatted species leave the state and enter as a drive. Smaller builders cover well-mixed networks, pure transport on a graph or periodic grid, and the C1 network. On the grid the cycle basis can be built from `d₁ᵀ` and the two harmonic cochains. |
 | `model.py` | `HyperME` and its three learned parts. `FreeEnergy` is `log c + αU` plus an MLP correction, optionally with non-local features `W∗c`. `Kinetics` gives a symmetric `k > 0` from hyperedge features and, if asked, from `c`. The drive map turns the force into `A` and projects it onto `ker S`. Methods: `rates`, `flux`, `readouts`, `generator`. |
-| `integrators.py` | Explicit SSP-RK2 with positivity-preserving substeps. Implicit Euler with conjugate gradients for linear master equations. A variational implicit step in flux space. The matrix exponential. |
+| `integrators.py` | Explicit SSP-RK2 with positivity-preserving substeps. Modified Patankar schemes (Patankar–Euler and MPRK22), which are linearly implicit, positive and conserving at any step size and can be trained through. Implicit Euler with conjugate gradients for linear master equations. A variational implicit step in flux space. The matrix exponential. |
 | `stochastic.py` | Gillespie and chemical Langevin samplers that use the learned rates. Occupation variance and current fluctuations. |
 | `coarse.py` | Projected generator and lag `τ` propagator. Both check that the coarse stationary state and currents are the block sums of the fine ones and that `σ̄ ≤ σ`. |
 | `baselines.py` | Flux-GNN, GNN-ODE, CRNN, reversible JKO and FINN with the same interface. FINN models transport only and treats reactions as a learned source term. |
 | `presets.py`, `train.py`, `bench.py` | The S2 TC-ME and C1 models in this form, their data, the training protocol and a speed test. |
 
-The substeps keep one step size per trajectory as a tensor. They talk to the host once per sampling interval instead of twice per substep. On S2 with the trained TC-ME on one GPU, a 200-step evaluation of 16 trajectories runs 3.1 times faster than the prototype loop, and a training step runs 2.1 times faster. On the CPU there is no host sync to save, so the CPU path keeps the loop.
+The substeps keep one step size per trajectory as a tensor. They talk to the host once per sampling interval instead of twice per substep. On S2 with the trained TC-ME on one GPU, a 200-step evaluation of 16 trajectories runs 3.1 times faster than the prototype loop, and a training step runs 2.1 times faster. On the CPU there is no host sync to save, so the CPU path keeps the loop. On the stiff Brusselator benchmark (C3), training with MPRK22 at 8 steps per sampling interval instead of about 29 explicit substeps makes an iteration 2.9 times faster and gives a 10T error of 0.023 under the exact integrator, against 0.048 for explicit training (one seed, `results/c3_patankar_summary.md`).
 
 The tests run on the CPU. A GPU is used only when no other user has a process on it, and `hyperme.gpu_guard` checks this before anything starts.
 
 ```bash
 python -m pytest hyperme/tests -m "not slow"          # about a minute
-python -m pytest hyperme/tests -m slow                # retrains C1 HyperME, two seeds
+python -m pytest hyperme/tests -m slow                # retrains C1 HyperME (two seeds) and C3 with MPRK22 (one seed)
 bash hyperme/tests/run_gpu_regression.sh              # waits for a free GPU, retrains S2 TC-ME, two seeds
 ```
 

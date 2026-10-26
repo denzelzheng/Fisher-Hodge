@@ -128,6 +128,64 @@ def positive_heun_rhs(model, c, ctx, Dt, dt_max=None, max_sub=4000, t_tol=1e-9):
     return c, nsub
 
 
+# ------------------------------------------------------------------------------------------ Patankar schemes
+def _patankar_system(hg, a, b, sigma, c0, dt):
+    """M x = r for the modified Patankar step  x = c0 + dt S (a w_fwd - b w_bwd), where each one-way channel is
+    weighted by x_m / sigma_m of the one component m it consumes (channels that consume nothing stay explicit).
+    M = I - dt sum_q S_q (flux_q / sigma_{m(q)}) e_{m(q)}^T is a Z-matrix whose columns sum to 1 + dt (consumption -
+    production) / sigma; it is an M-matrix whenever no channel produces more state than it consumes (true for C1, C2,
+    C3), and then x > 0 for every dt.  Every moiety l with l^T S = 0 is conserved exactly by construction."""
+    t = hg.on(a.device, a.dtype)
+    fc, bc = t['fcons'], t['bcons']
+    B, M = c0.shape
+    sh, sm, sv = t['s_h'], t['s_m'], t['s_val']
+    dtc = dt.to(a.dtype)[:, None] if torch.is_tensor(dt) else dt
+    Mf = torch.zeros(B, M * M, dtype=a.dtype, device=a.device)
+    r = c0.clone()
+    for flux, cons, sgn in ((a, fc, 1.0), (b, bc, -1.0)):
+        col = cons[sh]                                            # consumer of the channel of each S non-zero
+        imp = col >= 0
+        colc = col.clamp_min(0)
+        val = sgn * sv * flux[:, sh]                              # (B, nnz): this channel's contribution to dc_m/dt
+        kappa = val / sigma[:, colc]
+        Mf = Mf.index_add(1, (sm * M + colc)[imp], -(dtc * kappa)[:, imp])
+        r = r.index_add(1, sm[~imp], (dtc * val)[:, ~imp])
+    Mm = Mf.view(B, M, M) + torch.eye(M, dtype=a.dtype, device=a.device)
+    return Mm, r
+
+
+def mprk(model, c, ctx, Dt, nsub=1, order=2, max_split=6):
+    """advance c by Dt with nsub modified Patankar steps: order=1 Patankar-Euler, order=2 MPRK22 (alpha = 1,
+    Kopecz and Meister 2018).  Linearly implicit (one dense solve per stage, differentiable), positive and
+    conserving for any step size on networks with one consumer per channel.  A step whose result is not positive
+    (only possible when a channel produces more than it consumes) is redone as two half steps."""
+    hg = model.hg
+    t = hg.on(c.device, c.dtype)
+    if 'fcons' not in t:
+        fc, bc = hg.channel_consumers()
+        t['fcons'] = torch.as_tensor(fc, device=c.device); t['bcons'] = torch.as_tensor(bc, device=c.device)
+
+    def step(c0, dt, depth):
+        a0, b0 = model.rates(c0, ctx)
+        M1, r1 = _patankar_system(hg, a0, b0, c0, c0, dt)
+        c1 = torch.linalg.solve(M1, r1.unsqueeze(-1)).squeeze(-1)
+        cn = c1
+        if order == 2:
+            ok1 = bool((c1 > 0).all()) if depth < max_split else True
+            if ok1:
+                a1, b1 = model.rates(c1, ctx)
+                M2, r2 = _patankar_system(hg, 0.5 * (a0 + a1), 0.5 * (b0 + b1), c1, c0, dt)
+                cn = torch.linalg.solve(M2, r2.unsqueeze(-1)).squeeze(-1)
+        if depth < max_split and not bool((cn > 0).all()):
+            return step(step(c0, 0.5 * dt, depth + 1), 0.5 * dt, depth + 1)
+        return cn
+
+    dt = Dt / nsub
+    for _ in range(nsub):
+        c = step(c, dt, 0)
+    return c, torch.full((c.shape[0],), nsub, dtype=torch.long, device=c.device)
+
+
 # ------------------------------------------------------------------------------------------ linear implicit / expm
 def _linear_ops(model, c_ref, ctx):
     """matrix-free L x and L^T y of the master equation frozen at c_ref (unimolecular)."""

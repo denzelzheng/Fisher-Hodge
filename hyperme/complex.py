@@ -256,6 +256,25 @@ class Hypergraph:
         """moiety coordinates c @ L, (B, l)"""
         return c @ s.on(c.device, c.dtype)['L']
 
+    def channel_consumers(s):
+        """the single state component net-consumed by each one-way channel: (forward (H,), backward (H,)), -1 when
+        the channel consumes nothing (pure production).  Patankar schemes need at most one consumer per channel."""
+        if 'consumers' not in s.meta:
+            Sd = s.S
+            out = []
+            for sgn in (-1, 1):                                   # forward consumes S < 0, backward consumes S > 0
+                cons = np.full(s.H, -1, dtype=np.int64)
+                for h in range(s.H):
+                    m = np.nonzero(sgn * Sd[:, h] > 0)[0]
+                    if len(m) > 1:
+                        raise ValueError(f'hyperedge {h} net-consumes {len(m)} components; the linear Patankar step '
+                                         'needs one consumer per one-way channel')
+                    if len(m):
+                        cons[h] = m[0]
+                out.append(cons)
+            s.meta['consumers'] = tuple(out)
+        return s.meta['consumers']
+
     def chemostat_force(s, mu_chem):
         """drive on every hyperedge from the chemical potentials of the chemostatted species,
         force_h = <nu+_h - nu-_h, mu_Y> over the chemostats Y.  mu_chem: (B, n_chem) uniform in space or

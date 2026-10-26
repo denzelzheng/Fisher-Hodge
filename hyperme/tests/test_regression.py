@@ -40,7 +40,7 @@ def test_tcme_checkpoint_equivalence(device):
         Jo = old.flux(c.view(B, 32, 32), old.prepare(te['drive'])).reshape(B, -1)
         Jn = new.flux(c, new.prepare(te['drive']))
         assert ((Jo - Jn).norm() / Jo.norm()) < 1e-5
-        R, _ = rollout(new, te['drive'], te['c'][:, 0], 200)
+        R = rollout(new, te['drive'], te['c'][:, 0], 200)[0]
     e10 = float(np.median(relerr(R.double(), te['c'].double()).cpu().numpy()[:, 200]))
     ref = json.load(open(os.path.join(REPO, 'runs/tcme/S2_tcme_s0.json')))['sets']['test_id']['relerr_median'][200]
     assert abs(e10 - ref) / ref < 0.01, (e10, ref)
@@ -61,7 +61,7 @@ def test_c1_checkpoint_equivalence():
         ao, bo = old.ab(c.view(B, 3, 64), old.prepare(te['drive']['U'], te['drive']['dG'], 8))
         an, bn = new.rates(c, new.prepare(te['drive']))
         assert ((ao - an).norm() / ao.norm()) < 1e-12 and ((bo - bn).norm() / bo.norm()) < 1e-12
-        R, _ = rollout(new, te['drive'], te['c'][:, 0], 200)
+        R = rollout(new, te['drive'], te['c'][:, 0], 200)[0]
     V = 64
     e10 = float(np.median(relerr(R[..., :2 * V], te['c'][..., :2 * V]).numpy()[:, 200]))
     ref = json.load(open(os.path.join(REPO, 'hyper/runs/main/hyperme_s0.json')))['sets']['test_id']['relL2_XXp_median']['200']
@@ -71,23 +71,23 @@ def test_c1_checkpoint_equivalence():
     assert float(((q - q[:, :1]).norm(dim=-1) / q[:, :1].norm(dim=-1)).max()) <= 1e-14
 
 
-def _train(problem, seeds, device, iters):
+def _train(problem, seeds, device, iters, extra=(), tag=''):
     os.makedirs(OUT, exist_ok=True)
     reuse = os.environ.get('HYPERME_REUSE') == '1'
     procs = []
     env = dict(os.environ, FH_ROOT=REPO, PYTHONPATH=REPO + os.pathsep + os.environ.get('PYTHONPATH', ''),
                OMP_NUM_THREADS='4', MKL_NUM_THREADS='4', OPENBLAS_NUM_THREADS='4')
     for s in seeds:
-        js = os.path.join(OUT, f'{problem}_s{s}.json')
+        js = os.path.join(OUT, f'{problem}{tag}_s{s}.json')
         if reuse and os.path.exists(js):
             continue
         cmd = [sys.executable, '-m', 'hyperme.train', '--problem', problem, '--seed', str(s), '--iters', str(iters),
-               '--device', device, '--out', OUT]
+               '--device', device, '--out', OUT] + list(extra)
         procs.append(subprocess.Popen(cmd, cwd=REPO, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE))
     for p in procs:
         _, err = p.communicate()
         assert p.returncode == 0, err.decode()[-3000:]
-    return [json.load(open(os.path.join(OUT, f'{problem}_s{s}.json'))) for s in seeds]
+    return [json.load(open(os.path.join(OUT, f'{problem}{tag}_s{s}.json'))) for s in seeds]
 
 
 @pytest.mark.slow

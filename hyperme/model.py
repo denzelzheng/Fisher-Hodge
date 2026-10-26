@@ -234,10 +234,10 @@ class Kinetics(nn.Module):
 class ProjectedDrive(nn.Module):
     """A = P_kerS A_raw,  A_raw = gain * force + MLP(sym, ori) [antisymmetrised on orientation-odd hyperedges].
     The projection removes the part of the drive that a change of mu could absorb."""
-    def __init__(s, hg, n_edge_feats, hidden=64, mlp=True, gain_init=None):
+    def __init__(s, hg, n_edge_feats, hidden=64, mlp=True, gain_init=None, oriented=True, transport_zero=False):
         super().__init__()
-        s.hg = hg
-        s.mlp = MLP(n_edge_feats + 1, hidden, 1, last='zero') if mlp else None
+        s.hg, s.oriented, s.transport_zero = hg, oriented, transport_zero
+        s.mlp = MLP(n_edge_feats + (1 if oriented else 0), hidden, 1, last='zero') if mlp else None
         s.gain = nn.Parameter(torch.tensor(float(gain_init))) if gain_init is not None else None
 
     def forward(s, feats):
@@ -247,9 +247,13 @@ class ProjectedDrive(nn.Module):
             A = A + s.gain * feats['force']
         if s.mlp is not None:
             odd = s.hg.on(sym.device, sym.dtype)['odd']
-            ap = s.mlp(torch.cat([sym, ori[..., None]], -1)).squeeze(-1)
-            am = s.mlp(torch.cat([sym, -ori[..., None]], -1)).squeeze(-1)
-            A = A + odd * (ap - am) + (1 - odd) * ap
+            if s.oriented:
+                ap = s.mlp(torch.cat([sym, ori[..., None]], -1)).squeeze(-1)
+                am = s.mlp(torch.cat([sym, -ori[..., None]], -1)).squeeze(-1)
+                A = A + odd * (ap - am) + (1 - odd) * ap
+            else:                                   # no oriented input: transport edges get no raw drive
+                ap = s.mlp(sym).squeeze(-1)
+                A = A + ((1 - odd) * ap if s.transport_zero else ap)
         return s.hg.project_cycles(A)
 
 
@@ -367,9 +371,15 @@ class HyperME(nn.Module):
         return r.amax(-1)
 
     def advance(s, c, drive, Dt, **kw):
-        from .integrators import positive_ssp_rk2
+        """one sampling interval with the model's integrator: step['method'] = 'ssp' (explicit positive substeps,
+        default), 'mprk22' or 'patankar' (linearly implicit Patankar schemes, step['nsub'] steps per Dt)."""
+        from .integrators import positive_ssp_rk2, mprk
         cfg = dict(s.step); cfg.update(kw)
-        return positive_ssp_rk2(s, c, s.context(drive), Dt, **cfg)
+        method = cfg.pop('method', 'ssp')
+        if method == 'ssp':
+            return positive_ssp_rk2(s, c, s.context(drive), Dt, **cfg)
+        cfg.pop('vectorized', None)
+        return mprk(s, c, s.context(drive), Dt, nsub=cfg.get('nsub', 1), order=2 if method == 'mprk22' else 1)
 
     def free_energy_value(s, c, drive):
         return s.free_energy.value(c, s.context(drive))

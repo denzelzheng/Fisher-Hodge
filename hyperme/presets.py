@@ -143,4 +143,76 @@ def load_c1(root=ROOT, device='cpu', tag=''):
     return out
 
 
-PRESETS = dict(s2_tcme=(s2_tcme, load_s2), c1=(c1, load_c1))
+# ------------------------------------------------------------------------------------------ C3 / Brusselator
+C3_RX = [({'A': 1}, {'X': 1}), ({'X': 2, 'Y': 1}, {'X': 3}), ({'B': 1, 'X': 1}, {'Y': 1, 'D': 1}), ({'X': 1}, {'E': 1})]
+
+
+def c3_featurizer(hg):
+    """drive = dict(drv (B, 2) normalised (log a, log b)) -> features of hyper/crn2.edge_feats."""
+    ntyp = int(hg.meta['typ'].max()) + 1
+
+    def feat(F):
+        drv = F['drv']
+        B = drv.shape[0]
+        t = hg.on(drv.device, drv.dtype)
+        oh = Fn.one_hot(t['typ'], ntyp).to(drv.dtype).expand(B, hg.H, ntyp)
+        sym = torch.cat([oh, drv[:, None, :].expand(B, hg.H, drv.shape[1])], -1)
+        node = dict(d0=drv[:, :1].expand(B, hg.V), d1=drv[:, 1:2].expand(B, hg.V))
+        return dict(U=torch.zeros(B, hg.V, dtype=drv.dtype, device=drv.device), node=node, edge_sym=sym,
+                    edge_ori=torch.zeros_like(sym[..., 0]), force=None, raw=F)
+    feat.n_edge_sym = ntyp + 2
+    return feat
+
+
+def c3(n=8, hidden=64, use_A=True, method='ssp', nsub=1):
+    """Brusselator C3 (hyper/gen_brusselator.py): state X, Y; A, B, D, E chemostatted (absorbed into k and A);
+    the HyperME2 of hyper/crn2.py.  method='mprk22' integrates with the Patankar scheme (nsub steps per DT)."""
+    hg = Hypergraph.reaction_transport(['X', 'Y', 'A', 'B', 'D', 'E'], C3_RX, grid_n=n, diffusing=['X', 'Y'],
+                                       chemostats=['A', 'B', 'D', 'E'])
+    feat = c3_featurizer(hg)
+    with default_dtype(torch.float64):
+        kin = Kinetics(feat.n_edge_sym, hidden, last='default', last_bias=0.5, eps=1e-6)
+        dr = ProjectedDrive(hg, feat.n_edge_sym, hidden, mlp=True, oriented=False, transport_zero=True)
+        fe = FreeEnergy(hg, ('d0', 'd1'), hidden, mode='grad', alpha_init=1.0)
+        if not use_A:
+            from .model import NoDrive
+            dr = NoDrive()
+        step = dict(dt_max=C3_DT / 4, theta0=0.5, theta1=0.5, max_sub=2000, t_tol=1e-12)
+        if method != 'ssp':
+            step = dict(method=method, nsub=nsub)
+        m = HyperME(hg, fe, kin, dr, feat, step=step)
+    return m.double()
+
+
+C3_DT = 0.2
+
+
+def load_legacy_c3(model, sd):
+    mp = {'kmlp.': 'kinetics.mlp.', 'amlp.': 'drive.mlp.', 'G.': 'free_energy.mlp.'}
+    out = {}
+    for k, v in sd.items():
+        a = next(a for a in mp if k.startswith(a))
+        out[mp[a] + k[len(a):]] = v
+    missing, unexpected = model.load_state_dict(out, strict=False)
+    assert not unexpected and set(missing) <= {'free_energy.alpha'}, (missing, unexpected)
+    return model
+
+
+def load_c3(root=ROOT, device='cpu', name='brus'):
+    data = torch.load(os.path.join(root, 'hyper', 'runs', 'data', f'{name}.pt'))
+    meta = data['meta']
+    dm, ds = meta['drv_mean'].double(), meta['drv_std'].double()
+    out = dict(meta=meta)
+    for k, d in data.items():
+        if k == 'meta':
+            continue
+        B, T = d['c'].shape[:2]
+        out[k] = dict(c=d['c'].reshape(B, T, -1).double().to(device),
+                      drive=dict(drv=((d['drv'].double() - dm) / ds).to(device)))
+        for extra in ('sigma', 'homog'):
+            if extra in d:
+                out[k][extra] = d[extra]
+    return out
+
+
+PRESETS = dict(s2_tcme=(s2_tcme, load_s2), c1=(c1, load_c1), c3=(c3, load_c3))

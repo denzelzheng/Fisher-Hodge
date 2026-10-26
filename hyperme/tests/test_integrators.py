@@ -65,6 +65,40 @@ def test_expm_step_matches_explicit():
     assert torch.allclose(e.sum(-1), c0.sum(-1), rtol=1e-12)
 
 
+@pytest.mark.parametrize('name', ['c1', 'schlogl', 'grid_nonlocal'])
+def test_mprk_positive_and_conserving_at_large_steps(name):
+    m, drive, c0 = case(name, seed=8)
+    ctx = m.prepare(drive)
+    c0 = c0.clone(); c0[:, ::5] = 1e-6
+    L = m.hg.on(c0.device, c0.dtype)['L']
+    for order in (1, 2):
+        with torch.no_grad():
+            c, _ = I.mprk(m, c0, ctx, 2.0, nsub=1, order=order)
+        assert torch.isfinite(c).all() and c.min() > 0
+        if L.shape[1]:
+            q0, q1 = c0 @ L, c @ L
+            assert ((q1 - q0).norm(dim=-1) / q0.norm(dim=-1)).max() < 1e-12
+
+
+@pytest.mark.parametrize('order', [1, 2])
+def test_mprk_convergence_order(order):
+    m, ctx, c0 = linear_model(False)
+    with torch.no_grad():
+        ref = I.expm_step(m, c0, ctx, 0.4)
+        err = [float((I.mprk(m, c0, ctx, 0.4, nsub=n, order=order)[0] - ref).norm() / ref.norm()) for n in (8, 16, 32)]
+    rates = [err[i] / err[i + 1] for i in range(2)]
+    assert all(abs(r - 2 ** order) < 0.35 * 2 ** order for r in rates), (err, rates)
+
+
+def test_mprk_differentiable():
+    m, drive, c0 = case('c1', seed=9)
+    ctx = m.prepare(drive)
+    c, _ = I.mprk(m, c0, ctx, 0.2, nsub=2)
+    c.pow(2).sum().backward()
+    g = [p.grad for p in m.parameters() if p.grad is not None]
+    assert g and all(torch.isfinite(x).all() for x in g) and sum(float(x.abs().sum()) for x in g) > 0
+
+
 @pytest.mark.parametrize('name', ['grid_nonlocal', 'c1', 'reactions'])
 def test_proximal_step(name):
     m, drive, c0 = case(name, seed=7, reversible=True)
