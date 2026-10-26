@@ -33,6 +33,20 @@ The usual question in scientific machine learning is how to learn a dynamics. Th
 
 Theorem 0 in `results/theory_notes.md` states the converse under the assumption of local detailed balance. Among gray-box models whose learned part does not read the conditions, the only split that gives the second law by construction, exact transfer across conditions and a convex fit at once is this one: fix `f` by thermodynamics and learn `k`. The manifold itself is known structure from stochastic thermodynamics. What is new is to pose learning as placing a material on it.
 
+## From fitting a map to locating a point
+
+Physics-informed networks, neural ODEs, universal differential equations and neural operators all start from a blank sheet. A network builds a function, a vector field or an operator, and physics then trims it, as a penalty in the loss or as a fixed part of the equation. Fisher–Hodge starts from the other end. Once the event network `S` and local detailed balance are accepted, every admissible non-equilibrium dynamics is already a point on the generator manifold. Learning only has to locate the material on it.
+
+| | What is learned | How physics enters | Guaranteed by construction | New temperature or drive | Thermodynamic readouts |
+|---|---|---|---|---|---|
+| PINN | a solution u(x, t), fitted per problem | residual of the equation in the loss | nothing | retrain | none |
+| Neural ODE | a vector field on the state space | only that the model is an ODE | nothing | conditions as features, no guarantee off the training range | none |
+| UDE | the missing term of a known equation | the known terms of the equation | the known terms only | conditions as features of the learned term, no guarantee | usually none |
+| FNO, DeepONet | a map between function spaces | not at all | nothing, negative densities and mass drift occur | conditions as input channels, no guarantee | none |
+| Fisher–Hodge | the position k(ξ) of a material on the generator manifold | the manifold itself, through local detailed balance and natural parameters | the second law edge by edge, conservation, positivity | a move along a known coordinate, no retraining | fluxes, a lower bound on the entropy production, blind directions, coarse-graining, control |
+
+The split into a force coordinate `f` and a kinetic coordinate `k` is canonical in the sense of Theorem 0. It is not claimed to be orthogonal in any metric. `k` sets the scale of the Onsager metric. When a material is far from ideal, the model also learns a correction to the chemical potential, which enters `f`. Everything that holds for every material is fixed and never learned.
+
 The rest of this file follows the order in which the work was done. The first round studies transport on a grid. Later rounds generalise to reactions on hypergraphs, compare with published methods and test materials the model has not seen.
 
 ## What the figures show
