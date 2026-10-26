@@ -222,16 +222,10 @@ C3_DT = 0.2
 
 
 def c3_wired_featurizer(hg):
-    """drive = dict(logab (B, 2) raw (log a, log b)) -> wired features: chem_logc = (log a, log b, log d = 0, log e = 0)."""
-    from .model import wired_featurizer
+    """drive = dict(logab (B, 2) raw (log a, log b)) -> wired features: chem_logc = (log a, log b, log d = 0, log e = 0);
+    logab (B, 4) sets all four chemostats (the equilibrium anchor runs of hyperme/c3_anchor.py)."""
     assert hg.meta['chemostats'] == ['A', 'B', 'D', 'E']
-    base = wired_featurizer(hg)
-
-    def feat(F):
-        lab = F['logab']
-        return base(dict(chem_logc=torch.cat([lab, torch.zeros_like(lab)], -1)))
-    feat.n_edge_sym = base.n_edge_sym
-    return feat
+    return chem_featurizer(hg)
 
 
 def c3_wired(n=8, method='mprk22', nsub=8, chem_prefactor=True, well_mixed=False, nonideal_residual=False):

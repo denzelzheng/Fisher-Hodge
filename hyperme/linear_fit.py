@@ -90,12 +90,9 @@ def class_structure(model, c_ref, drive_ref, decimals=6):
 
 
 @torch.no_grad()
-def fit_linear(model, data, dt, rule='simpson', floor=1e-6, batch=16, log=print):
-    """set the linear parameters of model to the non-negative least-squares optimum on data (a training set dict
-    with c (B, T+1, M) and drive, or a dict holding it under 'train').  dt: sampling interval.  Returns diagnostics:
-    the relative residual of the derivative fit before (kappa = 1) and after, and the fitted factors."""
-    t0 = time.time()
-    tr = data['train'] if 'train' in data else data
+def assemble(model, tr, dt, rule='simpson', batch=16):
+    """the normal equations of the derivative fit in the class factors kappa (kappa = 1 is the current model):
+    residual(kappa) = (yy - 2 kappa.h + kappa.G.kappa) / yy.  Returns a dict with params, U, rp, rm, fixed, G, h, yy."""
     C = tr['c']
     B, T1, M = C.shape
     assert T1 >= 3, 'need at least three samples per trajectory'
@@ -140,7 +137,12 @@ def fit_linear(model, data, dt, rule='simpson', floor=1e-6, batch=16, log=print)
         yy += (dC ** 2).sum()
         for (r1, X1, s1), (r2, X2, s2) in itertools.product([(rp_t, Ip, 1.0), (rm_t, Im, -1.0)], repeat=2):
             G.index_put_((r1[ii], r2[jj]), s1 * s2 * q * (X1[:, ii] * X2[:, jj]).sum(0), accumulate=True)
-    G, h, yy = G.cpu().numpy(), h.cpu().numpy(), float(yy)
+    return dict(params=params, U=U, rp=rp, rm=rm, fixed=fixed, G=G.cpu().numpy(), h=h.cpu().numpy(), yy=float(yy))
+
+
+def nnls_kappa(G, h, fixed):
+    """the non-negative least-squares class factors (1 for classes the data do not see) and the mask of seen classes"""
+    R = len(h)
     free = ~fixed & (np.diag(G) > 1e-14 * max(np.diag(G).max(), 1e-300))  # classes the data see
     Gu, hu = G[np.ix_(free, free)], h[free]
     d = 1.0 / np.sqrt(np.diag(Gu))
@@ -149,6 +151,20 @@ def fit_linear(model, data, dt, rule='simpson', floor=1e-6, batch=16, log=print)
     ks, _ = nnls(Lc.T, scipy.linalg.solve_triangular(Lc, hs, lower=True), maxiter=50 * len(hs))
     kap = np.ones(R)
     kap[free] = d * ks
+    return kap, free
+
+
+@torch.no_grad()
+def fit_linear(model, data, dt, rule='simpson', floor=1e-6, batch=16, log=print):
+    """set the linear parameters of model to the non-negative least-squares optimum on data (a training set dict
+    with c (B, T+1, M) and drive, or a dict holding it under 'train').  dt: sampling interval.  Returns diagnostics:
+    the relative residual of the derivative fit before (kappa = 1) and after, and the fitted factors."""
+    t0 = time.time()
+    tr = data['train'] if 'train' in data else data
+    A = assemble(model, tr, dt, rule, batch)
+    params, U, G, h, yy = A['params'], A['U'], A['G'], A['h'], A['yy']
+    R = U.shape[0]
+    kap, free = nnls_kappa(G, h, A['fixed'])
     res = lambda k: (yy - 2 * k @ h + k @ G @ k) / yy
     # back to theta: log kappa_r = U_r delta (classes not seen by the data keep their value)
     tgt = np.log(np.maximum(kap, floor))
