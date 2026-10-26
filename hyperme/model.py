@@ -392,11 +392,14 @@ class WiredFreeEnergy(nn.Module):
 class WiredKinetics(nn.Module):
     """k_h = k_ref * T^p * exp(kappa_theta(local features)), symmetric, split (SQRA) form.  kappa starts at zero, so the
     untrained model runs at the reference rates (for transport on a grid k_ref = D / h^2 gives the SQRA scheme).
-    p = 1 is the Einstein relation (mobility at fixed friction), p = 0 keeps k independent of temperature."""
+    p = 1 is the Einstein relation (mobility at fixed friction), p = 0 keeps k independent of temperature.
+    chem_prefactor=True (default): chemostatted reactants and products also multiply k by their mass-action factor
+    exp(<nu+ + nu-, log c_chem> / 2); False keeps only their force in A (the earlier design, exact only at fixed c_chem)."""
     split, rho_dependent = True, False
 
-    def __init__(s, n_edge_feats, hidden=32, k_ref=1.0, T_exponent=1.0, hg=None, table=False):
+    def __init__(s, n_edge_feats, hidden=32, k_ref=1.0, T_exponent=1.0, hg=None, table=False, chem_prefactor=True):
         super().__init__()
+        s.chem_prefactor = chem_prefactor
         # table=True: log k linear in the features (a table when they are a one-hot hyperedge type); better conditioned
         # than the MLP when the rates span decades
         s.mlp = LinearLog(n_edge_feats) if table else MLP(n_edge_feats, hidden, 1, last='zero')
@@ -409,7 +412,7 @@ class WiredKinetics(nn.Module):
         if s.p:
             k = k * feats['T'][:, None] ** s.p
         hg = hg or s.hg
-        if hg is not None and feats.get('chem_logc') is not None and 'chem_Np' in hg.meta:
+        if s.chem_prefactor and hg is not None and feats.get('chem_logc') is not None and 'chem_Np' in hg.meta:
             # chemostats are mass-action species with known activity: besides the force they carry the symmetric
             # factor exp(<nu+ + nu-, log c_chem> / 2) (e.g. sqrt(ATP ADP)), so that a ~ c_ATP and b ~ c_ADP c_Pi exactly
             lc = feats['chem_logc']
@@ -482,9 +485,11 @@ class HyperME(nn.Module):
 
     @classmethod
     def build_wired(cls, hg, hidden=32, k_ref=1.0, T_exponent=1.0, nonideal='none', charges=None, harmonic=True,
-                    featurizer=None, step=None, learn_mu0=False, learn_chem_mu0=False, kinetics_table=False):
+                    featurizer=None, step=None, learn_mu0=False, learn_chem_mu0=False, kinetics_table=False,
+                    chem_prefactor=True):
         feat = featurizer or wired_featurizer(hg)
-        kin = WiredKinetics(feat.n_edge_sym, hidden, k_ref=k_ref, T_exponent=T_exponent, hg=hg, table=kinetics_table)
+        kin = WiredKinetics(feat.n_edge_sym, hidden, k_ref=k_ref, T_exponent=T_exponent, hg=hg, table=kinetics_table,
+                            chem_prefactor=chem_prefactor)
         fe = WiredFreeEnergy(hg, nonideal, charges, learn_mu0)
         dr = WiredDrive(hg, harmonic, learn_chem_mu0)
         return cls(hg, fe, kin, dr, feat, step)

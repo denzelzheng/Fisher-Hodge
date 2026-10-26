@@ -11,8 +11,8 @@ import torch
 from .presets import PRESETS, T_TRAIN, ROOT
 
 EVAL_SETS = dict(s2_tcme=['test_id', 'test_oodpot', 'test_oodinit'], s2_wired=['test_id', 'test_oodpot', 'test_oodinit'], c1=['test_id', 'test_oodG', 'test_oodU'],
-                 c3=['test_id', 'test_ood'])
-DTS = dict(s2_tcme=0.05, s2_wired=0.05, c1=0.05, c3=0.2)
+                 c3=['test_id', 'test_ood'], c3_wired=['test_id', 'test_ood'])
+DTS = dict(s2_tcme=0.05, s2_wired=0.05, c1=0.05, c3=0.2, c3_wired=0.2)
 
 
 def take(drive, idx):
@@ -81,7 +81,7 @@ def evaluate(problem, model, data, sets=None):
     for name in sets or EVAL_SETS[problem]:
         sd = data[name]; Y = sd['c']
         t0 = time.time()
-        R, ns, smin = rollout(model, sd['drive'], Y[:, 0], Y.shape[1] - 1, DTS[problem], sigma=problem == 'c3')
+        R, ns, smin = rollout(model, sd['drive'], Y[:, 0], Y.shape[1] - 1, DTS[problem], sigma=problem.startswith('c3'))
         S = dict(infer_time_s=time.time() - t0, substeps_per_DT=ns, min_c=float(R.min()),
                  n_traj_negative=int((R.flatten(1) < 0).any(1).sum()))
         if problem == 'c1':
@@ -104,7 +104,7 @@ def evaluate(problem, model, data, sets=None):
     return res
 
 
-def run(problem, seed, iters, device, out, legacy_steps=False, sets=None, tag='', ntrain=0, **preset_kw):
+def run(problem, seed, iters, device, out, legacy_steps=False, sets=None, tag='', ntrain=0, lr=1e-3, **preset_kw):
     from .gpu_guard import require_free
     require_free(device)
     build, load = PRESETS[problem]
@@ -117,9 +117,9 @@ def run(problem, seed, iters, device, out, legacy_steps=False, sets=None, tag=''
 
     def log(*a):
         s = ' '.join(str(x) for x in a); print(s, flush=True); logf.write(s + '\n'); logf.flush()
-    log(f'{name}: params={sum(p.numel() for p in model.parameters())} iters={iters} device={device} preset={preset_kw}')
+    log(f'{name}: params={sum(p.numel() for p in model.parameters())} iters={iters} lr={lr} device={device} preset={preset_kw}')
     tr = data['train'] if ntrain <= 0 else dict(c=data['train']['c'][:ntrain], drive={k: v[:ntrain] for k, v in data['train']['drive'].items()})
-    info = train(model, tr, iters, seed, DTS[problem], log=log, legacy_steps=legacy_steps)
+    info = train(model, tr, iters, seed, DTS[problem], lr=lr, log=log, legacy_steps=legacy_steps)
     torch.save(model.state_dict(), os.path.join(out, name + '.pt'))
     model.eval()
     ev = evaluate(problem, model, data, sets)
@@ -128,7 +128,7 @@ def run(problem, seed, iters, device, out, legacy_steps=False, sets=None, tag=''
                  f' | mass {v["mass_err_max"]:.1e}' if 'mass_err_max' in v else f' | sigma min {v["sigma_min"]:.2e}')
         log(f'[{k}] relerr@T,2T,5T,10T median = ' + ', '.join(f'{x:.3e}' for x in v['relerr_median'].values())
             + f' | min c {v["min_c"]:.2e}' + extra + f' | substeps {v["substeps_per_DT"]:.1f} | infer {v["infer_time_s"]:.1f}s')
-    res = dict(problem=problem, seed=seed, iters=iters, preset=preset_kw, **info, sets=ev)
+    res = dict(problem=problem, seed=seed, iters=iters, lr=lr, preset=preset_kw, **info, sets=ev)
     json.dump(res, open(os.path.join(out, name + '.json'), 'w'))
     return res
 
@@ -139,14 +139,19 @@ if __name__ == '__main__':
     p.add_argument('--iters', type=int, default=None); p.add_argument('--device', default='cpu')
     p.add_argument('--out', default=os.path.join(ROOT, 'runs', 'hyperme'))
     p.add_argument('--legacy_steps', action='store_true')
-    p.add_argument('--method', default=None, help='c3 only: ssp | mprk22 | patankar')
+    p.add_argument('--method', default=None, help='c3, c3_wired: ssp | mprk22 | patankar')
     p.add_argument('--nsub', type=int, default=1)
     p.add_argument('--threads', type=int, default=4)
     p.add_argument('--ntrain', type=int, default=0, help='>0: use only the first ntrain training trajectories')
+    p.add_argument('--lr', type=float, default=1e-3)
+    p.add_argument('--no_chem_prefactor', action='store_true', help='c3_wired only: chemostats enter the force but not k')
     a = p.parse_args()
-    iters = a.iters or dict(s2_tcme=2500, s2_wired=2500, c1=2000, c3=2000)[a.problem]
+    iters = a.iters or dict(s2_tcme=2500, s2_wired=2500, c1=2000, c3=2000, c3_wired=2000)[a.problem]
     if a.device == 'cpu':
         torch.set_num_threads(a.threads)
     kw = dict(method=a.method, nsub=a.nsub) if a.method else {}
-    tag = (f'_{a.method}{a.nsub}' if a.method else '') + (f'_n{a.ntrain}' if a.ntrain > 0 else '')
-    run(a.problem, a.seed, iters, a.device, a.out, a.legacy_steps, tag=tag, ntrain=a.ntrain, **kw)
+    if a.no_chem_prefactor:
+        kw['chem_prefactor'] = False
+    tag = ((f'_{a.method}{a.nsub}' if a.method else '') + (f'_n{a.ntrain}' if a.ntrain > 0 else '')
+           + (f'_lr{a.lr:g}' if a.lr != 1e-3 else '') + ('_nochemk' if a.no_chem_prefactor else ''))
+    run(a.problem, a.seed, iters, a.device, a.out, a.legacy_steps, tag=tag, ntrain=a.ntrain, lr=a.lr, **kw)

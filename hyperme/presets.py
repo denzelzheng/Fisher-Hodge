@@ -221,6 +221,52 @@ def c3(n=8, hidden=64, use_A=True, method='ssp', nsub=1, well_mixed=False):
 C3_DT = 0.2
 
 
+def c3_wired_featurizer(hg):
+    """drive = dict(logab (B, 2) raw (log a, log b)) -> wired features: chem_logc = (log a, log b, log d = 0, log e = 0)."""
+    from .model import wired_featurizer
+    assert hg.meta['chemostats'] == ['A', 'B', 'D', 'E']
+    base = wired_featurizer(hg)
+
+    def feat(F):
+        lab = F['logab']
+        return base(dict(chem_logc=torch.cat([lab, torch.zeros_like(lab)], -1)))
+    feat.n_edge_sym = base.n_edge_sym
+    return feat
+
+
+def c3_wired(n=8, method='mprk22', nsub=8, chem_prefactor=True, well_mixed=False):
+    """Brusselator C3 in the wired mode: mu = log c + mu0 (learned mu0 for X, Y), A = chemostat force of (a, b, d, e)
+    plus learned chemostat mu0, log k a table over the hyperedge types, and (chem_prefactor) the chemostat mass-action
+    factor in k.  With the true parameters (c3_true_wired) this is the generating model for every (a, b)."""
+    kw = dict(n_sites=1) if well_mixed else dict(grid_n=n, diffusing=['X', 'Y'])
+    hg = Hypergraph.reaction_transport(['X', 'Y', 'A', 'B', 'D', 'E'], C3_RX, chemostats=['A', 'B', 'D', 'E'], **kw)
+    step = dict(dt_max=C3_DT / 4, theta0=0.5, theta1=0.5, max_sub=2000, t_tol=1e-12) if method == 'ssp' else dict(method=method, nsub=nsub)
+    with default_dtype(torch.float64):
+        m = HyperME.build_wired(hg, k_ref=1.0, T_exponent=0.0, harmonic=False, featurizer=c3_wired_featurizer(hg), step=step,
+                                learn_mu0=True, learn_chem_mu0=True, kinetics_table=True, chem_prefactor=chem_prefactor)
+    return m.double()
+
+
+@torch.no_grad()
+def c3_true_wired(model, k=(1.0, 1.0, 1.0, 1.0), eps=1e-3, DX=0.4, DY=3.6):
+    """set a c3_wired model to the generator of hyper/gen_brusselator.py: reaction r has forward constant k_r (times its
+    chemostat reactant) and reverse eps (times its chemostat product), so log k_sym = log sqrt(k_r eps) and the standard
+    potentials satisfy <nu+ - nu-, mu0> = log(k_r / eps); transport has k = D_s."""
+    x = torch.log(torch.as_tensor(k, dtype=torch.float64) / eps)
+    # species stoichiometry per reaction (one site) for X, Y and the chemostats A, B, D, E
+    nu = torch.tensor([[-1., 0., 1., 0., 0., 0.],       # rows: <nu+ - nu-> over (X, Y, A, B, D, E); R1 A -> X
+                       [-1., 1., 0., 0., 0., 0.],       # R2 2X + Y -> 3X
+                       [1., -1., 0., 1., -1., 0.],      # R3 B + X -> Y + D
+                       [1., 0., 0., 0., 0., -1.]], dtype=torch.float64)   # R4 X -> E
+    mu0 = torch.linalg.pinv(nu) @ x                    # minimum-norm solution (the 2 gauge directions set to 0)
+    assert torch.allclose(nu @ mu0, x, atol=1e-12)
+    model.free_energy.mu0.copy_(mu0[:2]); model.drive.chem_mu0.copy_(mu0[2:])
+    lk = torch.cat([0.5 * torch.log(torch.as_tensor(k, dtype=torch.float64) * eps), torch.log(torch.tensor([DX, DY], dtype=torch.float64))])
+    W = model.kinetics.mlp.net[0].weight
+    W.copy_(lk[None, :W.shape[1]])
+    return model
+
+
 def load_legacy_c3(model, sd):
     mp = {'kmlp.': 'kinetics.mlp.', 'amlp.': 'drive.mlp.', 'G.': 'free_energy.mlp.'}
     out = {}
@@ -242,11 +288,11 @@ def load_c3(root=ROOT, device='cpu', name='brus'):
             continue
         B, T = d['c'].shape[:2]
         out[k] = dict(c=d['c'].reshape(B, T, -1).double().to(device),
-                      drive=dict(drv=((d['drv'].double() - dm) / ds).to(device)))
+                      drive=dict(drv=((d['drv'].double() - dm) / ds).to(device), logab=d['drv'].double().to(device)))
         for extra in ('sigma', 'homog', 'k', 'A'):
             if extra in d:
                 out[k][extra] = d[extra]
     return out
 
 
-PRESETS = dict(s2_tcme=(s2_tcme, load_s2), s2_wired=(s2_wired, load_s2), c1=(c1, load_c1), c3=(c3, load_c3))
+PRESETS = dict(s2_tcme=(s2_tcme, load_s2), s2_wired=(s2_wired, load_s2), c1=(c1, load_c1), c3=(c3, load_c3), c3_wired=(c3_wired, load_c3))
