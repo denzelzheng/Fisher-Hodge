@@ -10,7 +10,7 @@ def linear_model(reversible, n=6, seed=0, B=3):
     torch.manual_seed(seed)
     with presets.default_dtype(torch.float64):
         hg = Hypergraph.grid_transport(n)
-        m = HyperME.build(hg, hidden=16, k_scale=4.0, drive='none' if reversible else 'project')
+        m = HyperME.build(hg, mode="flexible", hidden=16, k_scale=4.0, drive='none' if reversible else 'project')
         m.free_energy.mlp = None                      # phi = alpha U: linear
         m = perturb(m.double(), seed=seed)
     drive = dict(U=smooth(B, n, g).reshape(B, -1), force=torch.randn(B, hg.H, generator=g, dtype=torch.float64))

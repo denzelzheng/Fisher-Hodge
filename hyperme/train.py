@@ -10,9 +10,9 @@ import numpy as np
 import torch
 from .presets import PRESETS, T_TRAIN, ROOT
 
-EVAL_SETS = dict(s2_tcme=['test_id', 'test_oodpot', 'test_oodinit'], c1=['test_id', 'test_oodG', 'test_oodU'],
+EVAL_SETS = dict(s2_tcme=['test_id', 'test_oodpot', 'test_oodinit'], s2_wired=['test_id', 'test_oodpot', 'test_oodinit'], c1=['test_id', 'test_oodG', 'test_oodU'],
                  c3=['test_id', 'test_ood'])
-DTS = dict(s2_tcme=0.05, c1=0.05, c3=0.2)
+DTS = dict(s2_tcme=0.05, s2_wired=0.05, c1=0.05, c3=0.2)
 
 
 def take(drive, idx):
@@ -92,7 +92,7 @@ def evaluate(problem, model, data, sets=None):
             S.update(n_conserved=int(q.shape[-1]), cons_relerr_max=float(cons))
         else:
             e = relerr(R.double(), Y.double()).cpu().numpy()
-            if problem == 's2_tcme':
+            if problem.startswith('s2'):
                 S['mass_err_max'] = float((R.mean(-1) - 1.0).abs().max())
             else:
                 S['sigma_min'] = smin
@@ -142,7 +142,7 @@ if __name__ == '__main__':
     p.add_argument('--nsub', type=int, default=1)
     p.add_argument('--threads', type=int, default=4)
     a = p.parse_args()
-    iters = a.iters or dict(s2_tcme=2500, c1=2000, c3=2000)[a.problem]
+    iters = a.iters or dict(s2_tcme=2500, s2_wired=2500, c1=2000, c3=2000)[a.problem]
     if a.device == 'cpu':
         torch.set_num_threads(a.threads)
     kw = dict(method=a.method, nsub=a.nsub) if a.method else {}

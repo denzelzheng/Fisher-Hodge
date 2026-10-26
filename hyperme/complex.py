@@ -342,6 +342,12 @@ class Hypergraph:
         meta = dict(typ=typ, odd=typ >= R, site=site, et=et, eh=eh, n_reactions=R, diffusing=list(diffusing))
         if grid_n is not None:
             meta['grid_n'] = grid_n
+            # harmonic 1-cochains of the torus for every diffusing species: all its horizontal / all its vertical edges
+            Hm = np.zeros((H, 2 * Dn))
+            for d in range(Dn):
+                Hm[R * V + d * E + np.arange(V), 2 * d] = 1.0
+                Hm[R * V + d * E + V + np.arange(V), 2 * d + 1] = 1.0
+            meta['harmonic'] = Hm
         if NC:
             meta['chemostats'] = list(chemostats); meta['chem_S'] = Yc
         return cls(Np, Nm, n_species=NS, species_names=state, meta=meta, **kw)
@@ -372,6 +378,12 @@ class Hypergraph:
         harmonic cochains (cheap for large n), basis='svd' uses scipy null_space."""
         hg = cls.from_graph(grid_edge_list(n), n * n, n_species=n_species)
         hg.meta['grid_n'] = n
+        V = n * n
+        Hm = np.zeros((hg.H, 2 * n_species))                  # harmonic cochains: all horizontal / all vertical edges
+        for i in range(n_species):
+            Hm[i * 2 * V + np.arange(V), 2 * i] = 1.0
+            Hm[i * 2 * V + V + np.arange(V), 2 * i + 1] = 1.0
+        hg.meta['harmonic'] = Hm
         if basis == 'curl':
             Zs = grid_curl_basis(n)
             m = Zs.shape[0]

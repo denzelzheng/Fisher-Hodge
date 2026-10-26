@@ -54,6 +54,33 @@ def s2_tcme(n=32, hidden=128, rho_scale=10.0, D=0.02):
                    step=dict(dt_max=DT / 8, theta0=0.9, theta1=1.0, max_sub=4000, t_tol=1e-9))
 
 
+def s2_wired_featurizer(hg):
+    """S2 grid drive -> wired features: U (already in units of the training temperature), the drift line integral
+    dpsi as the force line integral, T (default 1 = training conditions), edge orientation as the only kinetic feature."""
+    def feat(F):
+        U, P = F['U'], F['dpsi']
+        B = U.shape[0]
+        T = torch.as_tensor(F.get('T', 1.0), dtype=U.dtype, device=U.device)
+        T = T.expand(B) if T.dim() == 0 else T.reshape(B)
+        ish = torch.zeros_like(P); ish[:, 0] = 1
+        sym = torch.stack([ish, 1 - ish], -1).reshape(B, -1, 2)
+        return dict(U=U.reshape(B, -1), T=T, line=G.flat_e(P), chem_logc=None, chem_mu0=None, edge_sym=sym,
+                    edge_ori=torch.zeros_like(sym[..., 0]), node={}, raw=F)
+    feat.n_edge_sym = 2
+    return feat
+
+
+def s2_wired(n=32, hidden=32, D=0.02, nonideal='none'):
+    """the wired model on S2: mu = log rho + U / T, A = (s_A dpsi + harmonic) / T, k = (D / h^2) T exp(kappa(orientation)).
+    Untrained (s_A = 1, b = 0, kappa = 0) it is the SQRA discretisation of the reference PDE (fisher_hodge/e7_wired.py).
+    Temperature: drive['T'] = D_test / D_train, or model.edit(T=...)."""
+    from .model import HyperME
+    hg = Hypergraph.grid_transport(n)
+    return HyperME.build_wired(hg, hidden=hidden, k_ref=D * n * n, T_exponent=1.0, nonideal=nonideal,
+                               featurizer=s2_wired_featurizer(hg),
+                               step=dict(dt_max=DT / 8, theta0=0.9, theta1=1.0, max_sub=4000, t_tol=1e-9))
+
+
 def load_legacy_tcme(model, sd):
     """fisher_hodge/models_tcme.TCME state dict -> s2_tcme model"""
     mp = {'k.': 'kinetics.mlp.', 'g.': 'free_energy.mlp.', 'psi.': 'drive.psi.'}
@@ -222,4 +249,4 @@ def load_c3(root=ROOT, device='cpu', name='brus'):
     return out
 
 
-PRESETS = dict(s2_tcme=(s2_tcme, load_s2), c1=(c1, load_c1), c3=(c3, load_c3))
+PRESETS = dict(s2_tcme=(s2_tcme, load_s2), s2_wired=(s2_wired, load_s2), c1=(c1, load_c1), c3=(c3, load_c3))

@@ -6,7 +6,7 @@ import pytest
 import torch
 from hyperme import Hypergraph
 from hyperme.complex import grid_curl_basis
-from helpers import case, CASES
+from helpers import case, CASES, PROJECTED
 
 NSTEP = 40
 DT = 0.05
@@ -73,7 +73,7 @@ def test_free_energy_monotone_without_drive(name):
         assert out['excess'].min() > 0 and (out['housekeeping'] <= 1e-10 * out['sigma']).all()
 
 
-@pytest.mark.parametrize('name', CASES)
+@pytest.mark.parametrize("name", PROJECTED)
 def test_drive_in_cycle_space(name):
     m, drive, c0 = case(name, seed=4)
     with torch.no_grad():

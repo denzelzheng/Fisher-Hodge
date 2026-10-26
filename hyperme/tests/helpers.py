@@ -14,7 +14,7 @@ def perturb(model, std=0.3, seed=0):
             if mlp is not None:
                 for p in mlp.net[-1].parameters():
                     p.copy_(torch.randn(p.shape, generator=g, dtype=p.dtype) * std)
-            for nm in ('gam', 'v', 'Wb', 'gain', 'chi'):
+            for nm in ('gam', 'v', 'Wb', 'gain', 'chi', 'b', 'L', 'a'):
                 if hasattr(m, nm) and isinstance(getattr(m, nm), torch.nn.Parameter):
                     p = getattr(m, nm); p.copy_(torch.randn(p.shape, generator=g, dtype=p.dtype) * std)
     return model
@@ -48,7 +48,7 @@ def case(name, B=4, seed=0, reversible=False):
         elif name == 'grid_nonlocal':
             n = 6
             hg = Hypergraph.grid_transport(n)
-            m = HyperME.build(hg, hidden=32, nonlocal_kernel=gaussian_kernel(n), k_scale=5.0, step=dict(dt_max=0.01))
+            m = HyperME.build(hg, mode="flexible", hidden=32, nonlocal_kernel=gaussian_kernel(n), k_scale=5.0, step=dict(dt_max=0.01))
             P = smooth(B, n, g)
             force = GridOps.flat_e(GridOps.d1T(P)) + 0.3 * torch.randn(B, hg.H, generator=g, dtype=torch.float64)
             drive = dict(U=smooth(B, n, g).reshape(B, -1), force=force)
@@ -58,7 +58,7 @@ def case(name, B=4, seed=0, reversible=False):
             # one cycle per site (r1 + r3 = r2) and two moieties per site (A atoms, B atoms)
             rx = [({'A': 1, 'B': 1}, {'C': 1}), ({'A': 2}, {'D': 1}), ({'C': 1, 'A': 1}, {'D': 1, 'B': 1})]
             hg = Hypergraph.from_reactions(rx, sp, n_sites=3)
-            m = HyperME.build(hg, hidden=32, step=dict(dt_max=0.01))
+            m = HyperME.build(hg, mode="flexible", hidden=32, step=dict(dt_max=0.01))
             drive = dict(U=0.3 * torch.randn(B, hg.M, generator=g, dtype=torch.float64),
                          force=torch.randn(B, hg.H, generator=g, dtype=torch.float64))
             c0 = torch.rand(B, hg.M, generator=g, dtype=torch.float64) + 1e-3
@@ -67,10 +67,23 @@ def case(name, B=4, seed=0, reversible=False):
             # No conserved moiety; the chemostats drive the local cycle through chemostat_force().
             hg = Hypergraph.reaction_transport(['X', 'A', 'B'], [({'A': 1, 'X': 2}, {'X': 3}), ({'X': 1}, {'B': 1})],
                                                grid_n=5, diffusing=['X'], chemostats=['A', 'B'])
-            m = HyperME.build(hg, hidden=32, step=dict(dt_max=0.01))
+            m = HyperME.build(hg, mode="flexible", hidden=32, step=dict(dt_max=0.01))
             mu = torch.stack([1.0 + torch.rand(B, generator=g, dtype=torch.float64), torch.zeros(B, dtype=torch.float64)], 1)
             drive = dict(U=0.3 * smooth(B, 5, g).reshape(B, -1), force=hg.chemostat_force(mu))
             c0 = torch.rand(B, hg.M, generator=g, dtype=torch.float64) + 0.2
+        elif name in ('wired_c1', 'wired_dh'):
+            # wired mode on a C1-type network with ATP / ADP chemostats: X + E + ATP <-> Xp + E + ADP, Xp <-> X,
+            # X and Xp diffuse on a 4 x 4 torus; temperature, potential and chemostat potentials are drive inputs
+            rx = [({'X': 1, 'E': 1, 'ATP': 1}, {'Xp': 1, 'E': 1, 'ADP': 1}), ({'Xp': 1}, {'X': 1})]
+            hg = Hypergraph.reaction_transport(['X', 'Xp', 'E', 'ATP', 'ADP'], rx, grid_n=4, diffusing=['X', 'Xp'],
+                                               chemostats=['ATP', 'ADP'])
+            nonideal = 'virial' if name == 'wired_c1' else 'debye_huckel'
+            m = HyperME(hg, mode='wired', nonideal=nonideal, charges=[1.0, 2.0, 0.0], k_ref=2.0,
+                        step=dict(dt_max=0.01))
+            drive = dict(U=smooth(B, 4, g).reshape(B, -1), T=0.5 + 1.5 * torch.rand(B, generator=g, dtype=torch.float64),
+                         chem_logc=torch.stack([1 + 2 * torch.rand(B, generator=g, dtype=torch.float64),
+                                                torch.zeros(B, dtype=torch.float64)], 1))
+            c0 = torch.rand(B, hg.M, generator=g, dtype=torch.float64) * 1.5 + 0.05
         elif name == 'tcme':
             n = 8
             m = presets.s2_tcme(n=n, hidden=32)
@@ -84,4 +97,5 @@ def case(name, B=4, seed=0, reversible=False):
     return m, drive, c0
 
 
-CASES = ['c1', 'schlogl', 'reactions', 'grid_nonlocal', 'tcme']
+CASES = ['c1', 'schlogl', 'reactions', 'grid_nonlocal', 'tcme', 'wired_c1', 'wired_dh']
+PROJECTED = ['c1', 'schlogl', 'reactions', 'grid_nonlocal', 'tcme']        # drive maps that project onto ker S

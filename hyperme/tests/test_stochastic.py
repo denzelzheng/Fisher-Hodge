@@ -10,7 +10,7 @@ def ring_model(n_states=4, seed=0):
     E = [(i, (i + 1) % n_states) for i in range(n_states)]
     with presets.default_dtype(torch.float64):
         hg = Hypergraph.from_graph(E, n_states)
-        m = HyperME.build(hg, hidden=8, k_scale=1.0, force_gain_init=1.0).double()
+        m = HyperME.build(hg, mode="flexible", hidden=8, k_scale=1.0, force_gain_init=1.0).double()
         m.free_energy.mlp = None
     g = torch.Generator().manual_seed(seed)
     drive = dict(U=0.5 * torch.randn(1, n_states, generator=g, dtype=torch.float64),

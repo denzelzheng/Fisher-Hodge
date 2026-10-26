@@ -180,7 +180,9 @@ On the Brusselator limit cycle in a well-mixed volume of size 200, HyperME is cl
 
 The prototype code is now collected in one library, `hyperme/`. The scripts in `fisher_hodge/` and `hyper/` are unchanged and give the same numbers as before.
 
-A model lives on a hypergraph. Hyperedge `h` turns the reactants `ν_h⁺` into the products `ν_h⁻`. Transport along a graph edge is a hyperedge with one reactant and one product. The state `c` holds one concentration per species and site. The drive holds the external potential `U` and a force on every hyperedge. For a transport edge the force is the line integral of the driving field along the edge. For a chemostatted reaction it is the chemical potential difference of the chemostats.
+A model lives on a hypergraph. Hyperedge `h` turns the reactants `ν_h⁺` into the products `ν_h⁻`. Transport along a graph edge is a hyperedge with one reactant and one product. The state `c` holds one concentration per species and site. The drive holds the knobs of the system: the potential `U`, the temperature `T`, the line integral of an external force along every edge, and the log concentrations of the chemostats.
+
+The default mode wires the thermodynamics and learns only the kinetics. The chemical potential is `log c + U/T`, plus an optional correction for non-ideal solutions with a few parameters. The force and the chemostats enter the edge affinity `A` exactly. The network learns a symmetric rate prefactor from local features of each hyperedge, a global drive scale and one coefficient per harmonic cochain. No knob is a network input, so `model.edit(T=..., drive_scale=...)` changes a knob without retraining, and `drive_scale=0` removes the drive. Untrained on S2, the model is the SQRA discretisation of the reference equation (10T error 4.1e-3). With `edit` it follows a halved or doubled diffusion constant (errors 0.012 and 0.0015, against 0.44 and 0.34 without the edit) and a drift switched off or doubled (0.003 and 0.009). `mode='flexible'` keeps the learned free energy and drive map of the earlier experiments.
 
 ```python
 import torch
@@ -188,18 +190,19 @@ from hyperme import Hypergraph, HyperME, integrators
 
 rx = [({'A': 1, 'X': 2}, {'X': 3}), ({'X': 1}, {'B': 1})]           # Schlögl model at every site
 hg = Hypergraph.reaction_transport(['X', 'A', 'B'], rx, grid_n=16, diffusing=['X'], chemostats=['A', 'B'])
-model = HyperME.build(hg)                                           # free energy, kinetics and drive map
-drive = dict(U=torch.randn(4, 256), force=hg.chemostat_force(torch.tensor([[2.0, 0.0]] * 4)))
+model = HyperME(hg, nonideal='virial')                              # wired thermodynamics, learned kinetics
+drive = dict(U=torch.randn(4, 256), T=torch.ones(4), chem_logc=torch.tensor([[2.0, 0.0]] * 4))
 c = torch.rand(4, 256) + 0.5                                        # a batch of 4 states
 dcdt = model(c, drive)                                              # S (a − b)
 out = model.readouts(c, drive)            # J, f, ℓ, σ, excess, housekeeping, cycle affinities, moieties
-c, nsub = integrators.positive_ssp_rk2(model, c, model.prepare(drive), Dt=0.05)
+hot = model.edit(T=2.0)                   # the same model at twice the temperature, no retraining
+c, nsub = integrators.positive_ssp_rk2(hot, c, hot.prepare(drive), Dt=0.05)
 ```
 
 | File | Contents |
 |---|---|
 | `complex.py` | `Hypergraph`. It holds the stoichiometric matrix `S` and orthonormal bases of `ker S` (cycles) and `ker Sᵀ` (moieties). The main builder `reaction_transport` copies a reaction list to every site of a spatial graph. Reactions may be many-to-many with any integer coefficients. Each listed species gets its own transport edges, and chemostatted species leave the state and enter as a drive. Smaller builders cover well-mixed networks, pure transport on a graph or periodic grid, and the C1 network. On the grid the cycle basis can be built from `d₁ᵀ` and the two harmonic cochains. |
-| `model.py` | `HyperME` and its three learned parts. `FreeEnergy` is `log c + αU` plus an MLP correction, optionally with non-local features `W∗c`. `Kinetics` gives a symmetric `k > 0` from hyperedge features and, if asked, from `c`. The drive map turns the force into `A` and projects it onto `ker S`. Methods: `rates`, `flux`, `readouts`, `generator`. |
+| `model.py` | `HyperME` and its three parts. Wired mode: `WiredFreeEnergy` (`log c + U/T` with a virial or Debye–Hückel correction), `WiredKinetics` (`k_ref T exp(κ_θ)`), `WiredDrive` (exact force, chemostats, harmonic coefficients). Flexible mode: `FreeEnergy` with an MLP correction and optional non-local features `W∗c`, `Kinetics` from hyperedge features and optionally `c`, and a drive map projected onto `ker S`. Methods: `rates`, `flux`, `readouts`, `generator`, `edit`. |
 | `integrators.py` | Explicit SSP-RK2 with positivity-preserving substeps. Modified Patankar schemes (Patankar–Euler and MPRK22), which are linearly implicit, positive and conserving at any step size and can be trained through. Implicit Euler with conjugate gradients for linear master equations. A variational implicit step in flux space. The matrix exponential. |
 | `stochastic.py` | Gillespie, tau-leaping and chemical Langevin samplers that use the learned rates. They record firing counts and the entropy of every channel. `ws3.py` runs the fluctuation study. |
 | `coarse.py` | Projected generator and lag `τ` propagator. Both check that the coarse stationary state and currents are the block sums of the fine ones and that `σ̄ ≤ σ`. |
