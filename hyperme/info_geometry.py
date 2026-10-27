@@ -15,7 +15,7 @@ coordinate) and the network gives the symmetric kinetics k (the material coordin
   5 extrap  the transfer bound of Theorem 0(iii)(b) on S2-M, an S2 variant whose true generator lies in G(S) (SQRA
             with a mobility that depends on a material field): bound against measured vector-field and 10T errors
             at drive x 1, 2, 4, 8 and temperature x 0.25 ... 4, with Flux-GNN and a UDE closure for comparison.
-    python -m hyperme.info_geometry --stage c1_train | c1_path | pyth | proj | coarse | ex_data | ex_eval | plot | report
+    python -m hyperme.info_geometry --stage c1_train | c1_path | pyth | proj | coarse | ex_data | ex_eval | ex_vf | plot | report
     python -m hyperme.info_geometry --stage ex_train --model wired|flux|ude
 Outputs go to runs/hyperme/infogeo/, figures to assets/ig_*.png.  CPU only."""
 import argparse, copy, json, os, time
@@ -759,6 +759,72 @@ def stage_ex_eval(seed=0):
     json.dump(out, open(os.path.join(OUT, 'ex_eval.json'), 'w'), indent=1)
 
 
+def poisson_kl(a, b, at, bt):
+    """D(L_model || L_true) per sample: sum over hyperedges of the relative entropy of the two Poisson intensities"""
+    D = lambda x, y: x * (torch.log(x) - torch.log(y)) - x + y
+    return (D(a, at) + D(b, bt)).sum(-1)
+
+
+def phi_kl(d):
+    """phi(delta) = (1 + delta) log(1 + delta) - delta"""
+    return (1 + d) * torch.log1p(d) - d
+
+
+@torch.no_grad()
+def stage_ex_vf(seed=0):
+    """the exact form of the transfer bound (theory notes, IG2(c)) at the true states of every condition:
+    ||dc/dt error||_* / sqrt(sigma_true) <= delta_k with ||v||_*^2 = v^T (S Lambda S^T)^+ v (Lambda of the truth),
+    and D(L_model || L_true) / tau_true <= max_h phi(delta_h), tau = a + b.  For the chart, D = sum_h tau_h phi(delta_h)
+    exactly.  Flux-GNN is measured in the same norms (it conserves mass, so its error lies in im S)."""
+    log = _log('ex_vf')
+    D = torch.load(os.path.join(OUT, 'ex_data.pt'))
+    truth = ex_model(truth=True)
+    models = {}
+    for kind in ('wired', 'flux'):
+        p = os.path.join(OUT, f'ex_{kind}_s{seed}.pt')
+        if os.path.exists(p):
+            m = ex_build(kind); m.load_state_dict(torch.load(p)); models[kind] = m.eval()
+    S = truth.hg.S; Nl = scipy.linalg.null_space(S.T)
+    tb = D['test_base']
+    dlt = (models['wired'].prepare(cond_drive(tb))['k'] / truth.prepare(cond_drive(tb))['k'] - 1)
+    dk = float(dlt.abs().max())
+    phimax = float(phi_kl(dlt).max())                  # max_h phi(delta_h), the KL constant (delta_h > -1 always)
+    out = dict(delta_k=dk, phi_max=phimax, delta_min=float(dlt.min()), delta_max=float(dlt.max()), rows=[])
+    log(f'delta_k = {dk:.4f} (delta in [{dlt.min():.3f}, {dlt.max():.3f}]), max phi(delta_h) = {phimax:.4f}')
+    for kind, s, r in conditions():
+        drive = cond_drive(tb, s, r)
+        fr = D['test'][(kind, s, r)]
+        ct = truth.prepare(drive)
+        row = dict(kind=kind, s=s, r=r, sqrt_sigma=[], sqrt_sigma_ex=[], tau=[], J2=[], f_med=[], f_max=[], tight=[], kl_chart_formula=[],
+                   models={k: dict(dual=[], kl=[], eu=[]) for k in models})
+        for t in EX_FRAMES:
+            c = fr[t]
+            at, bt = truth.rates(c, ct)
+            J = at - bt; f = torch.log(at) - torch.log(bt); ell = logmean(at, bt)
+            sig = (J * f).sum(-1); tau = (at + bt).sum(-1)
+            cd_t = truth.hg.apply_S(J)
+            km = models['wired'].prepare(drive)['k']
+            d = km / ct['k'] - 1
+            row['sqrt_sigma'] += torch.sqrt(sig).tolist(); row['tau'] += tau.tolist(); row['J2'] += J.norm(dim=-1).tolist()
+            row['f_med'] += f.abs().median(-1).values.tolist(); row['f_max'] += f.abs().amax(-1).tolist()
+            row['tight'] += torch.sqrt((d ** 2 * J * f).sum(-1)).tolist()
+            row['kl_chart_formula'] += ((at + bt) * phi_kl(d)).sum(-1).tolist()
+            row['sqrt_sigma_ex'] += [onsager_norm(S, cd_t[i].numpy(), ell[i].numpy(), Nl) for i in range(len(c))]
+            for k, m in models.items():
+                ctx = m.prepare(drive)
+                a, b = m.rates(c, ctx)
+                e = m.hg.apply_S(a - b) - cd_t
+                row['models'][k]['eu'] += e.norm(dim=-1).tolist()
+                row['models'][k]['dual'] += [onsager_norm(S, e[i].numpy(), ell[i].numpy(), Nl) for i in range(len(c))]
+                row['models'][k]['kl'] += poisson_kl(a, b, at, bt).tolist()
+        out['rows'].append(row)
+        ss, tt = np.array(row['sqrt_sigma']), np.array(row['tau'])
+        log(kind, s, r, ' '.join(f"{k}: dual/sqrt(sigma) med {np.median(np.array(v['dual']) / ss):.4f} max {np.max(np.array(v['dual']) / ss):.4f}"
+                                  f" KL/tau med {np.median(np.array(v['kl']) / tt):.2e} max {np.max(np.array(v['kl']) / tt):.2e}" for k, v in row['models'].items()),
+            f"|f| median {np.median(row['f_med']):.3f} max {np.max(row['f_max']):.2f}")
+    json.dump(out, open(os.path.join(OUT, 'ex_vf.json'), 'w'), indent=1)
+
+
 # ------------------------------------------------------------------------------------------ figures
 INK, INK2, GRID = '#0b0b0b', '#52514e', '#e4e3df'
 C_BLUE, C_ORANGE, C_AQUA, C_YELLOW = '#2a78d6', '#eb6834', '#1baf7a', '#eda100'
@@ -820,42 +886,53 @@ def plot_proj(plt):
 
 
 def plot_extrap(plt):
+    import matplotlib.ticker
     E = json.load(open(os.path.join(OUT, 'ex_eval.json')))
-    rows = E['rows']
+    V = json.load(open(os.path.join(OUT, 'ex_vf.json')))
+    roll = {(r['kind'], r['s'], r['r']): r for r in E['rows']}
+    rows = V['rows']
     sel = dict(drive=sorted([r for r in rows if r['kind'] == 'drive'], key=lambda r: r['s']),
                temp=sorted([r for r in rows if r['kind'] == 'temp' or r['s'] == 1.0 and r['r'] == 1.0], key=lambda r: r['r']))
-    fig, axs = plt.subplots(3, 2, figsize=(9, 8.4), sharex='col')
-    lab_m = dict(wired='Neural Chart, measured', flux='Flux-GNN, measured', ude='UDE closure, measured')
-    col_m = dict(wired=C_BLUE, flux=C_ORANGE, ude=C_YELLOW)
+    fig, axs = plt.subplots(4, 2, figsize=(9, 10.8), sharex='col')
+    lab_m = dict(wired='Neural Chart, measured', flux='Flux-GNN, measured')
+    col_m = dict(wired=C_BLUE, flux=C_ORANGE)
+    med = lambda x: float(np.median(x))
     for j, (kind, rr) in enumerate(sel.items()):
         x = [r['s'] if kind == 'drive' else r['r'] for r in rr]
-        med = lambda key, src='vf': [np.median(r[src][key]) for r in rr]
         ax = axs[0, j]
-        for k in ('wired', 'flux', 'ude'):
-            if k in rr[0]['models']:
-                ax.plot(x, [np.median(r['models'][k]['vf_meas']) for r in rr], '-o', color=col_m[k], lw=2, ms=5, mec='white', label=lab_m[k])
-        ax.plot(x, med('bound_tight'), '--', color=C_BLUE, lw=1.5, label='bound ‖S‖ ‖Δk ⊙ φ‖')
-        ax.plot(x, med('bound_dk'), ':', color=C_BLUE, lw=1.5, label='bound ‖S‖ δk ‖J‖')
-        ax.set_yscale('log'); ax.set_ylabel('‖Δ dc/dt‖₂', fontsize=8, color=INK2)
+        for k in ('wired', 'flux'):
+            ax.plot(x, [med(np.array(r['models'][k]['dual']) / np.array(r['sqrt_sigma'])) for r in rr], '-o', color=col_m[k], lw=2, ms=5, mec='white', label=lab_m[k])
+        ax.plot(x, [med(np.array(r['tight']) / np.array(r['sqrt_sigma'])) for r in rr], '--', color=C_BLUE, lw=1.5, label='√(Σ δ_h² σ_h) / √σ')
+        ax.axhline(V['delta_k'], color=C_BLUE, ls=':', lw=1.5, label=f"δ_k = {V['delta_k']:.2f}")
+        ax.set_yscale('log'); ax.set_ylabel('‖Δċ‖_* / √σ_true', fontsize=8, color=INK2)
         ax = axs[1, j]
-        ax.plot(x, med('ons_meas'), '-o', color=C_BLUE, lw=2, ms=5, mec='white', label='Neural Chart, measured')
-        ax.plot(x, med('ons_tight'), '--', color=C_BLUE, lw=1.5, label='bound ‖Δk ⊙ φ‖ in ℓ⁻¹')
-        ax.plot(x, med('ons_dk'), ':', color=C_BLUE, lw=1.5, label='bound δk √σ')
-        ax.set_yscale('log'); ax.set_ylabel('Onsager norm of Δ dc/dt', fontsize=8, color=INK2)
+        for k in ('wired', 'flux'):
+            ax.plot(x, [med(np.array(r['models'][k]['kl']) / np.array(r['tau'])) for r in rr], '-o', color=col_m[k], lw=2, ms=5, mec='white', label=lab_m[k])
+        ax.axhline(V['phi_max'], color=C_BLUE, ls=':', lw=1.5, label=f"max_h φ(δ_h) = {V['phi_max']:.2f}")
+        ax.set_yscale('log'); ax.set_ylabel('D(model ‖ truth) / τ_true', fontsize=8, color=INK2)
         ax = axs[2, j]
-        for k in ('wired', 'flux', 'ude'):
-            if k in rr[0]['models']:
-                ax.plot(x, [np.median(r['models'][k]['rollout']['200']) for r in rr], '-o', color=col_m[k], lw=2, ms=5, mec='white', label=lab_m[k])
+        b = [r for r in rr if r['s'] == 1.0 and r['r'] == 1.0][0]
+        g = lambda r, key: med(r[key]) / med(b[key])
+        ax.plot(x, [med(r['models']['wired']['eu']) / med(b['models']['wired']['eu']) for r in rr], '-o', color=C_BLUE, lw=2, ms=5, mec='white', label='chart, Euclidean ‖Δċ‖₂')
+        ax.plot(x, [med(r['models']['wired']['dual']) / med(b['models']['wired']['dual']) for r in rr], '-o', color=C_AQUA, lw=2, ms=5, mec='white', label='chart, Onsager ‖Δċ‖_*')
+        ax.plot(x, [g(r, 'J2') for r in rr], '--', color=C_BLUE, lw=1.3, label='‖J_true‖₂ (∝ sinh f/2)')
+        ax.plot(x, [g(r, 'sqrt_sigma') for r in rr], '--', color=C_AQUA, lw=1.3, label='√σ_true (∝ √(f sinh f/2))')
+        ax.set_yscale('log'); ax.set_ylabel('growth relative to × 1', fontsize=8, color=INK2)
+        ax = axs[3, j]
+        for k in ('wired', 'flux'):
+            ax.plot(x, [med(roll[(r['kind'], r['s'], r['r'])]['models'][k]['rollout']['200']) for r in rr], '-o', color=col_m[k], lw=2, ms=5, mec='white', label=lab_m[k])
         ax.set_yscale('log'); ax.set_ylabel('10T relative L2 error', fontsize=8, color=INK2)
         ax.set_xscale('log', base=2)
         ax.set_xlabel('drive × s' if kind == 'drive' else 'temperature × r', fontsize=8, color=INK2)
         ax.set_xticks(x); ax.set_xticklabels([f'{v:g}' for v in x])
         for a in axs[:, j]:
-            _style(a); a.axvline(1.0, color=INK2, lw=0.8, ls='-', alpha=0.4)
+            _style(a); a.axvline(1.0, color=INK2, lw=0.8, alpha=0.4)
+            a.yaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
     axs[0, 0].set_title('drive strength (training at × 1)', fontsize=9, color=INK, loc='left')
     axs[0, 1].set_title('temperature (training at × 1)', fontsize=9, color=INK, loc='left')
-    for i in range(3):
-        axs[i, 1].legend(frameon=False, fontsize=7, loc='best')
+    for i in range(4):
+        kw = dict(loc='center left', bbox_to_anchor=(0.02, 0.66)) if i == 0 else dict(loc='center right' if i == 1 else 'best')
+        axs[i, 0 if i < 3 else 1].legend(frameon=False, fontsize=7, **kw)
     fig.tight_layout(); fig.savefig(os.path.join(ASSETS, 'ig_extrapolation_bound.png'), dpi=160); plt.close(fig)
 
 
@@ -864,7 +941,7 @@ def stage_plot():
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
     plt.rcParams['font.family'] = 'DejaVu Sans'
-    for f, p in (('pyth.json', plot_pyth), ('proj.json', plot_proj), ('ex_eval.json', plot_extrap)):
+    for f, p in (('pyth.json', plot_pyth), ('proj.json', plot_proj), ('ex_vf.json', plot_extrap)):
         if os.path.exists(os.path.join(OUT, f)):
             p(plt)
 
@@ -945,6 +1022,22 @@ def stage_report():
                      + ' / '.join(f"{g(k, lambda m: md(np.array(m['vf_meas'][:nb]) / ct0)):.3f}" for k in ('wired', 'flux', 'ude')) + ' | '
                      + ' / '.join(f"{g(k, lambda m: md(m['rollout']['200'])):.2e}" for k in ('wired', 'flux', 'ude')) + ' | '
                      + ' / '.join(f"{g(k, lambda m: md(m['rollout']['20'])):.2e}" for k in ('wired', 'flux', 'ude')) + ' |')
+    p = os.path.join(OUT, 'ex_vf.json')
+    if os.path.exists(p):
+        V = json.load(open(p))
+        L += ['', '## 5 (IG2(c))', f"δ_k = {V['delta_k']:.4f}, δ_h in [{V['delta_min']:.3f}, {V['delta_max']:.3f}], max_h φ(δ_h) = {V['phi_max']:.4f}",
+              '| condition | median / max |f| | ‖Δċ‖_*/√σ chart: median / max | tight √(Σδ²σ)/√σ median | ‖Δċ‖_*/√σ Flux: median / max | D/τ chart: median / max | D/τ chart formula median | D/τ Flux: median / max | growth vs × 1: ‖Δċ‖₂ / ‖Δċ‖_* / ‖J‖ / √σ (chart) |',
+              '|---|---|---|---|---|---|---|---|---|']
+        base = [r for r in V['rows'] if r['s'] == 1.0 and r['r'] == 1.0][0]
+        md = lambda x: float(np.median(x))
+        for r in V['rows']:
+            ss, tt = np.array(r['sqrt_sigma']), np.array(r['tau'])
+            w, fl = r['models']['wired'], r['models'].get('flux')
+            q = lambda v, n: f"{md(np.array(v) / n):.4g} / {np.max(np.array(v) / n):.4g}"
+            L.append(f"| {r['kind']} s={r['s']:g} r={r['r']:g} | {md(r['f_med']):.3f} / {np.max(r['f_max']):.2f} | {q(w['dual'], ss)} | {md(np.array(r['tight']) / ss):.4g} | "
+                     + (q(fl['dual'], ss) if fl else '-') + f" | {q(w['kl'], tt)} | {md(np.array(r['kl_chart_formula']) / tt):.4g} | " + (q(fl['kl'], tt) if fl else '-') + ' | '
+                     + f"{md(w['eu']) / md(base['models']['wired']['eu']):.2f} / {md(w['dual']) / md(base['models']['wired']['dual']):.2f} / "
+                     f"{md(r['J2']) / md(base['J2']):.2f} / {md(r['sqrt_sigma']) / md(base['sqrt_sigma']):.2f} |")
     txt = '\n'.join(L)
     open(os.path.join(OUT, 'tables.md'), 'w').write(txt)
     print(txt)
@@ -965,4 +1058,4 @@ if __name__ == '__main__':
         stage_ex_train(a.model, a.seed, a.iters)
     else:
         dict(c1_path=stage_c1_path, pyth=stage_pyth, proj=stage_proj, coarse=stage_coarse, ex_data=stage_ex_data,
-             ex_eval=stage_ex_eval, plot=stage_plot, report=stage_report)[st]()
+             ex_eval=stage_ex_eval, ex_vf=stage_ex_vf, plot=stage_plot, report=stage_report)[st]()

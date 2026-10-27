@@ -66,3 +66,16 @@ def test_transfer_bound_onsager_norm():
     assert IG.onsager_norm(S, e, ell, Nl) <= np.sqrt((dk ** 2 * sig_h).sum()) * (1 + 1e-9)
     assert IG.onsager_norm(S, e, ell, Nl) <= np.abs(dk).max() * np.sqrt(sig_h.sum())
     assert np.linalg.norm(e) <= np.linalg.norm(S, 2) * np.linalg.norm(dk * J) * (1 + 1e-12)
+
+
+def test_ig2_kl_and_uniform_onsager_equality():
+    hg = Hypergraph.grid_transport(4)
+    S = hg.S; Nl = scipy.linalg.null_space(S.T)
+    rng = np.random.default_rng(3)
+    a, b = torch.as_tensor(np.exp(rng.normal(size=hg.H))), torch.as_tensor(np.exp(rng.normal(size=hg.H)))
+    d = torch.as_tensor(rng.uniform(-0.5, 0.8, hg.H))
+    kl = IG.poisson_kl((1 + d) * a, (1 + d) * b, a, b)
+    assert torch.allclose(kl, ((a + b) * IG.phi_kl(d)).sum(), rtol=1e-12)
+    J = (a - b).numpy(); ell = logmean(a, b).numpy(); cd = S @ J
+    for dd in (0.2, -0.3):                    # uniform relative error: equality with sqrt(sigma_ex)
+        assert abs(IG.onsager_norm(S, dd * cd, ell, Nl) - abs(dd) * IG.onsager_norm(S, cd, ell, Nl)) < 1e-10

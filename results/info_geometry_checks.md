@@ -84,31 +84,46 @@ Medians over the drives, entropy production per unit time in probability units. 
 
 **Models and protocol.** Training data: 16 trajectories at the training condition (S2 training fields, 21 frames at Δt = 0.05). Test: the 16 test_id fields with their own material fields, at drive × 1, 2, 4, 8 (the drift scaled) and temperature × 0.25, 0.5, 2, 4 (T enters μ, A and k). The **Thermodynamic Neural Chart** wires the force exactly (the drive scale fixed at 1, no harmonic term) and learns k = (D/h²) T exp(core + s_k MLP(orientation, M̄)), 32 hidden units, with `fit()` (closed-form step, then 2000 Adam steps at lr 1e-3, batch 8, rollout K in [4, 8]). **Flux-GNN** learns both one-way rates from U/T, M, log T, the edge features and the drift line integral divided by T (the best-informed black box of G1), with the same protocol and 32 hidden units (64 took 14 s per step on the CPU). It trained for 3.3 hours on the CPU of axiom to a final loss of 5.4e-5 (chart 1.7e-5). A UDE closure (the uniform-mobility SQRA plus a GNN correction of dc/dt) was started with the same protocol and stopped after 65 minutes without a logged step: at about 11 s per step it would have needed more than 6 hours. It is not reported.
 
-**Bounds.** With ΔJ = J_model − J_true = (k/k_true − 1) ⊙ J_true at shared forces:
+**Bounds (theory notes, IG2(c)).** Let δ_h = k_h/k_true,h − 1, δ_k = max_h |δ_h|, and take τ = a + b, Λ and σ at the truth at the state and condition in question. Then
 
-- Euclidean, Theorem 0(iii)(b): ‖Δċ‖₂ ≤ ‖S‖₂ ‖ΔJ‖₂ ≤ ‖S‖₂ δ_k ‖J_true‖₂, with ‖S‖₂ = 2√2 on the torus and δ_k = max_h |k_h/k_true,h − 1|.
-- Onsager norm: ‖Δċ‖_{(SℓSᵀ)⁺} ≤ ‖ΔJ‖_{ℓ⁻¹} = (Σ_h (k_h/k_true,h − 1)² σ_h)^{1/2} ≤ δ_k √σ_true, with ℓ the true Onsager weights. The first step is the minimum principle of Theorem 1(d), ‖x‖²_{(SℓSᵀ)⁺} = min{‖J‖²_{ℓ⁻¹} : SJ = x}, and the second uses J_h²/ℓ_h = σ_h. So the error of the vector field, measured as the excess dissipation it would need, is at most the relative kinetic error times √σ. This is our form, pending the exact form from the theory notes.
+- Onsager dual norm, ‖v‖²_* = vᵀ(SΛSᵀ)⁺v on im S: ‖Δċ‖_* ≤ ‖ΔJ‖_{Λ⁻¹} = (Σ_h δ_h² σ_h)^{1/2} ≤ δ_k √σ_true, with equality |δ|√σ_ex when δ_h is uniform (checked in the tests).
+- Path divergence: D(L_model ‖ L_true) = Σ_h τ_h φ(δ_h) ≤ max_h φ(δ_h) · τ_true, with φ(δ) = (1 + δ) log(1 + δ) − δ. The theory notes write the constant as φ̄(δ_k) = max{φ(δ_k), φ(−δ_k)}, which needs δ_k < 1. Here δ_k = 1.92, so we use max_h φ(δ_h) = 1.21, with δ_h between −0.048 and 1.92.
+- Euclidean, Theorem 0(iii)(b): ‖Δċ‖₂ ≤ ‖S‖₂ ‖ΔJ‖₂ ≤ ‖S‖₂ δ_k ‖J_true‖₂, with ‖S‖₂ = 2√2 on the torus.
 
-δ_k does not depend on the condition, because k does not see it (checked: the same 1.92 at all 8 conditions). The vector-field errors are taken at the true states at t = 0, T and 10T (48 states per condition, median).
+So the normalized errors ‖Δċ‖_*/√σ_true and D/τ_true must stay below δ_k and max_h φ(δ_h) at every condition. δ_k does not depend on the condition, because k does not see it (the same 1.92 at all 8 conditions). All errors are taken at the true states at t = 0, T and 10T (48 states per condition, median and maximum over them). Flux-GNN conserves mass, so its error also lies in im S and is measured in the same norms. It has no bound.
 
-| condition | ‖Δċ‖₂ chart / bound ‖S‖‖ΔJ‖ / bound ‖S‖δ_k‖J‖ | Onsager norm: chart / ‖ΔJ‖_ℓ⁻¹ / δ_k√σ | ‖ΔJ‖/‖J‖ chart | ‖Δċ‖₂ Flux-GNN | ‖Δċ‖/‖ċ‖ at t = 0: chart / Flux-GNN | 10T error: chart / Flux-GNN |
+| condition | median / max \|f\| | ‖Δċ‖_*/√σ chart, median / max | √(Σδ²σ)/√σ, median | ‖Δċ‖_*/√σ Flux-GNN, median / max | D/τ chart, median / max | D/τ Flux-GNN, median / max |
 |---|---|---|---|---|---|---|
-| training (× 1) | 2.26 / 9.31 / 1215 | 0.62 / 0.94 / 83 | 0.012 | 10.7 | 0.020 / 0.083 | 0.0057 / 0.028 |
-| drive × 2 | 4.05 / 17.1 / 2293 | 0.96 / 1.45 / 151 | 0.013 | 22.4 | 0.023 / 0.125 | 0.010 / 0.054 |
-| drive × 4 | 8.47 / 34.3 / 4347 | 1.81 / 2.74 / 296 | 0.014 | 66 | 0.027 / 0.287 | 0.017 / 0.190 |
-| drive × 8 | 21.7 / 91.8 / 11100 | 4.20 / 6.01 / 628 | 0.014 | 149 | 0.027 / 0.643 | 0.022 / 0.416 |
-| temperature × 0.25 | 2.64 / 10.3 / 1712 | 0.87 / 1.45 / 146 | 0.012 | 322 | 0.026 / 1.93 | 0.0089 / 0.647 |
-| temperature × 0.5 | 2.64 / 10.2 / 1387 | 0.67 / 1.04 / 112 | 0.012 | 108 | 0.023 / 0.933 | 0.0062 / 0.159 |
-| temperature × 2 | 2.05 / 8.00 / 1093 | 0.49 / 0.90 / 58 | 0.013 | 11.0 | 0.019 / 0.510 | 0.0033 / 0.032 |
-| temperature × 4 | 1.81 / 7.82 / 1016 | 0.35 / 0.71 / 40 | 0.013 | 9.5 | 0.018 / 0.754 | 0.0018 / 0.053 |
+| training (× 1) | 0.16 / 2.0 | 0.0116 / 0.15 | 0.018 | 0.054 / 0.35 | 1.2e-4 / 6.2e-3 | 0.034 / 0.048 |
+| drive × 2 | 0.25 / 2.4 | 0.0116 / 0.12 | 0.017 | 0.076 / 0.22 | 1.2e-4 / 5.9e-3 | 0.035 / 0.049 |
+| drive × 4 | 0.45 / 3.9 | 0.0123 / 0.10 | 0.018 | 0.133 / 0.53 | 1.4e-4 / 6.2e-3 | 0.047 / 0.11 |
+| drive × 8 | 0.82 / 7.6 | 0.0117 / 0.11 | 0.018 | 0.139 / 0.81 | 1.5e-4 / 7.9e-3 | 0.148 / 0.46 |
+| temperature × 0.25 | 0.58 / 5.9 | 0.0125 / 0.18 | 0.017 | 1.59 / 7.37 | 1.2e-4 / 3.3e-2 | 1.19 / 4.62 |
+| temperature × 0.5 | 0.32 / 3.3 | 0.0116 / 0.17 | 0.018 | 0.667 / 1.81 | 1.2e-4 / 1.7e-2 | 0.124 / 0.35 |
+| temperature × 2 | 0.07 / 1.7 | 0.0119 / 0.10 | 0.018 | 0.229 / 0.51 | 1.2e-4 / 2.2e-3 | 0.256 / 0.28 |
+| temperature × 4 | 0.03 / 1.6 | 0.0111 / 0.07 | 0.018 | 0.201 / 0.75 | 1.2e-4 / 1.2e-3 | 0.504 / 0.52 |
+| bound | | ≤ δ_k = 1.92 | | none | ≤ max φ(δ_h) = 1.21 | none |
+
+Euclidean errors and trajectories (medians over the same states; relative error at t = 0, where ċ is far from zero):
+
+| condition | ‖Δċ‖₂ chart / ‖S‖‖ΔJ‖ / ‖S‖δ_k‖J‖ | ‖Δċ‖₂ Flux-GNN | ‖Δċ‖/‖ċ‖ at t = 0, chart / Flux-GNN | growth vs × 1, chart: ‖Δċ‖₂ / ‖Δċ‖_* (references ‖J‖ / √σ) | 10T error, chart / Flux-GNN |
+|---|---|---|---|---|---|
+| training (× 1) | 2.26 / 9.31 / 1215 | 10.7 | 0.020 / 0.083 | 1 / 1 | 0.0057 / 0.028 |
+| drive × 2 | 4.05 / 17.1 / 2293 | 22.4 | 0.023 / 0.125 | 1.79 / 1.56 (1.89 / 1.82) | 0.010 / 0.054 |
+| drive × 4 | 8.47 / 34.3 / 4347 | 66 | 0.027 / 0.287 | 3.74 / 2.94 (3.58 / 3.56) | 0.017 / 0.190 |
+| drive × 8 | 21.7 / 91.8 / 11100 | 149 | 0.027 / 0.643 | 9.57 / 6.82 (9.13 / 7.54) | 0.022 / 0.416 |
+| temperature × 0.25 | 2.64 / 10.3 / 1712 | 322 | 0.026 / 1.93 | 1.17 / 1.41 (1.41 / 1.75) | 0.0089 / 0.647 |
+| temperature × 0.5 | 2.64 / 10.2 / 1387 | 108 | 0.023 / 0.933 | 1.17 / 1.09 (1.14 / 1.35) | 0.0062 / 0.159 |
+| temperature × 2 | 2.05 / 8.00 / 1093 | 11.0 | 0.019 / 0.510 | 0.91 / 0.80 (0.90 / 0.70) | 0.0033 / 0.032 |
+| temperature × 4 | 1.81 / 7.82 / 1016 | 9.5 | 0.018 / 0.754 | 0.80 / 0.57 (0.84 / 0.47) | 0.0018 / 0.053 |
 
 ![Transfer bound](../assets/ig_extrapolation_bound.png)
 
-- **The bound holds at every state and condition.** Over all 384 states, the measured error of the chart is at most 0.48 of ‖S‖‖ΔJ‖ and 0.049 of ‖S‖δ_k‖J‖. In the Onsager norm it is at most 0.89 of ‖ΔJ‖_{ℓ⁻¹} (median 0.62 to 0.68) and 0.092 of δ_k√σ.
-- **The relative error does not grow with the condition, the absolute error does.** The current-weighted kinetic error ‖ΔJ‖/‖J‖ is 1.2 to 1.4 percent at every drive and temperature, and the relative error of the vector field at t = 0 is 1.8 to 2.7 percent. The absolute error grows with the drive, from 2.3 to 21.7 at × 8, following |φ| = 2ε|sinh(f/2)|, and the bound grows with it. This is the statement of the theorem: the new condition enters only through φ.
-- **The δ_k form is valid but loose: about 500 times the measured error at the median (at least 20), and 130 times in the Onsager norm (at least 11).** δ_k = 1.92 is set by 4 percent of the edges, where the material field is beyond ±2 and the mobility is small. These edges carry little current, so the data hardly constrain them. On the other 96 percent of the edges the learned k is within 5 percent. The tight Euclidean form is about 4 times the measured error (at least 2.1) and the tight Onsager form about 1.5 times (at least 1.1). The Onsager form weights each edge by its dissipation σ_h, so the slow, poorly identified edges drop out.
-- **The black box has no such bound, and its error grows with the condition.** Flux-GNN starts 4 to 5 times worse in distribution (8 against 2 percent relative vector-field error, 10T error 2.8 against 0.57 percent), part of which is the smaller network and the CPU budget. Its relative vector-field error then grows to 64 percent at drive × 8 and to 193 percent at temperature × 0.25, while the chart stays at 2 to 3 percent. The 10T error of Flux-GNN grows to 42 and 65 percent.
-- **The bound is on the vector field, not on trajectories.** The 10T error of the chart grows from 0.57 to 2.2 percent at drive × 8, although its relative vector-field error does not change, through the Gronwall factor of the stronger drive.
+- **The normalized error of the chart is constant across conditions and below the bound everywhere.** ‖Δċ‖_*/√σ_true is 0.011 to 0.012 at the median at every drive and temperature, and at most 0.18 over all 384 states, against δ_k = 1.92. D/τ_true is 1.2 to 1.5e-4 at the median and at most 0.033, against 1.21. The measured divergence equals the formula Σ τ_h φ(δ_h) to the printed digits. The tight form √(Σ δ_h² σ_h)/√σ is 0.017 to 0.018, so the first inequality is within a factor of about 1.5 (at most 0.89 of it at any state).
+- **The black box has no bound, and its normalized error grows with the condition.** For Flux-GNN ‖Δċ‖_*/√σ rises from 0.054 to 0.14 at drive × 8 and to 1.59 at temperature × 0.25 (7.4 at the worst state, above the chart's δ_k), and D/τ from 0.034 to 0.15 and 1.19. It also starts 4 to 5 times worse in distribution, part of which is the smaller network and the CPU budget. Its 10T error grows to 42 and 65 percent, against 2.2 and 0.9 percent for the chart.
+- **Euclidean against Onsager growth.** Along the drive the Euclidean error of the chart grows 9.6 times at × 8 and the Onsager error 6.8 times, close to their references ‖J_true‖ (9.1) and √σ_true (7.5). The forces here are moderate (median |f| from 0.16 to 0.82, largest 7.6), so most edges are in the linear range where both scale like f. The e^{|f|/2} against e^{|f|/4} separation is the large-force limit and shows here only as a 30 percent gap at × 8. Along the temperature k changes as well (k ∝ T), and the two absolute errors follow their references, which move in the other order (√σ_true grows 1.75 times at × 0.25, ‖J_true‖ 1.41 times). The normalized errors stay flat in both directions.
+- **The δ_k forms are valid but loose.** δ_k = 1.92 is set by 4 percent of the edges, where the material field is beyond ±2 and the mobility is small. These edges carry little current, so the data hardly constrain them. On the other 96 percent the learned k is within 5 percent. The Onsager form weights each edge by its dissipation σ_h, so the slow edges drop out of √(Σ δ_h² σ_h), while δ_k√σ is about 160 times the measured error. The Euclidean δ_k form is about 500 times, and ‖S‖‖ΔJ‖ about 4 times.
+- **The bound is on the vector field, not on trajectories.** The 10T error of the chart grows from 0.57 to 2.2 percent at drive × 8 while its normalized vector-field error does not change, through the Gronwall factor of the stronger drive.
 
 ## Limits
 
