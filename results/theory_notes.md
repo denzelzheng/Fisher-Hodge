@@ -1,6 +1,6 @@
 # HyperME theory notes
 
-These notes state five results that the HyperME experiments already support numerically. Each item gives a statement, a proof or proof sketch, a label that separates known results from statements of this project, and one line of numerical evidence. Theorem 0, placed last, states the design rule behind the wired model. It fixes the force by local detailed balance and learns only the symmetric kinetics, lists what this cut guarantees, and says in what precise sense it is the only cut with these guarantees.
+These notes state five results that the HyperME experiments already support numerically. Each item gives a statement, a proof or proof sketch, a label that separates known results from statements of this project, and one line of numerical evidence. Theorem 0, placed after them, states the design rule behind the wired model. It fixes the force by local detailed balance and learns only the symmetric kinetics, lists what this cut guarantees, and says in what precise sense it is the only cut with these guarantees. The last section, Information geometry of the chart, defines the Thermodynamic Neural Chart and restates these results as one line of proof in the dually flat geometry of the local jump law, from entropy production as a path divergence to the two sources of non-identifiability.
 
 ## 0. Setting and notation
 
@@ -222,6 +222,129 @@ The blind spot (Theorem 1) says that density data are constant along cycle direc
 
 **Relation to known theory.** The following structures are known: the exponential family of rates under LDB (Seifert 2012, Rao and Esposito 2016), cycle affinities (Schnakenberg 1976), the Hessian geometry of reaction networks (Kobayashi et al. 2022), and the gradient structure of detailed-balanced dynamics (Maas 2011, Mielke 2011). Near equilibrium $\Lambda\to g$, so $g$ is the edge Onsager coefficient and reciprocity holds by construction. At $[A]=0$, $\dot c=-S\Lambda S^\top\mu$ is the gradient flow of $F$ in the metric of $\Lambda$, so the cut wires the energy and learns the dissipation. The contribution of this project is the learning formulation, a map from material descriptors into $\mathfrak G(S)$, together with the combination of (a) to (d) that it yields at once, Proposition 0.1, and the counterexamples. Each step is elementary.
 
+## Information geometry of the chart
+
+**Definition (Thermodynamic Neural Chart).** Let $\Theta$ be the space of conditions and $\Xi$ the space of local material descriptors. A Thermodynamic Neural Chart is the map
+$$\Phi_w:\Theta\times\Xi^m\to\mathfrak G(S),\qquad(\theta,\xi)\mapsto\big(f^{\rm phys}(\cdot;\theta),\,k_w(\xi)\big).$$
+The physical coordinate $f^{\rm phys}$ is fixed by the axioms of §0 and Theorem 0(ii). The material coordinate $k_w(\xi)$ is the output of a network. Strictly, $\Phi_w$ is a parametrization of $\mathfrak G(S)$, the inverse of a coordinate chart. Physics-as-Coordinates is the rule behind it: the axioms supply some coordinates of the generator and a network supplies the rest. A Neural Chart is any model built this way.
+
+This section makes information geometry carry the proofs of the earlier results. Throughout, $L(a,b)$ is the local law of the event counts at a frozen state. On a window of length $\tau$ the forward and backward counts of hyperedge $h$ are independent Poisson variables with means $\tau a_h$ and $\tau b_h$. We quote divergences per unit time. For intensity vectors, $D(a\|a')=\sum_h(a_h\log(a_h/a'_h)-a_h+a'_h)$.
+
+### IG1. Entropy production is a path divergence
+
+**Statement.** (a) Let $P_{[0,T]}$ be the path measure of a Markov jump process with rates $w_{xy}$ started at $p_0$. Let $\tilde P_{[0,T]}$ be the law of the reversed path $\omega(T-\cdot)$ when $\omega$ follows the same generator started at $p_T$. Then
+$$D(P_{[0,T]}\|\tilde P_{[0,T]})=\int_0^T\sigma_{\rm tot}(t)\,dt,\qquad \sigma_{\rm tot}=\sum_{x<y}(p_xw_{xy}-p_yw_{yx})\log\frac{p_xw_{xy}}{p_yw_{yx}} .$$
+At stationarity $\sigma=T^{-1}D(P_{[0,T]}\|\tilde P_{[0,T]})$ for every $T$. Otherwise $\sigma=\lim_{T\to\infty}T^{-1}D$, since the boundary term is bounded.
+(b) At a frozen state,
+$$D\big(L(a,b)\,\|\,L(b,a)\big)=\sum_h(a_h-b_h)\log\frac{a_h}{b_h}=\sum_h\big[D(a_h\|b_h)+D(b_h\|a_h)\big].$$
+Each term is the Jeffreys divergence between the Poisson laws of intensities $a_h$ and $b_h$. For a linear network, with $a_h=p_iQ_{ij}$, this is $\sigma_{\rm tot}$ of (a). For mass-action networks with extensive propensities, $\sigma_{\rm tot}/\Omega$ of the chemical master equation converges to the §0 expression along the mean-field solution.
+
+**Proof.** (a) The log-likelihood ratio of two jump processes is the sum of log rate ratios over jumps minus the integrated difference of escape rates (Andersen et al. 1993). The escape terms cancel because the reversed path visits the same states for the same times. What remains is $\log p_0(\omega_0)-\log p_T(\omega_T)+\sum_{\rm jumps}\log(w_{xy}/w_{yx})$, whose expectation is the change of Shannon entropy plus the medium term, together $\int\sigma_{\rm tot}\,dt$. (b) The Poisson divergence is $a\log(a/b)-a+b$, and reversal swaps the two intensities. $\square$
+
+**Label.** Known: Lebowitz and Spohn (1999), Maes (1999), Maes and Netočný (2003), Gaspard (2004), Seifert (2012). The macroscopic limit is due to Ge and Qian (2016) and Rao and Esposito (2016). So the readout $\sigma$ is a property of the learned path measure.
+
+**Evidence.** WS3: with each model's own forces the fluctuation relation holds for every model (slopes 0.89 to 0.93 for a partial loop entropy). With the true forces on the model paths the slope falls to 0.27–0.46, so the learned path measures carry about a third of the true irreversibility of the near-irreversible loop.
+
+### IG2. Dual flatness, and the conditions as natural parameters
+
+**Statement.** (a) $\{L(a,b)\}$ is an exponential family with natural coordinates $(\log a,\log b)$, expectation coordinates $(a,b)$ and potential $\psi=\sum_h(a_h+b_h)$. The linear change $f_h=\log a_h-\log b_h$, $\lambda_h=\tfrac12(\log a_h+\log b_h)=\log g_h$ gives e-coordinates $(f,\lambda)$, in which $\psi=\sum_h2e^{\lambda_h}\cosh(f_h/2)$. The dual m-coordinates are
+$$\partial_{f_h}\psi=J_h/2,\qquad\partial_{\lambda_h}\psi=a_h+b_h=:\tau_h ,$$
+the current and the traffic. The Fisher metric of hyperedge $h$ in $(f_h,\lambda_h)$ is
+$$G_h=\begin{pmatrix}\tau_h/4&J_h/2\\ J_h/2&\tau_h\end{pmatrix},$$
+so $f$ and $\lambda$ are Fisher-orthogonal exactly when $J_h=0$.
+
+(b) In the chart, $f=f^{\rm phys}(c;\theta)$ and $\lambda=\log k+\log\varepsilon(c;\theta)$. By Proposition 4 both are affine in $\eta(\theta)=(1/T,F/T,\mu_Y)$ at fixed $c$, up to the known shift $\log T$ when $k=mT$. So at fixed $c$ and $k$ the conditions are natural parameters,
+$$e(\theta)=e_0(c)+B(c)\,\eta(\theta)+(0,\log k),$$
+and the model family over $\Theta$ is e-flat. A change of condition is the e-translation by the known vector $B(c)\Delta\eta$. Model and truth differ by the e-vector $(0,\log(k/k^{\rm true}))$ at every condition, which is Theorem 0(iii)(b) in e-coordinates.
+
+(c) *Extrapolation error in the Fisher and Onsager geometry.* Let $\delta_h=k_h/k_h^{\rm true}-1$, $\delta_k=\max_h|\delta_h|$, and evaluate $\tau,\Lambda,\sigma$ at the truth at any $(c,\theta')$. Then
+
+(c1) $D(L_{\rm model}\|L_{\rm true})=\sum_h\tau_h^{\rm true}\,\phi(\delta_h)\le\bar\phi(\delta_k)\,\tau^{\rm true}$, where $\phi(\delta)=(1+\delta)\log(1+\delta)-\delta=\delta^2/2+O(\delta^3)$ and $\bar\phi(\delta)=\max\{\phi(\delta),\phi(-\delta)\}$.
+
+(c2) $\|J-J^{\rm true}\|^2_{\Lambda^{-1}}=\sum_h\delta_h^2\,\sigma_h^{\rm true}$.
+
+(c3) With the Onsager dual norm $\|v\|_*^2=v^\top(S\Lambda S^\top)^+v$ on $\operatorname{im}S$, for which $\|\dot c\|_*^2=\sigma_{\rm ex}$ by Theorem 1(d),
+$$\|\dot c-\dot c^{\rm true}\|_*\ \le\ \|J-J^{\rm true}\|_{\Lambda^{-1}}\ \le\ \delta_k\sqrt{\sigma^{\rm true}(c;\theta')} .$$
+If $\delta_h\equiv\delta$, then $\|\dot c-\dot c^{\rm true}\|_*=|\delta|\sqrt{\sigma^{\rm true}_{\rm ex}}$ exactly.
+
+Since $\tau_h=2k_h\varepsilon_h\cosh(f_h/2)$ and $\sigma_h=2k_h\varepsilon_hf_h\sinh(f_h/2)$, the Euclidean error of Theorem 0(iii)(b) and the divergence grow like $e^{|f_h|/2}$, and the Onsager error only like $\sqrt{f_h\sinh(f_h/2)}\sim e^{|f_h|/4}$. The normalized errors $D/\tau^{\rm true}$ and $\|\Delta\dot c\|_*/\sqrt{\sigma^{\rm true}}$ stay below $\bar\phi(\delta_k)$ and $\delta_k$ at every condition.
+
+**Proof.** (a) The log-likelihood is $\sum_h(N_h^+\log a_h+N_h^-\log b_h)-\tau\psi$ plus a term free of parameters. Differentiating $\psi$ once and twice in $(f,\lambda)$ gives the m-coordinates and $G_h$. (b) follows from Proposition 4 and Theorem 0(ii). (c1) Both intensities scale by $1+\delta_h$, and $\phi$ is convex with minimum $0$ at $0$. (c2) $J_h-J_h^{\rm true}=\delta_hJ_h^{\rm true}$ by Theorem 0(iii)(b), and $(J_h^{\rm true})^2/\Lambda_h=J_hf_h=\sigma_h$. (c3) $\Delta\dot c=S\Delta J$, and $\|SJ'\|_*\le\|J'\|_{\Lambda^{-1}}$ by the variational formula of Theorem 1(d). For uniform $\delta$, $\Delta\dot c=\delta\dot c^{\rm true}$. $\square$
+
+**Label.** (a) is known. Up to a constant, $\psi$ is the dual dissipation potential of the cosh gradient structure (Mielke, Peletier and Renger 2014). See also Maes and Netočný (2008) and Kaiser, Jack and Zimmer (2018). This project: (b) and (c), both elementary.
+
+**Evidence.** The Euclidean form holds on E6 and G1 (Theorem 0). The forms (c1) and (c3) are pending, see the experiment suite.
+
+### IG3. The Onsager metric is an averaged Fisher information
+
+**Statement.** The Fisher information of a Poisson law for its log-intensity is the intensity. Along the e-geodesic $\lambda_s=a^{1-s}b^s$ from $a$ to $b$,
+$$\Lambda(a,b)=\int_0^1\lambda_s\,ds,\qquad a-b=\Lambda(a,b)\log\frac ab,\qquad \sigma_h=\Lambda_hf_h^2=D(a_h\|b_h)+D(b_h\|a_h).$$
+Moreover $g=\lambda_{1/2}\le\Lambda\le(a+b)/2$, and all three equal the Fisher information $a$ at equilibrium. In the chart $\Lambda_h=k_h\cdot\varepsilon_h\,\frac{\sinh(f_h/2)}{f_h/2}$. The material sets the Fisher information at the e-midpoint.
+
+**Proof.** $\int_0^1a(b/a)^sds=(b-a)/\log(b/a)$. Along the geodesic $d\lambda_s/ds=-f\lambda_s$, and integration gives $a-b=f\int_0^1\lambda_sds$. This is the mean-value form of the Legendre map of a dually flat family, and the Jeffreys divergence is the pairing of the two differences. The inequalities are the Hermite–Hadamard inequality for the convex map $s\mapsto\lambda_s$. The chart form is Theorem 0(i). $\square$
+
+**Label.** The integral form is classical (Carlson 1972), and its reading follows from the dually flat structure (Amari and Nagaoka 2000). We claim no priority. The factorization in the chart is of this project.
+
+**Evidence.** This is a one-channel statement. In the WS3 network $\operatorname{Var}(N^+-N^-)/(t(a+b))$ is 0.6 to 1.3 because channels are correlated. $\Lambda$ as a weight is tested in IG4.
+
+### IG4. The Pythagorean split as e- and m-projections
+
+**Statement.** (a) *Exact quadratic split.* At every state $\sigma=\|f\|_\Lambda^2$, because $J=\Lambda f$ exactly. The $\Lambda$-orthogonal split $f=f_{\rm ex}+f_{\rm hk}$ of Theorem 1(d), with $f_{\rm ex}\in\operatorname{im}S^\top$ and $\Lambda f_{\rm hk}\in\ker S$, gives $\sigma=\sigma_{\rm ex}+\sigma_{\rm hk}$ exactly. It is the Pythagorean theorem in the tangent space, in the averaged Fisher metric of IG3 frozen at the current state. It is not a linear-response approximation. Only $\Lambda$-orthogonality makes the split additive, since any other split leaves the cross term $2\langle f_1,f_2\rangle_\Lambda$.
+
+(b) *Exact divergence split* (Kolchinsky et al. 2022). Tilt the one-way intensities as $j^+_h(\vartheta)=a_he^{\vartheta^+_h-f_h}$, $j^-_h(\vartheta)=b_he^{\vartheta^-_h+f_h}$. Then $\vartheta=(f,-f)$ gives $P=L(a,b)$ and $\vartheta=0$ gives $\tilde P=L(b,a)$. The conservative parameters $\mathcal C=\{(-S^\top\varphi,S^\top\varphi)\}$ form a linear subspace of natural parameters, an e-flat submanifold that contains $\tilde P$. Let $Q^*$ be the m-projection of $P$ onto $\mathcal C$. Then
+$$\sigma=D(P\|\tilde P)=\underbrace{D(P\|Q^*)}_{\sigma^{\rm IG}_{\rm hk}}+\underbrace{D(Q^*\|\tilde P)}_{\sigma^{\rm IG}_{\rm ex}},\qquad \sigma^{\rm IG}_{\rm ex}=\min\{D(j\|\tilde P):S(j^+-j^-)=\dot c\}.$$
+The second formula says that $Q^*$ is also the e-projection of $\tilde P$ onto the m-flat set of laws with the observed $\dot c$. Both statements are exact far from equilibrium.
+
+(c) *Relation.* $\sigma^{\rm IG}_{\rm hk}\le\sigma_{\rm hk}$ and $\sigma^{\rm IG}_{\rm ex}\ge\sigma_{\rm ex}$ (Kolchinsky et al. 2022, Eq. S79). Both housekeeping terms vanish iff $f\in\operatorname{im}S^\top$, and both excess terms vanish at a steady state. They agree to second order in small forces. (a) is exact in a metric, (b) in divergences, and the two are different decompositions.
+
+(d) *Not a projection onto $A=0$.* The reversible subfamily $\{[A]=0\}$ of the chart is also e-flat, and the m-projection of $P$ onto it keeps $\dot c$ and the traffic $\tau_h$. But $\tilde P$ lies in that family only when $f\in\operatorname{im}S^\top$, so its Pythagorean relation does not split $\sigma$.
+
+**Proof.** (a) Theorem 1(d). (b) The tilted laws form an exponential family in $\vartheta$, and the generalized KL is its Bregman divergence. The Pythagorean theorem for the m-projection onto an e-flat set (Amari and Nagaoka 2000, Csiszár 1975) applied with $R=\tilde P\in\mathcal C$ gives the split. (c) is cited. (d) The stationarity conditions of $\min_RD(P\|R)$ over $\log(a'/b')\in\operatorname{im}S^\top$ with free $\lambda'$ are $a'_h+b'_h=a_h+b_h$ and $S(J'-J)=0$. $\square$
+
+**Label.** (a) is the Onsager-projective decomposition (Dechant, Sasa and Ito 2022, Yoshimura et al. 2023), which is what Theorem 1(d) states. (b) and (c) are due to Kolchinsky et al. (2022). This project: the reading of (a) through IG3, and (d).
+
+**Evidence.** E1: at the learned steady state the $\Lambda$-weighted excess is $10^{-16}$, while the Euclidean projection books 8% and 18% of $\sigma$ as excess. At a steady state $f=\Lambda^{-1}J$ with $J\in\ker S$, which is Euclidean-orthogonal to $\operatorname{im}S^\top$ only when $\Lambda$ is constant on the support of $J$. A comparison of (a) and (b) on C1 and C3 is pending, see the experiment suite.
+
+### IG5. The lower bound on entropy production as an information projection
+
+**Statement.** Let the one-way intensities be linear in parameters $r\ge0$, $a_h=\langle\alpha_h,r\rangle$, $b_h=\langle\beta_h,r\rangle$, with known nonnegative exposures $\alpha_h(c,\theta),\beta_h(c,\theta)$. This covers the cut ($r=k$) and the rate classes of C3. Let $\mathcal F$ be a convex set of parameters consistent with the data, such as $\{r:\mathcal L(r)\le(1+\epsilon)\mathcal L^*\}$ for a convex loss. Let $\bar\sigma(r)=\sum_iw_i\sum_h(a_h-b_h)\log(a_h/b_h)$ over evaluation states $(c^i,\theta^i)$.
+(a) $\bar\sigma$ is convex in $r$, and $\sigma_{\min}(\mathcal F)=\inf_{\mathcal F}\bar\sigma$ is a convex program whose local minimizers are global.
+(b) $\bar\sigma(r)=\sum_iw_iD(L^i_r\|\tilde L^i_r)$, so $\sigma_{\min}$ is the smallest divergence between a law and its reverse among the laws consistent with the data. If the truth lies in $\mathcal F$, then $\sigma^{\rm true}\ge\sigma_{\min}$.
+(c) If $\mathcal F'\subset\mathcal F$, then $\sigma_{\min}(\mathcal F')\ge\sigma_{\min}(\mathcal F)$. An extra observable shrinks $\mathcal F$, so the bound can only tighten.
+(d) If $\mathcal F$ allows $b_h\to0$ with $a_h$ bounded below at a weighted state, then $\sup_{\mathcal F}\bar\sigma=\infty$. With $(a,b)$ free apart from $S(a-b)=\dot c$ the infimum would be $0$, since $J\log(1+J/b)\to0$ as $b\to\infty$. The bound draws its content from the wired exposures.
+
+**Proof.** $(u,v)\mapsto u\log(u/v)$ is the perspective of $t\log t$, hence jointly convex, and $(u-v)\log(u/v)=u\log(u/v)+v\log(v/u)$. Linear maps keep convexity. (b) is IG1(b), (c) is an infimum over a subset, and in (d) the term of the vanishing $b_h$ diverges. $\square$
+
+**Label.** Joint convexity of relative entropy is known (Csiszár 1967, Cover and Thomas 2006). The projection reading follows Csiszár (1975) in an extended sense. It is not the I-projection of a fixed reference measure, because both arguments move with $r$. In the cut, $\bar\sigma$ is linear in $k$. This project: the data-consistent bound and (d).
+
+**Evidence.** C3, tolerance 10%: $\sigma_{\min}/\sigma^{\rm true}$ rises from 0.58 to 0.80 with one reservoir observable, and from 0.58 to 0.70 with equilibrium anchors. The truth lies above the bound at every test point. Four one-way classes can still be switched off (five without the observable), so there is no finite upper end.
+
+### IG6. Coarse graining is data processing
+
+**Statement.** Let $\Phi$ lump states as in Theorem 3, applied to whole paths. (a) $\Phi$ commutes with time reversal, so at stationarity $D(\Phi_*P_{[0,T]}\|\Phi_*\tilde P_{[0,T]})\le T\sigma$. (b) The same argument on transition pairs $(X_t,X_{t+dt})$ gives $\bar\sigma\le\sigma$ for the Markov surrogate $\bar Q=\Pi QP$, whose entropy production is the divergence rate of block transition pairs. Theorem 3(iii) sharpens this to $\bar\sigma\le\sigma-\sigma_{\rm intra}$. (c) $\bar\pi=\pi P$ and $\bar J=PJ$ are algebra. (d) Chentsov's theorem supports one sentence only. Up to scale the Fisher metric is the unique metric invariant under congruent Markov embeddings such as $\Pi$, so the embedded coarse simplex carries the fine Fisher geometry isometrically and no other metric does this for every partition. (a) to (c) do not use it, and it does not cover $\Lambda$.
+
+**Proof.** (a) The data-processing inequality for a measurable map (Csiszár 1967), with $\Phi\circ\Theta=\Theta\circ\Phi$ for the reversal $\Theta$. (b) The pair law has off-diagonal mass $\pi_iQ_{ij}dt$, and its divergence from the reversed pair law is $\sigma\,dt+O(dt^2)$. Lumping maps it to $X_{ab}dt$ and gives $\bar\sigma\,dt$. (c) and (d) are Theorem 3. $\square$
+
+**Label.** Known: Kawai, Parrondo and Van den Broeck (2007), Gomez-Marin, Parrondo and Van den Broeck (2008), Roldán and Parrondo (2010), Esposito (2012). The Chentsov accounting is that of Theorem 3.
+
+**Evidence.** E4: $\bar\pi$ and $\bar J$ match to $10^{-15}$, and $\sigma$ decreases monotonically on $32\to16\to8$ for 64/64 trajectories.
+
+### IG7. Fisher bounds on identifiability, and two sources of blindness
+
+**Statement.** (a) *Information.* With $k$ a nuisance, jump data give $\operatorname{Var}(\hat A)\ge1/\bar N_++1/\bar N_-$ (Theorem 2). The efficient information rate $ab/(a+b)$ is at most $g/2$, half the Fisher information at the e-midpoint of IG3, and it tends to $0$ with $b$.
+(b) *Topology.* For density data $\dot c=SJ$ with noise of intensity $\eta^2$, the Fisher information of $k$ in the cut is $X^\top X/\eta^2$. Its null space $\ker X=\{v:\operatorname{diag}(\varphi^i)v\in\ker S\ \forall i\}$ carries zero information at any sample size (Theorem 0(iii)(d)).
+(c) So non-identifiability has two sources. The topological one gives exact zero eigenvalues from $\ker S$, such as parallel channels, and only a new observable outside $\operatorname{im}S^\top+\operatorname{span}\{w_r\}$ removes it (Theorem 1(c)). The informational one gives positive eigenvalues that decay with the backward rate, and only more events remove it, about $(1+e^{A})/\varepsilon^2$ forward events for error $\varepsilon$.
+
+**Proof.** (a) Theorem 2(ii) and $a+b\ge2\sqrt{ab}$. (b) is the Fisher information of a linear Gaussian model. (c) combines the two. $\square$
+
+**Label.** (a) is Theorem 2 and (b) is standard. Placing both in the spectrum of one Fisher matrix is of this project.
+
+**Evidence.** Information: on C1, C3 and E5 the learned affinity reaches 15–40% of the truth, and in WS3 the value 4.91 is recovered as 1.43. Topology: on C1 four local currents remove four of 257 blind directions, and on C3 one reservoir observable identifies R4 (ratio −2.87 and −2.96 against −2.79).
+
+### The division of labour between Fisher and Hodge
+
+Fisher supplies the metric, the projections, the lower bounds and the coordinates in which the conditions act. Because the conditions are natural parameters, a new condition is an e-translation, and its error is controlled in the Onsager metric (IG2, IG3). Hodge supplies the coboundary $S^\top$ that turns potentials into forces, the cycle space $\ker S$, the blind spot of densities, and the dimension $\beta_1$ of the non-equilibrium drive, whose classes $[A]$ live in $(\ker S)^*$. The two meet in the $\Lambda$-weighted Hodge decomposition, where the averaged Fisher metric makes $\operatorname{im}S^\top$ and $\Lambda^{-1}\ker S$ orthogonal and $\sigma$ splits exactly. We derive no thermodynamic uncertainty relation here. Every bound in this section is either a convex lower bound or a Cramér–Rao bound.
+
 ## References
 
-Amari and Nagaoka, *Methods of Information Geometry*, AMS (2000). Andersen, Borgan, Gill and Keiding, *Statistical Models Based on Counting Processes*, Springer (1993). Brunton, Proctor and Kutz, PNAS 113, 3932 (2016). Bruggeman, Burchard, Kooi and Sommeijer, Appl. Numer. Math. 57, 36 (2007). Burchard, Deleersnijder and Meister, Appl. Numer. Math. 47, 1 (2003). Campbell, Proc. AMS 98, 135 (1986). Čencov, *Statistical Decision Rules and Optimal Inference*, AMS (1982). Culver, Proc. AMS 17, 1146 (1966). Esposito, PRE 85, 041125 (2012). Frank and Wolfe, Naval Res. Logist. Q. 3, 95 (1956). Horn and Jackson, Arch. Ration. Mech. Anal. 47, 81 (1972). Hummer and Szabo, J. Phys. Chem. B 119, 9029 (2015). Jiang, Qian and Qian, *Mathematical Theory of Nonequilibrium Steady States*, LNM 1833 (2004). Kaiser, Jack and Zimmer, J. Stat. Phys. 170, 1019 (2018). Kobayashi, Loutchko, Kamimura and Sughiyama, PRR 4, 033208 (2022). Kolchinsky, Dechant, Yoshimura and Ito, arXiv:2206.14599 (2022). Lawson and Hanson, *Solving Least Squares Problems*, Prentice-Hall (1974). Maas, J. Funct. Anal. 261, 2250 (2011). Maes, Phys. Rep. 850, 1 (2020). Mielke, Nonlinearity 24, 1329 (2011). Mielke, Peletier and Renger, Potential Anal. 41, 1293 (2014), arXiv:1312.7591. Murashita, Funo and Ueda, PRE 90, 042110 (2014). Peletier and Schlichting, arXiv:2203.05435 (2022). Rao and Esposito, PRX 6, 041064 (2016). Schnakenberg, Rev. Mod. Phys. 48, 571 (1976). Seifert, Rep. Prog. Phys. 75, 126001 (2012). Wolfer and Watanabe, arXiv:2106.05669 (2021), and arXiv:2203.04575. Xu et al., ICLR (2021). Yoshimura, Kolchinsky, Dechant and Ito, PRR 5, 013017 (2023).
+Amari and Nagaoka, *Methods of Information Geometry*, AMS (2000). Andersen, Borgan, Gill and Keiding, *Statistical Models Based on Counting Processes*, Springer (1993). Brunton, Proctor and Kutz, PNAS 113, 3932 (2016). Bruggeman, Burchard, Kooi and Sommeijer, Appl. Numer. Math. 57, 36 (2007). Burchard, Deleersnijder and Meister, Appl. Numer. Math. 47, 1 (2003). Campbell, Proc. AMS 98, 135 (1986). Carlson, Amer. Math. Monthly 79, 615 (1972). Čencov, *Statistical Decision Rules and Optimal Inference*, AMS (1982). Cover and Thomas, *Elements of Information Theory*, 2nd ed., Wiley (2006). Csiszár, Studia Sci. Math. Hungar. 2, 299 (1967). Csiszár, Ann. Probab. 3, 146 (1975). Culver, Proc. AMS 17, 1146 (1966). Dechant, Sasa and Ito, PRR 4, L012034 (2022). Esposito, PRE 85, 041125 (2012). Frank and Wolfe, Naval Res. Logist. Q. 3, 95 (1956). Gaspard, J. Stat. Phys. 117, 599 (2004). Ge and Qian, PRE 94, 052150 (2016). Gomez-Marin, Parrondo and Van den Broeck, PRE 78, 011107 (2008). Horn and Jackson, Arch. Ration. Mech. Anal. 47, 81 (1972). Hummer and Szabo, J. Phys. Chem. B 119, 9029 (2015). Jiang, Qian and Qian, *Mathematical Theory of Nonequilibrium Steady States*, LNM 1833 (2004). Kaiser, Jack and Zimmer, J. Stat. Phys. 170, 1019 (2018). Kawai, Parrondo and Van den Broeck, PRL 98, 080602 (2007). Kobayashi, Loutchko, Kamimura and Sughiyama, PRR 4, 033208 (2022). Kolchinsky, Dechant, Yoshimura and Ito, arXiv:2206.14599 (2022). Lawson and Hanson, *Solving Least Squares Problems*, Prentice-Hall (1974). Lebowitz and Spohn, J. Stat. Phys. 95, 333 (1999). Maas, J. Funct. Anal. 261, 2250 (2011). Maes, J. Stat. Phys. 95, 367 (1999). Maes, Phys. Rep. 850, 1 (2020). Maes and Netočný, J. Stat. Phys. 110, 269 (2003). Maes and Netočný, EPL 82, 30003 (2008). Mielke, Nonlinearity 24, 1329 (2011). Mielke, Peletier and Renger, Potential Anal. 41, 1293 (2014), arXiv:1312.7591. Murashita, Funo and Ueda, PRE 90, 042110 (2014). Peletier and Schlichting, arXiv:2203.05435 (2022). Rao and Esposito, PRX 6, 041064 (2016). Roldán and Parrondo, PRL 105, 150607 (2010). Schnakenberg, Rev. Mod. Phys. 48, 571 (1976). Seifert, Rep. Prog. Phys. 75, 126001 (2012). Wolfer and Watanabe, arXiv:2106.05669 (2021), and arXiv:2203.04575. Xu et al., ICLR (2021). Yoshimura, Kolchinsky, Dechant and Ito, PRR 5, 013017 (2023).
