@@ -37,7 +37,7 @@ from .test_sets import CONDITIONS, LABEL
 MAGENTA = '#d81b60'                 # physics violation (the colour of negative values in the other animations)
 TRACER = '#56b4e9'                  # tracers in cells without a violation (Okabe-Ito sky blue)
 MODELS = ['chart', 'flux_gnn', 'ude']
-STRIDE = 5                          # one frame every 5 steps of DT: 41 frames over 10 time units
+STRIDE = 7                          # one frame every 7 steps of DT: 29 frames over 10 time units
 SCENES = {
     'porous_media': ['training_conditions', 'drive_x8', 'temperature_x4', 'point_cloud'],
     'porous_media_crowding': ['training_conditions', 'drive_x8'],
@@ -244,7 +244,7 @@ def _flag_text(p):
     return f'{100 * p["bad"].mean():.0f} % of cells flagged'
 
 
-def track_gif(path, title, panels, disc, times, n_part=900, trail=4, max_age=24, substeps=6, fps=6, width_in=8.6, dpi=72):
+def track_gif(path, title, panels, disc, times, n_part=800, trail=3, max_age=18, substeps=8, fps=5, width_in=8.6, dpi=64):
     """panels: [(label, dict(R, J, bad) or None for a diverged model)]; the first panel is the reference"""
     import matplotlib
     matplotlib.use('Agg')
@@ -289,20 +289,20 @@ def track_gif(path, title, panels, disc, times, n_part=900, trail=4, max_age=24,
                 for k, xh in enumerate(st['hist'][:-1]):
                     ck = col.copy(); ck[:, 3] = 0.15 + 0.5 * (k + 1) / len(st['hist'])
                     ax.scatter(xh[:, 0], xh[:, 1], s=1.2, c=ck, linewidths=0)
-                ax.scatter(st['x'][:, 0], st['x'][:, 1], s=4.0, c=col, linewidths=0)
+                ax.scatter(st['x'][:, 0], st['x'][:, 1], s=5.0, c=col, linewidths=0)
                 if 'bad' in d:
-                    ax.text(0.02, 0.02, _flag_text(dict(bad=bad)), transform=ax.transAxes, color='w', fontsize=7,
+                    ax.text(0.02, 0.02, _flag_text(dict(bad=bad)), transform=ax.transAxes, color='w', fontsize=8,
                             va='bottom', bbox=dict(fc='black', lw=0, pad=1.5))
             ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.set_xticks([]); ax.set_yticks([])
-            ax.set_title(lab, fontsize=9)
+            ax.set_title(lab, fontsize=10)
         fig.suptitle(f'{title}   t = {times[fi]:4.1f}\ntracers follow v = J / rho; magenta: sigma < 0 or flux against the '
-                     f'physical force', fontsize=8)
+                     f'physical force', fontsize=9)
         frames.append(_png(fig))
     plt.close(fig)
-    return write_gif(frames, path, fps, colors=24)
+    return write_gif(frames, path, fps, colors=16)
 
 
-def entropy_gif(path, title, panels, disc, times, fps=6, width_in=8.6, dpi=72):
+def entropy_gif(path, title, panels, disc, times, fps=5, width_in=8.6, dpi=64):
     """panels: [(label, dict(R, sigma, viol (models only)))]"""
     import matplotlib
     matplotlib.use('Agg')
@@ -339,14 +339,14 @@ def entropy_gif(path, title, panels, disc, times, fps=6, width_in=8.6, dpi=72):
                                                          linewidths=0.8))
                     ax.text(0.02, 0.02, f'{100 * (sg < 0).mean():.0f} % of cells with sigma < 0\n'
                             f'{100 * d["viol"][fi].mean():.0f} % of edges against the force', transform=ax.transAxes,
-                            color='w', fontsize=7, va='bottom', bbox=dict(fc='black', lw=0, pad=1.5))
+                            color='w', fontsize=8, va='bottom', bbox=dict(fc='black', lw=0, pad=1.5))
             ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.set_xticks([]); ax.set_yticks([])
-            ax.set_title(lab, fontsize=9)
+            ax.set_title(lab, fontsize=10)
         fig.suptitle(f'{title}   t = {times[fi]:4.1f}\nlocal entropy production (log scale); magenta: sigma < 0 and '
-                     f'edges with flux against the physical force', fontsize=8)
+                     f'edges with flux against the physical force', fontsize=9)
         frames.append(_png(fig))
     plt.close(fig)
-    return write_gif(frames, path, fps, colors=32)
+    return write_gif(frames, path, fps, colors=24)
 
 
 # ------------------------------------------------------------------------------------------ the animations

@@ -144,9 +144,15 @@ The learned mobility matches the true crowded mobility with a flux-weighted rela
 The Brusselator $A\to X$, $2X+Y\to3X$, $B+X\to Y+D$, $X\to E$ with chemostats $A$, $B$, $D$, $E$ on a 32×32 periodic grid, with diffusing $X$ and $Y$.
 Depending on the chemostat levels it shows a limit cycle or Turing patterns.
 
-| Turing pattern formation | Oscillation, b 4.0–4.6 |
+| Turing pattern formation (a = 1.90, b = 3.90) | Oscillation, both chemostats outside the training range (a = 1.39, b = 4.30) |
 |---|---|
 | ![Brusselator, Turing pattern](assets/brusselator_turing.gif) | ![Brusselator, oscillation](assets/brusselator_oscillation.gif) |
+
+In the Turing regime the Neural Chart grows the same stationary pattern as the reference from a random initial field.
+Flux-GNN relaxes to a uniform state, and FNO forms a pattern with a different arrangement.
+With both chemostat levels outside the training range the Neural Chart follows the oscillating pattern of the reference to t = 40, while Flux-GNN again relaxes to a uniform state and FNO drifts away from the reference.
+On these two trajectories Flux-GNN does worse than its median over the test set (0.56 against 0.29 in the Turing regime).
+`python -m benchmarks.brusselator.run gifs` renders both animations again.
 
 | Method | training conditions | b 3.2–3.7 | b 4.0–4.6 | a 1.3–1.5 (a and b outside training) | Turing regime (below the Hopf line) | 64×64 grid | parameters |
 |---|---|---|---|---|---|---|---|

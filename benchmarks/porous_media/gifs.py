@@ -119,8 +119,8 @@ def make_gifs(device='cuda', data_dir=None, weights=None, out=None, j=0, variant
             titles = ['Reference'] + [LABELS[m] for m in models]
             times = np.arange(ref.shape[0]) * DT
             path = os.path.join(out, f'{variant}_{s}.gif')
-            sizes[path] = comparison_gif(path, panels, titles, suptitle=f'{TITLE[variant]}, {sub}', times=times, step=2,
-                                         fps=12, time_label=lambda t, times=times: f't = {times[t]:.1f}',
+            sizes[path] = comparison_gif(path, panels, titles, suptitle=f'{TITLE[variant]}, {sub}', times=times, step=5,
+                                         fps=6, dpi=72, time_label=lambda t, times=times: f't = {times[t]:.1f}',
                                          cells=cell_map(disc))
             print(path, f'{sizes[path]:.2f} MB', flush=True)
     return sizes

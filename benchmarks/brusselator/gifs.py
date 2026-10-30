@@ -1,6 +1,6 @@
 """Comparison animations of the Brusselator for the README.
 
-    python -m benchmarks.brusselator.run gifs --device cuda
+    python -m benchmarks.brusselator.run gifs [--weights DIR]
 The Neural Chart comes from checkpoints/brusselator.  Baseline weights are not shipped: train them with
 `run train --model <name>` (written to runs/brusselator) or pass --weights DIR with DIR/<name>.pt.  Panels without
 weights are left out.
@@ -18,13 +18,17 @@ from .models import build
 from .training import accelerate, default_fast, set_max_sub
 
 ASSETS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'assets')
-# (file, test set, which trajectory, models after the reference, title)
+# (file, test set, trajectory, models after the reference, what the scene shows, sampling steps shown).  Trajectory 30
+# of the Turing set is the spatial start whose pattern grows most (relative spatial std of X 0.40 -> 0.87); the pattern
+# forms in the first 8 time units, which are shown at every sampling step.  Trajectory 30 of the a 1.3-1.5 set is the
+# spatial start with the largest growth of spatial structure while it oscillates (0.40 -> 1.38).
 SCENES = [
-    ('brusselator_turing.gif', 'turing', 'spatial', ['chart', 'flux_gnn', 'fno'],
-     'Turing regime (below the Hopf line): concentration of X'),
-    ('brusselator_oscillation.gif', 'b_far', 'spatial', ['chart', 'flux_gnn', 'ude'],
-     'Oscillations at b 4.0–4.6 (training b 2.3–3.0): concentration of X'),
+    ('brusselator_turing.gif', 'turing', 30, ['chart', 'flux_gnn', 'fno'], 'Turing regime',
+     list(range(0, 40)) + list(range(40, 201, 5))),
+    ('brusselator_oscillation.gif', 'a_high', 30, ['chart', 'flux_gnn', 'fno'], 'Oscillations, a and b outside training',
+     list(range(0, 201, 2))),
 ]
+TRAINING_RANGE = 'training a 0.9–1.1, b 2.3–3.0'
 
 
 def weights_of(name, weights=RUNS):
@@ -55,29 +59,36 @@ def model_rollout(name, sd, i, norm, device, weights=RUNS):
     return R[0].double().cpu().numpy()
 
 
-def make_gifs(device='cuda', data=None, weights=RUNS, scenes=SCENES, step=2):
+def make_gifs(device='cuda', data=None, weights=RUNS, scenes=SCENES, panel_in=2.8, max_mb=2.0):
+    """one GIF per scene: X on the grid at the chosen sampling steps, with the relative error of the full state
+    (X and Y) against the reference in every panel"""
     from scripts.gif_tools import comparison_gif
     dkw = {} if data is None else dict(data=data)
     norm = train_norm(**dkw)
     os.makedirs(ASSETS, exist_ok=True)
     out = []
-    for fname, sname, kind, models, title in scenes:
+    for fname, sname, i, models, what, steps in scenes:
+        idx = np.asarray(steps)
         sd = load_set(sname, device, **dkw)
-        h = sd['homog'].numpy().astype(bool)
-        i = int(np.where(~h)[0][0] if kind == 'spatial' else np.where(h)[0][0])
         n = sd['n']; V = n * n
+        a, b = np.exp(sd['logab'][i].double().cpu().numpy())
         Y = sd['c'][i].double().cpu().numpy()
-        frames, titles = [Y[::step, :V].reshape(-1, n, n)], ['Reference']
+        frames, titles, errs = [Y[idx, :V].reshape(-1, n, n)], ['Reference'], [None]
         for m in models:
             R = model_rollout(m, sd, i, norm, device, weights)
             if R is None:
                 print(f'{fname}: no weights for {m}, panel left out', flush=True)
                 continue
-            frames.append(R[::step, :V].reshape(-1, n, n))
-            err = np.linalg.norm(R[-1] - Y[-1]) / np.linalg.norm(Y[-1])
-            titles.append(f'{LABELS[m]}\nerror at 10T {err:.2g}' if np.isfinite(err) else LABELS[m])
-        times = np.arange(Y.shape[0])[::step] * DT
-        mb = comparison_gif(os.path.join(ASSETS, fname), frames, titles, suptitle=title, times=times)
-        print(f'{fname}: {mb:.2f} MB', flush=True)
+            frames.append(R[idx, :V].reshape(-1, n, n))
+            titles.append(LABELS[m])
+            e = np.linalg.norm(R[idx] - Y[idx], axis=1) / np.linalg.norm(Y[idx], axis=1)
+            errs.append([f'relative error {x:.2g}' if np.isfinite(x) else 'diverged' for x in e])
+        times = idx * DT
+        sup = f'{what}: a = {a:.2f}, b = {b:.2f} ({TRAINING_RANGE}), concentration of X'
+        mb = comparison_gif(os.path.join(ASSETS, fname), frames, titles, suptitle=sup, times=times,
+                            panel_in=panel_in, extra_titles=errs, max_mb=max_mb, time_label=lambda t: f't = {times[t]:.1f}')
+        std = ', '.join(f'{t_}: {F[-1].std() / abs(F[-1].mean()):.3g}' for t_, F in zip(titles, frames))
+        print(f'{fname}: {mb:.2f} MB ({sname}, trajectory {i}, a {a:.3f}, b {b:.3f}); relative spatial std of X at the '
+              f'last frame: {std}', flush=True)
         out.append((fname, mb))
     return out
