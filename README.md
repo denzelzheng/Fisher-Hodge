@@ -19,7 +19,6 @@ The fit has four steps. Physics fixes $f$. The mobility takes the form that the 
 - [Reproduce](#reproduce)
 - [Repository layout](#repository-layout)
 - [Theory](#theory)
-- [Citation](#citation)
 
 ## Benchmarks
 
@@ -471,17 +470,6 @@ tests/                  unit and regression tests
 Theorem 0 shows that fixing the force and learning only the mobility gives the second law, exact transfer across conditions, a convex closed-form fit and a clear identifiability criterion for every parameter value.
 It also shows that gray-box models whose learned part sees the conditions, or that learn the force, lose these properties.
 The other results cover minimal observables, a Cramér–Rao bound for near-irreversible steps, closed-form coarse graining, and the information geometry of the chart.
-
-## Citation
-
-```bibtex
-@misc{neuralchart2026,
-  title  = {Neural Chart},
-  author = {Zheng, Denzel},
-  year   = {2026},
-  note   = {Citation to be added}
-}
-```
 
 ## Licence
 
