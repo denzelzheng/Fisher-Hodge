@@ -2,7 +2,7 @@
 
     python -m benchmarks.brusselator.run tables [--runs DIR]
 reads DIR/<model>.json (default results/brusselator/runs) and writes
-results/brusselator/{main, physics, ablations, oscillation_patterns, training}.{md, csv}.
+results/brusselator/{main, physics, ablations, oscillation_patterns, entropy_readout, training}.{md, csv}.
 """
 import json
 import os
@@ -84,6 +84,19 @@ def oscillation_table(R, models):
     return header, rows
 
 
+def entropy_table(R, models):
+    """sigma(t) = sum_h (a_h - b_h) log(a_h / b_h) from the model's own one-way rates on the reference states, against
+    the true sigma: relative L2 error over time (median over the set) and the ratio of the time means"""
+    header = ['Method', 'quantity'] + [SET_LABELS[s] for s in TEST_SETS]
+    rows = []
+    for m in models:
+        if m not in R or not any('sigma' in (_set(R[m], s) or {}) for s in TEST_SETS):
+            continue
+        for key, lab in (('relerr', 'relative error of sigma(t)'), ('ratio', 'mean sigma, model / reference')):
+            rows.append([LABELS[m], lab] + [((_set(R[m], s) or {}).get('sigma') or {}).get(key) for s in TEST_SETS])
+    return header, rows
+
+
 def training_table(R, models):
     header = ['Method', 'gradient steps', 'training time (h)', 'final training loss', 'substeps per sampling step (mean)',
               'largest substeps per sampling step']
@@ -112,5 +125,6 @@ def make_tables(models=MODELS, out=RESULTS, runs=None):
                             ('physics', physics_table(R, models)),
                             ('ablations', ablation_table(R)),
                             ('oscillation_patterns', oscillation_table(R, models)),
+                            ('entropy_readout', entropy_table(R, models)),
                             ('training', training_table(R, models))):
         print(write_table(os.path.join(out, stem), h, rows), '\n')

@@ -76,6 +76,31 @@ Under changed temperature and drive their errors grow to 0.6–2.1, while the Ne
 No edge of the Neural Chart carries flux against the physical force, and no density becomes negative, on any test set.
 The UDE closure produces negative densities on all 64 test trajectories.
 
+#### What the flows look like
+
+The animations below follow one test trajectory in an unseen medium.
+Tracer particles move with the probability velocity $v=J/\rho$ of each model's own edge flux, so only models with an edge flux appear.
+A particle turns magenta in a cell where the local entropy production is negative or where an edge carries flux against the physical force.
+
+![Tracers, drive x8](assets/porous_media_track_drive_x8.gif)
+
+Under drive ×8 the tracers of the Neural Chart follow the reference, and no cell is flagged.
+Flux-GNN flags about a third of the cells and the UDE closure about two thirds.
+
+![Local entropy production, drive x8](assets/porous_media_entropy_drive_x8.gif)
+
+The same scene shows the local entropy production.
+It stays non-negative everywhere for the Neural Chart, while the UDE closure has negative entropy production in about half of the cells.
+
+![Tracers, point cloud](assets/porous_media_track_point_cloud.gif)
+
+On a random point cloud of 1024 cells, with the parameters trained on the 32×32 grid, the Neural Chart's flow again follows the reference.
+
+![Learned and true mobility](assets/medium_and_law.png)
+
+The learned mobility, mapped back to space, matches the true mobility of an unseen medium on the training grid and on the point cloud (Pearson r of log k over edges 0.994 on both).
+More animations, including the variant with crowding, are in the [gallery](results/porous_media/gallery/).
+
 ### Driven transport through porous media with crowding
 
 The same task with a crowded mobility $M(x)/(1+\bar\rho_e/2)$, where $\bar\rho_e$ is the mean density of the two cells of the edge.
@@ -116,8 +141,6 @@ The learned mobility matches the true crowded mobility with a flux-weighted rela
 
 ### Brusselator: oscillations and Turing patterns
 
-<!-- Text of this section to be finalised. -->
-
 The Brusselator $A\to X$, $2X+Y\to3X$, $B+X\to Y+D$, $X\to E$ with chemostats $A$, $B$, $D$, $E$ on a 32×32 periodic grid, with diffusing $X$ and $Y$.
 Depending on the chemostat levels it shows a limit cycle or Turing patterns.
 
@@ -151,6 +174,21 @@ In the Turing regime half of the test trajectories start from a uniform state, w
 | BSMS-GNN | N/A | N/A | 0.940 |
 | FNO | N/A | N/A | 3.2e-03 |
 | GENERIC-FNO | N/A | N/A | 0 |
+
+![Brusselator phase portraits](assets/brusselator_phase_portraits.png)
+
+The Neural Chart stays within a factor of 6 of the oracle on every test set.
+Outside the Turing regime it is 15 to 92 times more accurate than CRNN (mass action), and the black boxes are at least 470 times less accurate.
+Flux-GNN reaches 0.075 under the training conditions, but it loses the limit cycle and the Turing pattern when the conditions change (0.29 to 0.64).
+The reversible variant cannot sustain the oscillation, and the variant without convex initialisation stays at a wrong set of rates (errors 0.28 to 0.84, `results/brusselator/ablations.md`).
+From its own rates the Neural Chart reads out the entropy production with a relative error of 3–4e-5, while CRNN (mass action) overestimates it by 20 to 27 % and Flux-GNN errs by 0.57 to 1.5 (`results/brusselator/entropy_readout.md`).
+GENERIC-FNO coincides with persistence on this task.
+
+![Brusselator, local entropy production](assets/brusselator_entropy_b_far.png)
+
+The local entropy production of one trajectory at b 4.0–4.6 and t = 5T, computed with the true force on each model's own state.
+Green marks sites touched by a hyperedge with flux against the force.
+This is one snapshot, and the fractions over the whole test set are in the physics table above.
 
 ### Schlögl model: bistability and travelling fronts
 

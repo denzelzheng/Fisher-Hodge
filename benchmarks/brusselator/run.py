@@ -6,6 +6,7 @@
     python -m benchmarks.brusselator.run evaluate --model chart --fast    # shipped checkpoint -> runs/brusselator/evaluated
     python -m benchmarks.brusselator.run tables                       # results/brusselator/*.md, *.csv
     python -m benchmarks.brusselator.run gifs                         # assets/brusselator_*.gif
+    python -m benchmarks.brusselator.run figures                      # assets/brusselator_*.png
 
 Data: --data, default $NEURALCHART_DATA/brusselator if set, else data/brusselator.  The device defaults to cuda.
 
@@ -75,7 +76,7 @@ def cmd_check(device='cpu'):
 
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument('cmd', choices=['generate', 'check', 'train', 'evaluate', 'tables', 'gifs'])
+    p.add_argument('cmd', choices=['generate', 'check', 'train', 'evaluate', 'tables', 'gifs', 'figures'])
     p.add_argument('--model', default='chart')
     p.add_argument('--seed', type=int, default=0)
     p.add_argument('--iters', type=int, default=ITERS)
@@ -86,7 +87,7 @@ def main(argv=None):
     p.add_argument('--data', default=None, help='data directory (default $NEURALCHART_DATA/brusselator)')
     p.add_argument('--out', default=None, help='train: output directory (default runs/brusselator); evaluate: default runs/brusselator/evaluated')
     p.add_argument('--runs', default=None, help='tables: directory of the result files (default results/brusselator/runs)')
-    p.add_argument('--weights', default=RUNS, help='gifs: directory of the baseline weights <model>.pt (default runs/brusselator)')
+    p.add_argument('--weights', default=RUNS, help='gifs, figures: directory of the baseline weights <model>.pt (default runs/brusselator)')
     p.add_argument('--checkpoint', default=None, help='evaluate: the checkpoint (default checkpoints/brusselator/<model>.pt, '
                    'else runs/brusselator/<model>.pt)')
     p.add_argument('--checkpoint_dir', default=None, help='train: where the checkpoint goes (default: the output directory)')
@@ -109,6 +110,9 @@ def main(argv=None):
     elif a.cmd == 'gifs':
         from .gifs import make_gifs
         make_gifs(a.device, data=a.data, weights=a.weights)
+    elif a.cmd == 'figures':
+        from .figures import make_figures
+        make_figures(a.device, data=a.data, weights=a.weights)
 
 
 if __name__ == '__main__':

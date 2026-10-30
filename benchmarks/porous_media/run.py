@@ -6,6 +6,7 @@
     python -m benchmarks.porous_media.run law --variant porous_media --model chart       # learned mobility vs truth
     python -m benchmarks.porous_media.run tables
     python -m benchmarks.porous_media.run gifs
+    python -m benchmarks.porous_media.run gallery         # flow animations and the constitutive-law figure
 
 Data: --data, default $NEURALCHART_DATA/<variant> or data/<variant>.  train writes runs/<variant>/<model>.json, .pt
 and .log; evaluate and law write runs/<variant>/evaluated/.  tables reads results/<variant>/runs/ (or --runs) and
@@ -32,7 +33,7 @@ RUN_SETTINGS = {
 
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument('cmd', choices=['generate', 'train', 'evaluate', 'law', 'tables', 'gifs'])
+    p.add_argument('cmd', choices=['generate', 'train', 'evaluate', 'law', 'tables', 'gifs', 'gallery'])
     p.add_argument('--variant', default=None, choices=['porous_media', 'porous_media_crowding'],
                    help='default: porous_media (tables and gifs: both variants)')
     p.add_argument('--model', default='chart')
@@ -87,6 +88,12 @@ def main(argv=None):
         assert a.runs is None or len(variants) == 1, '--runs names the runs of one variant: give --variant'
         for v in variants:
             write_tables(v, a.models.split(',') if a.models else None, runs_dir=a.runs)
+    elif a.cmd == 'gallery':
+        from .gallery import make_gallery, medium_and_law
+        assert len(variants) == 1 or (a.data is None and a.weights is None), '--data / --weights name the directory of one variant'
+        if 'porous_media' in variants:
+            print(*medium_and_law(data_dir=a.data))
+        make_gallery(a.device, a.data, a.weights, variants=variants)
     elif a.cmd == 'gifs':
         from .gifs import make_gifs
         make_gifs(a.device, a.data, a.weights, variants=variants, scenes=[a.scene] if a.scene else None)
