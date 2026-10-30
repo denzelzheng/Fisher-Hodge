@@ -1,0 +1,19 @@
+Method,quantity,training conditions (ΔG 1–3),drive ΔG 3–4,"stronger, finer potential U",16×16 grid
+Neural Chart,"σ, relative error",0.00021551772532830827,0.00021701372875113914,0.0002053550880814348,0.00021499197342812211
+Neural Chart,"cycle affinity, model; reference",5.960; 5.960,7.477; 7.477,5.990; 5.990,5.323; 5.323
+Oracle (true rates in the Neural Chart class),"σ, relative error",1.4523844677532986e-15,1.97944564628654e-15,1.4268837748278391e-15,1.3418616110616543e-15
+Oracle (true rates in the Neural Chart class),"cycle affinity, model; reference",5.960; 5.960,7.477; 7.477,5.990; 5.990,5.323; 5.323
+CRNN (mass action),"σ, relative error",0.6617568258822333,0.4915241874071715,0.6184685892225275,0.7302857545949696
+CRNN (mass action),"cycle affinity, model; reference",2.603; 5.960,4.120; 7.477,2.633; 5.990,1.966; 5.323
+CRNN (condition features),"σ, relative error",0.5030365118590805,0.488513708708686,0.4785077627705952,0.5588220322965126
+CRNN (condition features),"cycle affinity, model; reference",2.733; 5.960,3.764; 7.477,2.760; 5.990,2.206; 5.323
+Flux-GNN,"σ, relative error",0.36163469813354837,0.5938009655519758,0.3319732622335738,0.3957173547590812
+Flux-GNN,"cycle affinity, model; reference",3.394; 5.960,3.224; 7.477,3.413; 5.990,2.858; 5.323
+"Neural Chart, learned standard potentials","σ, relative error",0.002145922407664324,0.001325126011630636,0.001974003213438463,0.0024865496114451968
+"Neural Chart, learned standard potentials","cycle affinity, model; reference",5.945; 5.960,7.462; 7.477,5.975; 5.990,5.308; 5.323
+"Neural Chart, no convex initialisation","σ, relative error",1.1667150749777073,1.014511352618453,1.1113994855081448,1.196987354671918
+"Neural Chart, no convex initialisation","cycle affinity, model; reference",5.960; 5.960,7.477; 7.477,5.990; 5.990,5.323; 5.323
+"Neural Chart, reversible (no drive)","σ, relative error",0.9875491069902265,0.9894468359126115,0.9430483478387589,0.9862006687014995
+"Neural Chart, reversible (no drive)","cycle affinity, model; reference",-6.7e-16; 5.960,0; 7.477,-3.3e-16; 5.990,-8.9e-16; 5.323
+Oracle (true rates in the Neural Chart class),"σ, relative error",1.4523844677532986e-15,1.97944564628654e-15,1.4268837748278391e-15,1.3418616110616543e-15
+Oracle (true rates in the Neural Chart class),"cycle affinity, model; reference",5.960; 5.960,7.477; 7.477,5.990; 5.990,5.323; 5.323

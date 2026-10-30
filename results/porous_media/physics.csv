@@ -1,0 +1,34 @@
+Method,quantity,training conditions,temperature ×0.25,temperature ×4,drive ×4,drive ×8,unseen low-porosity media,64×64 grid,point cloud
+Neural Chart,edges violating local detailed balance,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+Neural Chart,samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+Neural Chart,negative cell values,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+"Neural Chart, no state input",edges violating local detailed balance,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+"Neural Chart, no state input",samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+"Neural Chart, no state input",negative cell values,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+"Neural Chart, constant mobility",edges violating local detailed balance,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+"Neural Chart, constant mobility",samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+"Neural Chart, constant mobility",negative cell values,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+"Neural Chart, learned drive scale",edges violating local detailed balance,0.0009585013190840208,0.0007735020409845417,0.0010044820048117436,0.000826814585207688,0.0006437091075871821,0.0006922613731517901,0.000954067848237865,0.0009118004852244793
+"Neural Chart, learned drive scale",samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+"Neural Chart, learned drive scale",negative cell values,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+Oracle (true rates in the Neural Chart class),edges violating local detailed balance,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+Oracle (true rates in the Neural Chart class),samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+Oracle (true rates in the Neural Chart class),negative cell values,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+UDE closure,edges violating local detailed balance,0.3233057703952578,0.434261470764794,0.37352389124255914,0.5469609121080666,0.6883888026126956,0.4858304430047179,0.3239489299207177,0.30597105644326145
+UDE closure,samples with sigma < 0,0.20390625,0.16875,0.28828125,0.66328125,0.88203125,0.7609375,0.20625,0.15546875
+UDE closure,negative cell values,0.03954925537109375,0.10893478393554687,0.15732498168945314,0.16418685913085937,0.23644790649414063,0.12903671264648436,0.04258251190185547,0.07781219482421875
+Flux-GNN,edges violating local detailed balance,0.05374627257438828,0.21263388468435887,0.21846479803829116,0.07578722884763583,0.08108794760688225,0.0741368468927709,0.12155526006532157,0.3111710130167949
+Flux-GNN,samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+Flux-GNN,negative cell values,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+BSMS-GNN,edges violating local detailed balance,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A
+BSMS-GNN,samples with sigma < 0,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A
+BSMS-GNN,negative cell values,0.12372360229492188,0.20779647827148437,0.5179252624511719,0.24740524291992189,0.07832717895507812,0.31475067138671875,0.2054983139038086,0.176678466796875
+FNO,edges violating local detailed balance,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A
+FNO,samples with sigma < 0,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A
+FNO,negative cell values,0.11010665893554687,0.07985687255859375,0.4663421630859375,0.45680389404296873,0.5123710632324219,0.17667007446289062,0.11056232452392578,
+GENERIC-FNO,edges violating local detailed balance,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A
+GENERIC-FNO,samples with sigma < 0,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A
+GENERIC-FNO,negative cell values,0.33451156616210936,0.33451156616210936,0.33451156616210936,0.32820892333984375,0.3232383728027344,0.33231048583984374,0.3110328674316406,
+HelmFluid,edges violating local detailed balance,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A
+HelmFluid,samples with sigma < 0,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A
+HelmFluid,negative cell values,0.003621673583984375,0.03335647583007813,0.0,0.0,0.0,0.011280059814453125,,

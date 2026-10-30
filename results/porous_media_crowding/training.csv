@@ -1,0 +1,12 @@
+Method,parameters,training time (min),final training loss
+Neural Chart,"5,381",24.0,0.0002311679724152782
+"Neural Chart, no state input","5,058",2.2,0.0031325996539089828
+Oracle (true rates in the Neural Chart class),0 (true rates),N/A,
+Oracle without crowding,0 (true rates),N/A,
+UDE closure,"5,441",9.8,9.90857293800218e-05
+Flux-GNN,"151,234",416.4,0.00011186144765815698
+BSMS-GNN,"1,724,417",2.0,0.3689802763611078
+FNO,"1,188,609",5.3,0.0008735918147067423
+GENERIC-FNO,"1,002,388",2.9,0.0006090868719184073
+HelmFluid,"9,930,381",29.9,0.04088209038376808
+Persistence (u(t) = u(0)),0,N/A,

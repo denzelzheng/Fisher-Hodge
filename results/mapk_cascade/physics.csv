@@ -1,0 +1,28 @@
+Method,quantity,training conditions (ATP 0.5–2),ATP 3–5,ATP 0.15–0.3,phosphorylated initial states
+Neural Chart,hyperedges violating local detailed balance,0.0,0.0,0.0,0.0
+Neural Chart,samples with σ < 0,0.0,0.0,0.0,0.0
+Neural Chart,negative values,0.0,0.0,0.0,0.0
+Oracle (true rates in the Neural Chart class),hyperedges violating local detailed balance,0.0,0.0,0.0,0.0
+Oracle (true rates in the Neural Chart class),samples with σ < 0,0.0,0.0,0.0,0.0
+Oracle (true rates in the Neural Chart class),negative values,0.0,0.0,0.0,0.0
+CRNN (mass action),hyperedges violating local detailed balance,0.026227678571428572,0.0033267513736263735,0.05380752060439561,0.026334993131868132
+CRNN (mass action),samples with σ < 0,0.0,0.0,0.0,0.0
+CRNN (mass action),negative values,0.0,0.0,0.0,0.0
+CRNN (condition features),hyperedges violating local detailed balance,0.08709649725274725,0.11062700320512821,0.23182091346153846,0.07706616300366301
+CRNN (condition features),samples with σ < 0,0.0,0.0,0.0,0.0
+CRNN (condition features),negative values,0.0,0.0,0.0,0.0
+UDE closure,hyperedges violating local detailed balance,0.8049879807692307,0.8182091346153846,0.775390625,0.8374399038461539
+UDE closure,samples with σ < 0,1.0,1.0,1.0,1.0
+UDE closure,negative values,0.17269829828132066,0.3351574867141565,0.35414193238353686,0.23676539179104478
+Flux-GNN,hyperedges violating local detailed balance,0.08587311126373626,0.1147121108058608,0.13294843177655677,0.08341203067765568
+Flux-GNN,samples with σ < 0,0.0,0.0,0.0,0.0
+Flux-GNN,negative values,0.0,0.0,0.0,0.0
+FNO,hyperedges violating local detailed balance,N/A,N/A,N/A,N/A
+FNO,samples with σ < 0,N/A,N/A,N/A,N/A
+FNO,negative values,0.2509469696969697,0.28777013370646765,0.42128579404115785,0.24942139444821348
+BSMS-GNN,hyperedges violating local detailed balance,N/A,N/A,N/A,N/A
+BSMS-GNN,samples with σ < 0,N/A,N/A,N/A,N/A
+BSMS-GNN,negative values,0.292201987222976,0.461857085312076,0.3355806196291271,0.495069927351877
+GENERIC-FNO,hyperedges violating local detailed balance,N/A,N/A,N/A,N/A
+GENERIC-FNO,samples with σ < 0,N/A,N/A,N/A,N/A
+GENERIC-FNO,negative values,0.36177775893260966,0.3583882787765717,0.359729230269109,0.33287839919719586

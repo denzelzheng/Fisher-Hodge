@@ -1,0 +1,28 @@
+Method,quantity,training conditions (ΔG 1–3),drive ΔG 3–4,"stronger, finer potential U",16×16 grid
+Neural Chart,hyperedges violating local detailed balance,0.0,0.0,0.0,0.0
+Neural Chart,samples with σ < 0,0.0,0.0,0.0,0.0
+Neural Chart,negative values,0.0,0.0,0.0,0.0
+Oracle (true rates in the Neural Chart class),hyperedges violating local detailed balance,0.0,0.0,0.0,0.0
+Oracle (true rates in the Neural Chart class),samples with σ < 0,0.0,0.0,0.0,0.0
+Oracle (true rates in the Neural Chart class),negative values,0.0,0.0,0.0,0.0
+CRNN (mass action),hyperedges violating local detailed balance,0.04220920138888889,0.044557601686507936,0.06801060267857142,0.03781467013888889
+CRNN (mass action),samples with σ < 0,0.0,0.0,0.0,0.0
+CRNN (mass action),negative values,0.0,0.0,0.0,0.0
+CRNN (condition features),hyperedges violating local detailed balance,0.042821490575396824,0.22210596478174602,0.055206783234126984,0.03382316468253968
+CRNN (condition features),samples with σ < 0,0.0,0.0,0.0,0.0
+CRNN (condition features),negative values,0.0,0.0,0.0,0.0
+UDE closure,hyperedges violating local detailed balance,0.17733134920634921,0.40476428952991456,0.13076073232323232,0.1529327876984127
+UDE closure,samples with σ < 0,0.0,0.0,0.0,0.0
+UDE closure,negative values,0.0,0.012611098155058044,0.0320306021973466,0.0
+Flux-GNN,hyperedges violating local detailed balance,0.03890749007936508,0.14000604543375988,0.08971974206349206,0.03631107390873016
+Flux-GNN,samples with σ < 0,0.0,0.0,0.0,0.0
+Flux-GNN,negative values,0.0,0.0,0.0,0.0
+FNO,hyperedges violating local detailed balance,N/A,N/A,N/A,N/A
+FNO,samples with σ < 0,N/A,N/A,N/A,N/A
+FNO,negative values,0.0,0.023482846185737975,0.03727132566334992,0.0021531340692371474
+BSMS-GNN,hyperedges violating local detailed balance,N/A,N/A,N/A,N/A
+BSMS-GNN,samples with σ < 0,N/A,N/A,N/A,N/A
+BSMS-GNN,negative values,0.03579919413349917,0.10642263940713101,0.19087343231757878,0.03462748108416252
+GENERIC-FNO,hyperedges violating local detailed balance,N/A,N/A,N/A,N/A
+GENERIC-FNO,samples with σ < 0,N/A,N/A,N/A,N/A
+GENERIC-FNO,negative values,0.09068751295605307,0.10931669776119403,0.09944256581674958,0.04173630545190713

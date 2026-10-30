@@ -1,0 +1,19 @@
+Method,quantity,training conditions (ATP 0.5–2),ATP 3–5,ATP 0.15–0.3,phosphorylated initial states
+Neural Chart,"σ, relative error",0.031052645122238494,0.02856943158044685,0.030975106628710433,0.037141015417085615
+Neural Chart,"cycle affinity, model; reference",17.033; 17.033,18.437; 18.437,15.429; 15.429,17.089; 17.089
+Oracle (true rates in the Neural Chart class),"σ, relative error",1.8148262018960045e-15,1.5055995928782359e-15,2.256268456323092e-15,1.3804671738411864e-15
+Oracle (true rates in the Neural Chart class),"cycle affinity, model; reference",17.033; 17.033,18.437; 18.437,15.429; 15.429,17.089; 17.089
+CRNN (mass action),"σ, relative error",0.1742461898998932,0.14227187146446513,0.24490875150022445,0.2856064986580751
+CRNN (mass action),"cycle affinity, model; reference",22.447; 17.033,23.852; 18.437,20.844; 15.429,22.503; 17.089
+CRNN (condition features),"σ, relative error",0.2593353211568281,0.36880782840312215,0.4993933041656251,0.30387270265466276
+CRNN (condition features),"cycle affinity, model; reference",25.378; 17.033,30.003; 18.437,23.947; 15.429,25.510; 17.089
+Flux-GNN,"σ, relative error",0.5184181066106082,0.16134094122622672,0.25566296241181147,0.49783924540486385
+Flux-GNN,"cycle affinity, model; reference",33.245; 17.033,29.204; 18.437,14.843; 15.429,33.933; 17.089
+"Neural Chart, learned standard potentials","σ, relative error",0.1698484249120261,0.1671740149796543,0.16387093297898792,0.21060854421249092
+"Neural Chart, learned standard potentials","cycle affinity, model; reference",20.715; 17.033,22.119; 18.437,19.111; 15.429,20.771; 17.089
+"Neural Chart, no convex initialisation","σ, relative error",1.3153137503980228,1.3921975088121659,0.6717743334019619,0.95115622912581
+"Neural Chart, no convex initialisation","cycle affinity, model; reference",17.033; 17.033,18.437; 18.437,15.429; 15.429,17.089; 17.089
+"Neural Chart, reversible (no drive)","σ, relative error",0.9249769583726143,0.9384241468101745,0.8474986707160918,0.9635113506911568
+"Neural Chart, reversible (no drive)","cycle affinity, model; reference",1.2e-15; 17.033,8.3e-16; 18.437,1.7e-15; 15.429,8.6e-16; 17.089
+Oracle (true rates in the Neural Chart class),"σ, relative error",1.8148262018960045e-15,1.5055995928782359e-15,2.256268456323092e-15,1.3804671738411864e-15
+Oracle (true rates in the Neural Chart class),"cycle affinity, model; reference",17.033; 17.033,18.437; 18.437,15.429; 15.429,17.089; 17.089

@@ -1,0 +1,13 @@
+Method,parameters,training time (min),final training loss
+Neural Chart,"5,381",13.6,0.00014714077828102744
+"Neural Chart, no state input","5,058",4.8,0.00014883168627420672
+"Neural Chart, constant mobility",1,1.8,0.030364715023315513
+"Neural Chart, learned drive scale","5,382",14.0,0.0001487532292230753
+Oracle (true rates in the Neural Chart class),0 (true rates),N/A,
+UDE closure,"5,441",11.7,0.0002752150098240236
+Flux-GNN,"151,234",639.0,0.00045351591965300033
+BSMS-GNN,"1,724,417",48.0,0.3584746891260147
+FNO,"1,188,609",118.9,0.0021461699696374128
+GENERIC-FNO,"1,002,388",35.6,0.0012015959305244905
+HelmFluid,"9,930,381",37.8,0.05389450775980949
+Persistence (u(t) = u(0)),0,N/A,
