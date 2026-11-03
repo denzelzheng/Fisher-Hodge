@@ -35,13 +35,15 @@ The model returns a master equation on that hypergraph.
 
 ## The problem
 
-Neural simulators such as FNO, graph networks and chemical reaction neural networks learn the rate of change of the state, or the fluxes, from the state, the conditions and the material features in one model.
-The universal part of the physics and the material-specific part are then learned together.
-This has three consequences, which the benchmarks below show.
+Most neural simulators learn the flux or the time derivative from the state $c$, the conditions $\theta$ (temperature, external field, drive, chemostat levels) and the material features $\xi$ together in one network.
+Examples are FNO, graph networks that emit fluxes, and closures in universal differential equations.
+Seen as a learning problem, this mixing leads to three failures, all visible in the benchmarks below.
 
-1. **New conditions break the model.** Trained at one temperature and drive, FNO reaches an error of 2.3 at four times the temperature in porous media, and the UDE closure 1.0.
-2. **The second law is not guaranteed.** In porous media up to 69 % of the edges of the UDE closure carry flux against the physical force, and most of its samples have negative entropy production. On the non-ideal Schlögl model up to 40 % of the hyperedges of CRNN with condition features do. A penalty can reduce such violations but cannot remove them for all inputs.
-3. **An accurate trajectory says little about the inside.** A model that fits the state can still assign the wrong flux to each step. Fluxes that circulate around a cycle leave the state unchanged and change the entropy production (Theorem 1 of [docs/theory.md](docs/theory.md)). Without further structure, data on the state cannot rule them out.
+1. **Spurious correlation and failure under a shift of the conditions.** The network cannot tell which changes of the rate come from the material and which come from the temperature or the drive. When the test conditions leave the training range, it fails. Trained at one temperature, FNO reaches an error of 2.3 at four times that temperature in porous media, and the UDE closure 1.0.
+2. **An ill-conditioned, non-convex optimization.** The kinetic parameters and the state are strongly coupled, and gradient descent from a generic start stops at poor local optima. On the oscillating Brusselator every black-box model stays above an error of 0.29. The Neural Chart itself, started without its closed-form step, stays at 0.50.
+3. **Observational equivalence.** Very different internal parameters can produce almost the same trajectories. A model of the Schlögl model built on a library of candidate reactions reaches a trajectory error of 2e-5, and its entropy production is still wrong by a factor of 4, and by up to 24 on other tasks. Fluxes that circulate around a cycle leave the state unchanged and change the entropy production (Theorem 1 of [docs/theory.md](docs/theory.md)). The learned flux of each step, and every readout built on it, then cannot be trusted. The same freedom lets the UDE closure send up to 69 % of its edge fluxes against the physical force.
+
+The Neural Chart addresses all three with one structural factorization of the rate of each step on a given hypergraph.
 
 ## The idea: what stays the same when the conditions change
 
@@ -62,12 +64,17 @@ The symmetric coordinate $g$ also changes with the state and the conditions $\th
 Part of that change is known.
 We write
 
-$$g_h=k_h\,\varepsilon_h(c,\theta),\qquad \varepsilon_h=\exp\Big(\tfrac12\big\langle\nu_h^++\nu_h^-,\mu(c,\theta)\big\rangle\Big),$$
+$$g_h(c,\theta,\xi)=k_h(\xi,c)\,\varepsilon_h(c,\theta),\qquad \varepsilon_h=\exp\Big(\tfrac12\big\langle\nu_h^++\nu_h^-,\mu(c,\theta)\big\rangle\Big),$$
 
 where $\nu_h^\pm$ are the reactant and product counts of the step.
 The factor $\varepsilon_h$ collects the mass-action factors, the chemostat levels and the potential.
 In porous media a known prefactor $T$ joins it.
-What remains, the mobility $k_h>0$, belongs to the material and its local state, such as the permeability of a pore or the rate constant of a reaction.
+What remains, the mobility $k_h(\xi,c)>0$, belongs to the material and its local state, such as the permeability of a pore or the rate constant of a reaction.
+
+The roles are now divided.
+The scaling factor $\varepsilon(c,\theta)$ and the force $f(c,\theta)$ are computed by known formulas and take up every change of the conditions $\theta$.
+The mobility $k(\xi,c)$ is the only part a network learns, and it is restricted to a constitutive law that is the same under every condition.
+Learning the dynamics becomes the task of locating one condition-invariant coordinate $k$ on a manifold whose other coordinates are fixed.
 
 **The central assumption.** Once the known factors are taken out, the mobility does not read the conditions.
 Where it depends on them in a known way, that dependence goes into $\varepsilon$.
