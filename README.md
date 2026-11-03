@@ -1,62 +1,90 @@
 # Neural Chart
 
-The Neural Chart learns the constitutive law of a driven physical system from trajectories.
-It receives the state, the graph of reaction or transport steps, and the conditions of each trajectory: the temperature, an external potential and drive, and the chemostat levels.
-It returns a master equation on that graph that satisfies the second law for every value of its parameters.
+The Neural Chart is a way to learn the dynamics of a driven physical system from trajectories without learning the dynamics directly.
+Thermodynamics fixes the space of all valid simulators on a given reaction or transport hypergraph.
+This space is a manifold with two kinds of coordinates: the thermodynamic force of each step, which physics determines, and the mobility of each step, which depends on the material.
+The Neural Chart keeps the force as physics gives it and uses a neural network only to place the material on this manifold.
+
+The model receives the state, the hypergraph of reaction and transport steps, and the conditions of each trajectory: the temperature, an external potential and drive, and the chemostat levels.
+Each reaction is a hyperedge that joins its reactants to its products, and each transport step is an edge between two cells.
+The model returns a master equation on that hypergraph.
 
 **Contents**
 
-- [The idea](#the-idea)
+- [The problem](#the-problem)
+- [The idea: a chart of the thermodynamic manifold](#the-idea-a-chart-of-the-thermodynamic-manifold)
+- [Three consequences](#three-consequences)
 - [What is learned in each benchmark](#what-is-learned-in-each-benchmark)
 - [Results at a glance](#results-at-a-glance)
 - [Learned constitutive laws under new conditions](#learned-constitutive-laws-under-new-conditions): porous media, porous media with crowding, non-ideal Schlögl model, phosphorylation cycle
 - [Ideal reaction networks](#ideal-reaction-networks): Schlögl model, Brusselator, MAPK cascade
 - [How each part contributes](#how-each-part-contributes)
+- [Why the hypergraph is an input](#why-the-hypergraph-is-an-input)
 - [Scope and limits](#scope-and-limits)
 - [Reproduce](#reproduce)
 - [Repository layout](#repository-layout)
 
-## The idea
+## The problem
 
-Fix the graph.
-Each step $h$ of the graph (a reaction, or a transfer between two cells) runs forward at rate $a_h$ and backward at rate $b_h$.
+Neural simulators such as FNO, graph networks and chemical reaction neural networks learn the rate of change of the state, or the fluxes, from the state, the conditions and the material features in one model.
+The universal part of the physics and the material-specific part are then learned together.
+This has three consequences, which the benchmarks below show.
+
+1. **New conditions break the model.** Trained at one temperature and drive, Flux-GNN reaches an error of 2.1 at four times the temperature in porous media, and the UDE closure 1.0.
+2. **The second law is not guaranteed.** Up to 69 % of the edges of the UDE closure and 31 % of those of Flux-GNN carry flux against the physical force, and the UDE closure has negative entropy production in most samples. A penalty can reduce such violations but cannot remove them for all inputs.
+3. **Training is hard.** On the oscillating Brusselator every black-box model stays above an error of 0.07, and above 0.29 once the conditions change.
+
+## The idea: a chart of the thermodynamic manifold
+
+Fix the hypergraph.
+Each step $h$ (a reaction, or a transfer between two cells) runs forward at rate $a_h$ and backward at rate $b_h$.
 Write the two rates in the coordinates
 
 $$f_h=\log\frac{a_h}{b_h},\qquad g_h=\sqrt{a_h b_h}.$$
 
-Local detailed balance says that $f_h$ is the thermodynamic force of the step, $f_h=-\langle S_h,\mu\rangle+A_h$.
-It is set by the chemical potentials $\mu$ and the drive $A_h$, and so by the state and the conditions.
-The rate laws that satisfy local detailed balance therefore form a manifold.
-On it the force coordinate is a known function of the state and the conditions.
-The other coordinate is free, $g_h=k_h\varepsilon_h$, where $\varepsilon_h$ is a known mass-action factor and $k_h>0$ is the mobility of the step.
-The mobility is a property of the material.
+Local detailed balance says that $f_h$ is the thermodynamic force of the step,
+
+$$f_h=-\langle S_h,\mu\rangle+A_h,\qquad \mu=\log c+U/T+\mu^0/T+\ln\gamma(c),$$
+
+set by the chemical potentials $\mu$ and the drive $A_h$, and so by the state and the conditions.
+The rate laws that satisfy local detailed balance form a manifold.
+On this manifold the force coordinate $f$ is a known function of the state and the conditions.
+The other coordinate is free: $g_h=k_h\varepsilon_h$, where $\varepsilon_h$ is a known mass-action factor and $k_h>0$ is the mobility of the step.
+
+The two coordinates answer two different questions.
+The force $f$ says what pushes the step.
+Physics gives it from the temperature, the potential $U$, the drive and the chemostat levels.
+The mobility $k$ says how easily the step happens.
+It is a property of the material and of its local state, such as the permeability of a pore or the rate constant of a reaction.
 
 A Neural Chart is a parametrisation of this manifold.
-Physics supplies the force.
+Physics supplies $f$.
 A network supplies the mobility from what the step sees,
 
 $$\log k_h=\log\omega_{c(h)}+g_\theta(\xi_h)+s\,m(\bar c_h),$$
 
 with one constant $\omega_c$ per class of steps, an MLP $g_\theta$ of local material descriptors $\xi_h$, and a monotone term $m$ of the local state $\bar c_h$.
-On reaction networks the chemical potential $\mu=\log c+U/T+\mu^0_\theta/T$ has learned standard potentials $\mu^0_\theta$.
-On non-ideal mixtures it also has a learned activity correction $\ln\gamma_\theta(c)$.
+On reaction networks the model also learns the standard potentials $\mu^0_\theta$, and on non-ideal mixtures an activity correction $\ln\gamma_\theta(c)$, a monotone function of the concentration.
+The model therefore learns a constitutive functional, a map from material descriptors and local state to mobilities and chemical potentials.
+It does not learn the dynamics.
+The dynamics follow from the chart through the master equation $\dot c=\sum_h S_h\,(a_h-b_h)$.
 
-What the model learns is therefore a constitutive functional: a map from material descriptors and local state to mobilities and chemical potentials.
-The dynamics follow from it through the master equation $\dot c=\sum_h S_h\,(a_h-b_h)$.
-Three properties hold for every parameter value.
+## Three consequences
 
-1. **Second law.** The flux of every step runs along the model's force, so the entropy production is non-negative. Local detailed balance, conservation of every moiety and positivity hold as well. No penalty or projection is needed.
-2. **Conditions are coordinates.** The temperature, the drive and the chemostat levels enter only through $f$, and the mobility never reads them. A new condition moves the model along a coordinate it already has. No learned part has to extrapolate in the condition.
-3. **Convex start.** With the force fixed, the flux $J_h=k_h\varphi_h$ is linear in the mobility. At initialisation the class constants $\omega_c$ and the standard potentials enter the log-rates linearly, and their fit to the data is a non-negative least-squares problem with a global optimum. Training on rollouts starts there.
-
-[docs/theory.md](docs/theory.md) proves these statements (Theorem 0).
+These hold for every value of the parameters.
+[docs/theory.md](docs/theory.md) proves them (Theorem 0).
 It also shows that gray-box models whose learned part reads the conditions, or learns the force freely, lose them.
+
+1. **Conditions are coordinates.** The temperature, the potential, the drive and the chemostat levels enter only through $f$, and the mobility never reads them. A new condition moves the model along a coordinate it already has, while the learned mobility stays the same. No learned part has to extrapolate in the condition.
+2. **Convex start.** With $f$ fixed, the flux $J_h=k_h\varphi_h$ is linear in the mobility. At initialisation the class constants $\omega_c$ and the standard potentials enter the log-rates linearly, and their fit to the data is a non-negative least-squares problem with a global optimum. Training on rollouts starts from there.
+3. **Second law by construction.** The flux of every step runs along the model's force, so the entropy production is non-negative. Local detailed balance, conservation of every moiety and positivity also hold. No penalty or projection is needed.
+
 [docs/method.md](docs/method.md) gives the fit and the evaluation protocol.
 
 ## What is learned in each benchmark
 
 The same code runs every benchmark.
-Each benchmark changes only the graph, the inputs that exist (descriptors, local state, potential, chemostats) and the training data.
+Each benchmark changes only the hypergraph, the inputs that exist (descriptors, local state, potential, chemostats) and the training data.
 
 | Benchmark | System | Learned part | Parameters |
 |---|---|---|---|
@@ -483,10 +511,41 @@ The tables are in `results/<benchmark>/ablations.md`.
 
 Without the convex start the same model, trained with the same budget, is 100 to 10^6 times less accurate on every reaction network.
 
+## Why the hypergraph is an input
+
+The hypergraph is the base of the chart.
+On a fixed hypergraph the data determine the coordinates of the model, up to the directions that Theorem 0(iii)(d) of the theory notes identifies.
+Without it, trajectories do not determine the thermodynamic structure.
+Different hypergraphs can produce nearly the same trajectories with different forces and a different entropy production.
+
+We tested this with the same model on a library of all candidate reactions with up to three state molecules on each side.
+In the language of the chart, this is a larger manifold in which every smaller network is a face where some mobilities are zero.
+A sparsity penalty on the mobilities pushes the fit towards such a face, and the reactions that carry at least 1 % of the flux are read out as the network.
+This experiment is not part of the release.
+
+| Benchmark | 10T error, library of candidates | 10T error, hypergraph given | entropy production, library model / truth |
+|---|---|---|---|
+| Schlögl model | 2.2e-05 | 1.8e-06 | 4.0 |
+| Brusselator | 0.019 | 2.6e-03 | 1.08, with 6.4 % of the steps against the true force |
+| Phosphorylation cycle | 2.0e-05 | 5.9e-06 | 10.2 |
+| Non-ideal Schlögl model, strong crowding | 0.011 | 0.091 | 23.8 |
+
+The library model still predicts the trajectories, but its entropy production is wrong by a factor of up to 24.
+The data cannot tell its extra reactions apart from the true ones.
+Two mechanisms produce them.
+
+1. **Equivalent directions.** Conservation laws and catalysts give the manifold directions that the data do not see. In the phosphorylation cycle the product of the ATP and ADP levels is constant in the data, so the phosphorylation step splits into two half-reactions with the same effect on the state. In the Brusselator the reverse of $A\to X$ and the step $X\to E$ both remove $X$ in proportion to its concentration, so their split is not determined.
+2. **Topology standing in for the constitutive law.** When the chemical potential cannot express the true non-ideality, extra reactions take up what is missing. In the last row the chemostat $A$ varies over 1.5–4.5, so the crowding is much stronger than in the benchmark above. The activity correction of the Neural Chart is a sum of bounded tanh units and cannot follow it, so the given-hypergraph model reaches only 0.091. The library model fits the data better by adding reactions that do not exist.
+
+An accurate trajectory therefore does not imply the right thermodynamics.
+Fixing the hypergraph removes the first mechanism.
+The second calls for an activity correction that is flexible enough for the mixture at hand.
+
 ## Scope and limits
 
-- **The graph is given.** The model receives the reaction graph or the mesh. Learning which reactions exist from data is not part of this release.
+- **The hypergraph is given.** The model receives the reaction hypergraph or the mesh. Learning which reactions exist from data is not part of this release. On large networks it also needs a sparse solver for the closed-form start, since a library of candidate reactions for the MAPK cascade has 68,000 columns.
 - **Standard potentials are weakly determined by concentration data.** The model keeps the second law with respect to its own force. Where its learned potentials are off, a small fraction of steps (up to 2.2 % on the Brusselator and the MAPK cascade) carry flux against the true force, and readouts that depend on the potentials, such as the entropy production, inherit that error. Theorem 0(iii)(d) and Theorem 2 of [docs/theory.md](docs/theory.md) show why: the affinity of a step that is close to irreversible carries little information in the data.
+- **Bounded activity correction.** The learned $\ln\gamma$ is a sum of bounded units. It covers the crowding of the non-ideal Schlögl benchmark, and it does not cover the much stronger crowding of the last row of the table above.
 - **One seed.** Every number is from one training run.
 
 ## Reproduce
