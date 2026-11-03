@@ -72,7 +72,7 @@ In porous media a known prefactor $T$ joins it.
 What remains, the mobility $k_h(\xi,c)>0$, belongs to the material and its local state, such as the permeability of a pore or the rate constant of a reaction.
 
 The roles are now divided.
-The scaling factor $\varepsilon(c,\theta)$ and the force $f(c,\theta)$ are computed by known formulas and take up every change of the conditions $\theta$.
+The scaling factor $\varepsilon(c,\theta)$ and the force $f(c,\theta)$ are computed by known formulas and take up every change of the conditions $\theta$. Their only learned inputs are the standard potentials and, for non-ideal mixtures, the activity correction, neither of which reads $\theta$.
 The mobility $k(\xi,c)$ is the only part a network learns, and it is restricted to a constitutive law that is the same under every condition.
 Learning the dynamics becomes the task of locating one condition-invariant coordinate $k$ on a manifold whose other coordinates are fixed.
 
