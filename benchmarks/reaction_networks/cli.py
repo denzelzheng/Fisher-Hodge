@@ -8,7 +8,8 @@
     evaluate   evaluate weights (--weights FILE; default runs/<benchmark>/<model>.pt, else the shipped
                checkpoints/<benchmark>/<model>.pt) on every test set; writes runs/<benchmark>/evaluated/<model>.json
     tables     the tables of results/<benchmark>/ from results/<benchmark>/runs/ (--runs DIR: from fresh runs)
-    gifs       the README animation from the weights in --weights DIR (default runs/<benchmark>/)
+    gifs       the README animation from the weights in --weights DIR (default runs/<benchmark>/); with --track the
+               tracer animation assets/<benchmark>_track_<test set>.gif instead
 
 Data: --data DIR, default $NEURALCHART_DATA/<benchmark> or data/<benchmark>.  Outputs of train and evaluate:
 --out DIR, default runs/<benchmark>/.
@@ -66,6 +67,7 @@ def main(system, argv=None):
     p.add_argument('--weights', default=None, help='evaluate: the weights file; gifs: the weights directory')
     p.add_argument('--runs', default=None, help='tables: directory of run files (default results/<benchmark>/runs)')
     p.add_argument('--resume', action='store_true', help='train: continue from the last checkpoint of the run')
+    p.add_argument('--track', action='store_true', help='gifs: the tracer animation (flux and physics flags) instead')
     fast.add_args(p, C.RTOL)
     a = p.parse_args(argv)
     C.configure(system, a.data, a.out)
@@ -88,6 +90,9 @@ def main(system, argv=None):
     elif a.cmd == 'tables':
         from .tables import make_tables
         make_tables(a.runs)
+    elif a.track:
+        from .gifs import make_track_gif
+        make_track_gif(system, a.device, a.weights)
     else:
         from .gifs import make_gif
         make_gif(system, a.device, a.weights)

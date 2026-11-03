@@ -51,6 +51,8 @@ def main(argv=None):
     p.add_argument('--settings', action='store_true', help='use the integrator settings of the reported runs')
     p.add_argument('--scene', default=None, choices=['drive_x8', 'point_cloud'], help='gifs: one scene only')
     p.add_argument('--weights', default=None, help='gifs: directory with the baseline weights <model>.pt (default runs/<variant>/)')
+    p.add_argument('--track', action='store_true', help='gifs: the flow animations of `gallery` (tracers and local entropy '
+                   'production) instead')
     fast.add_args(p, 0.3)
     a = p.parse_args(argv)
     both = ('porous_media', 'porous_media_crowding')
@@ -88,10 +90,10 @@ def main(argv=None):
         assert a.runs is None or len(variants) == 1, '--runs names the runs of one variant: give --variant'
         for v in variants:
             write_tables(v, a.models.split(',') if a.models else None, runs_dir=a.runs)
-    elif a.cmd == 'gallery':
+    elif a.cmd == 'gallery' or (a.cmd == 'gifs' and a.track):
         from .gallery import make_gallery, medium_and_law
         assert len(variants) == 1 or (a.data is None and a.weights is None), '--data / --weights name the directory of one variant'
-        if 'porous_media' in variants:
+        if 'porous_media' in variants and a.cmd == 'gallery':
             print(*medium_and_law(data_dir=a.data))
         make_gallery(a.device, a.data, a.weights, variants=variants)
     elif a.cmd == 'gifs':

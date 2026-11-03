@@ -6,6 +6,7 @@
     python -m benchmarks.brusselator.run evaluate --model chart --fast    # shipped checkpoint -> runs/brusselator/evaluated
     python -m benchmarks.brusselator.run tables                       # results/brusselator/*.md, *.csv
     python -m benchmarks.brusselator.run gifs                         # assets/brusselator_*.gif
+    python -m benchmarks.brusselator.run gifs --track                 # assets/brusselator_track_turing.gif
     python -m benchmarks.brusselator.run figures                      # assets/brusselator_*.png
 
 Data: --data, default $NEURALCHART_DATA/brusselator if set, else data/brusselator.  The device defaults to cuda.
@@ -91,6 +92,7 @@ def main(argv=None):
     p.add_argument('--checkpoint', default=None, help='evaluate: the checkpoint (default checkpoints/brusselator/<model>.pt, '
                    'else runs/brusselator/<model>.pt)')
     p.add_argument('--checkpoint_dir', default=None, help='train: where the checkpoint goes (default: the output directory)')
+    p.add_argument('--track', action='store_true', help='gifs: the tracer animation (flux and physics flags) instead')
     fast.add_args(p, RTOL)
     a = p.parse_args(argv)
     fkw = fast.kwargs_from_args(a)
@@ -107,6 +109,9 @@ def main(argv=None):
     elif a.cmd == 'tables':
         from .tables import make_tables
         make_tables(runs=a.runs)
+    elif a.cmd == 'gifs' and a.track:
+        from .gifs import make_track_gif
+        make_track_gif(a.device, data=a.data, weights=a.weights)
     elif a.cmd == 'gifs':
         from .gifs import make_gifs
         make_gifs(a.device, data=a.data, weights=a.weights)

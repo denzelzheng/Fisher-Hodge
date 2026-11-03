@@ -205,20 +205,22 @@ class Cells:
         return v.reshape(s.n, s.n) if s.grid else v[s.lab]
 
 
-def cell_velocity(c, J, disc):
-    """v_i = sum_{e at i} J_e d_e / (2 c_i), zero in nearly empty cells"""
+def cell_velocity(c, J, disc, floor=0.02):
+    """v_i = sum_{e at i} J_e d_e / (2 c_i), zero in nearly empty cells (c_i < floor)"""
     E = disc.g['edges'].cpu().numpy(); dv = disc.g['dvec'].cpu().numpy()
     m = np.zeros((disc.V, 2))
     np.add.at(m, E[:, 0], J[:, None] * dv); np.add.at(m, E[:, 1], J[:, None] * dv)
-    v = m / (2 * np.maximum(c, 0.02))[:, None]
-    v[c < 0.02] = 0.0
+    v = m / (2 * np.maximum(c, floor))[:, None]
+    v[c < floor] = 0.0
     return v
 
 
 def seed(rng, n, w, cells):
     out = np.zeros((0, 2))
     w = np.clip(w, 0, None)
-    wmax = w.max() if w.max() > 0 else 1.0
+    if not w.max() > 0:                                     # nothing to weight by: uniform
+        w = np.ones_like(w)
+    wmax = w.max()
     while len(out) < n:
         x = rng.random((4 * n, 2))
         out = np.concatenate([out, x[rng.random(4 * n) < w[cells.cell(x)] / wmax]])
@@ -244,8 +246,11 @@ def _flag_text(p):
     return f'{100 * p["bad"].mean():.0f} % of cells flagged'
 
 
-def track_gif(path, title, panels, disc, times, n_part=800, trail=3, max_age=18, substeps=8, fps=5, width_in=8.6, dpi=64):
-    """panels: [(label, dict(R, J, bad) or None for a diverged model)]; the first panel is the reference"""
+def track_gif(path, title, panels, disc, times, n_part=800, trail=3, max_age=18, substeps=8, fps=5, width_in=8.6, dpi=64,
+              floor=0.02, colors=16, time_label=None, note='tracers follow v = J / rho', speed=1.0):
+    """panels: [(label, dict(R, J, bad) or None for a diverged model)]; the first panel is the reference.  Tracers are
+    advanced over speed times the physical time between two frames.  Cells with density below floor have no velocity,
+    and tracers that land there are seeded again."""
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
@@ -259,8 +264,9 @@ def track_gif(path, title, panels, disc, times, n_part=800, trail=3, max_age=18,
     fig, axs = plt.subplots(1, n, figsize=(width_in, width_in / n * 1.32), dpi=dpi)
     fig.subplots_adjust(left=0.005, right=0.995, top=0.74, bottom=0.01, wspace=0.03)
     frames = []
-    h = (times[1] - times[0]) / substeps
+    time_label = time_label or (lambda t: f't = {t:4.1f}')
     for fi in range(len(times)):
+        h = speed * (times[fi] - times[fi - 1]) / substeps if fi > 0 else 0.0
         for p, (lab, d) in enumerate(panels):
             ax = axs[p]; ax.clear(); ax.set_facecolor('black')
             st = state[p]
@@ -269,13 +275,13 @@ def track_gif(path, title, panels, disc, times, n_part=800, trail=3, max_age=18,
                 ax.text(0.5, 0.5, 'diverged', color='w', ha='center', va='center', transform=ax.transAxes)
             else:
                 if fi > 0:
-                    v = cell_velocity(c, J, disc)
+                    v = cell_velocity(c, J, disc, floor)
                     x = st['x']
                     for _ in range(substeps):                       # midpoint rule, periodic
                         k1 = cells.sample(v, x); k2 = cells.sample(v, (x + 0.5 * h * k1) % 1.0)
                         x = (x + h * k2) % 1.0
                     st['age'] = st['age'] + 1
-                    re = (st['age'] > max_age) | (c[cells.cell(x)] < 0.02)
+                    re = (st['age'] > max_age) | (c[cells.cell(x)] < floor)
                     if re.any():
                         x[re] = seed(rng, int(re.sum()), c * cells.dens, cells)
                         st['age'][re] = 0
@@ -295,11 +301,11 @@ def track_gif(path, title, panels, disc, times, n_part=800, trail=3, max_age=18,
                             va='bottom', bbox=dict(fc='black', lw=0, pad=1.5))
             ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.set_xticks([]); ax.set_yticks([])
             ax.set_title(lab, fontsize=10)
-        fig.suptitle(f'{title}   t = {times[fi]:4.1f}\ntracers follow v = J / rho; magenta: sigma < 0 or flux against the '
+        fig.suptitle(f'{title}   {time_label(times[fi])}\n{note}; magenta: sigma < 0 or flux against the '
                      f'physical force', fontsize=9)
         frames.append(_png(fig))
     plt.close(fig)
-    return write_gif(frames, path, fps, colors=16)
+    return write_gif(frames, path, fps, colors=colors)
 
 
 def entropy_gif(path, title, panels, disc, times, fps=5, width_in=8.6, dpi=64):

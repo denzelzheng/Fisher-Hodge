@@ -80,3 +80,72 @@ def comparison_gif(path, frames, titles, suptitle='', times=None, step=1, fps=10
         if mb <= max_mb or step >= T:
             return mb
         step *= 2
+
+
+# ------------------------------------------------------------------------------------------ tracer animations on grids
+def grid_disc(n):
+    """the n x n periodic grid in the form used by the tracer animation (benchmarks.porous_media.gallery.track_gif):
+    cells in the unit square, edges in the order of neuralchart.graphs.grid_edge_list (n^2 horizontal, then n^2
+    vertical) with displacement vectors of length 1 / n"""
+    import torch
+    from types import SimpleNamespace
+    from neuralchart.graphs import grid_edge_list
+    V = n * n
+    dv = torch.zeros(2 * V, 2, dtype=torch.float64)
+    dv[:V, 0] = 1.0 / n
+    dv[V:, 1] = 1.0 / n
+    return SimpleNamespace(V=V, g=dict(kind='grid', n=n, edges=torch.as_tensor(grid_edge_list(n)), dvec=dv,
+                                       dens=torch.ones(V, dtype=torch.float64)))
+
+
+def physical_force(hg, at, bt, c):
+    """the physical force f = log a - log b of every hyperedge (B, H) from the true one-way rates at the states c (B, M);
+    NaN where a reactant or product of the hyperedge is not positive (the force is undefined there)"""
+    import torch
+    c = c.double().cpu()
+    pos = torch.isfinite(c) & (c > 0)
+    undef = (hg.dot(1.0 * ~pos, '+') + hg.dot(1.0 * ~pos, '-')) > 0
+    f = torch.log(at) - torch.log(bt)
+    return torch.where(undef, torch.full_like(f, float('nan')), f)
+
+
+def hypergraph_track(hg, species, states, J, f, gross=None):
+    """the inputs of one tracer panel on a reaction-transport hypergraph of the n x n periodic grid
+    (neuralchart.graphs.Hypergraph.reaction_transport), for a sequence of states.
+      states (T, M), J (T, H) the model's own hyperedge flux, f (T, H) the physical force at those states (NaN where
+      undefined), gross (T, H) = a + b of a model with forward / backward rates (None: a single edge flux)
+    The local entropy production of a site is J f of its reactions plus half of J f of every transport hyperedge at it
+    (all species).  A site is flagged when it is negative or when a hyperedge at the site carries flux against the force
+    beyond rounding (neuralchart.diagnostics.ldb_violation, among the hyperedges with |J| > 1e-9 max |J| as in the
+    evaluation).  Returns dict(R (T, V) the density of `species` (a name, or a tuple of names that are summed), J (T, 2V)
+    its transport flux on the grid edges, bad (T, V) flagged sites, sigma (T, V), viol (T, H))."""
+    import torch
+    from neuralchart.diagnostics import ldb_violation
+    m = hg.meta
+    V, R = hg.V, m['n_reactions']
+    E = 2 * V
+    species = (species,) if isinstance(species, str) else tuple(species)
+    J = torch.as_tensor(J).double().cpu()
+    f = torch.as_tensor(f).double().cpu()
+    gross = None if gross is None else torch.as_tensor(gross).double().cpu()
+    ok = torch.isfinite(f) & torch.isfinite(J)
+    val = ok & (J.abs() > 1e-9 * J.abs().nan_to_num(0).amax(-1, keepdim=True).clamp_min(1e-30))
+    viol = ldb_violation(J.nan_to_num(0), f.nan_to_num(0), None if gross is None else gross.nan_to_num(0)) & val
+    jf = torch.where(ok, J * f, torch.zeros_like(J))
+    tr = torch.as_tensor(m['odd'])
+    rx = torch.nonzero(~tr)[:, 0]; te = torch.nonzero(tr)[:, 0]
+    site, et, eh = (torch.as_tensor(m[k]) for k in ('site', 'et', 'eh'))
+    T = J.shape[0]
+    sigma = torch.zeros(T, V, dtype=torch.float64)
+    sigma.index_add_(1, site[rx], jf[:, rx]).index_add_(1, et[te], 0.5 * jf[:, te]).index_add_(1, eh[te], 0.5 * jf[:, te])
+    hit = torch.zeros(T, V, dtype=torch.float64)
+    vd = viol.double()
+    hit.index_add_(1, site[rx], vd[:, rx]).index_add_(1, et[te], vd[:, te]).index_add_(1, eh[te], vd[:, te])
+    bad = (sigma < 0) | (hit > 0)
+    states = torch.as_tensor(states).double().cpu()
+    rho, Jt = 0.0, 0.0
+    for sp in species:
+        s, d = hg.species_names.index(sp), m['diffusing'].index(sp)
+        rho = rho + states[:, s * V:(s + 1) * V]
+        Jt = Jt + J[:, R * V + d * E:R * V + (d + 1) * E]
+    return dict(R=rho.numpy(), J=Jt.numpy(), bad=bad.numpy(), sigma=sigma.numpy(), viol=viol.numpy())
