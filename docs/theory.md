@@ -19,6 +19,14 @@ The Neural Chart is a master equation on graphs and hypergraphs whose thermodyna
 - Information geometry of the chart (IG1 to IG7, and the division of labour between information geometry and Hodge theory)
 - References
 
+**Where the claims of the README are proved.**
+The Neural Chart is a learned map onto the set $\mathfrak G(S)$ of rate laws that satisfy local detailed balance on a fixed graph (Theorem 0, formulation).
+The second law for every parameter value is Theorem 0(iii)(a).
+Conditions as coordinates is Theorem 0(iii)(b) and Proposition 4.
+The convex start is Theorem 0(iii)(c).
+Why the standard potentials are weakly determined on networks with nearly irreversible steps is the example after Theorem 0(iii)(d) and Theorem 2.
+Theorem 0(iv) shows what a model loses when its learned part reads the conditions or learns the force freely.
+
 ## 0. Setting and notation
 
 There are $n$ state coordinates (species at sites) and $m$ hyperedges. Hyperedge $h$ has reactant and product vectors $\nu_h^+,\nu_h^-\in\mathbb{Z}_{\ge 0}^n$, and $S=\nu^--\nu^+\in\mathbb{R}^{n\times m}$. The rates are
