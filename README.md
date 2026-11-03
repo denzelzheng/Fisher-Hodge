@@ -15,6 +15,8 @@ Three properties follow from this assumption.
 
 In addition, every point of the chart dissipates non-negatively with respect to its own force.
 
+![The hypergraph fixes the thermodynamic manifold, the conditions move along the driving coordinate, and a point of the manifold gives the dynamics](assets/fig_manifold.svg)
+
 The inputs are the state, the hypergraph of reaction and transport steps, and the conditions of each trajectory: the temperature, an external potential and drive, and the chemostat levels.
 Each reaction is a hyperedge that joins its reactants to its products, and each transport step is an edge between two cells.
 A point of the manifold is a master equation on that hypergraph, so the dynamics follow once the point is known.
@@ -126,6 +128,8 @@ $$\log k_h=\log\omega_{c(h)}+g_\theta(\xi_h)+s\,m(\bar c_h),$$
 with one constant $\omega_c$ per class of steps, an MLP $g_\theta$ of local material descriptors $\xi_h$, and a monotone term $m$ of the local state $\bar c_h$.
 What the model learns is thus a constitutive functional, a map from material descriptors and local state to mobilities and chemical potentials.
 The dynamics follow from it through the master equation $\dot c=\sum_h S_h\,(a_h-b_h)$.
+
+![The model, the fit and the use at a new condition](assets/fig_pipeline.svg)
 
 ## What the invariance gives
 
@@ -607,6 +611,8 @@ Two mechanisms produce them.
 An accurate trajectory therefore does not imply the right thermodynamics.
 Fixing the hypergraph removes the first mechanism.
 The second calls for an activity correction that is flexible enough for the mixture at hand.
+
+![Smaller networks are boundary faces of the larger manifold, and some directions are invisible to the trajectories](assets/fig_boundary_faces.svg)
 
 ## Related work
 

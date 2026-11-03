@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 470" width="960" height="470" font-family="Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#444"/></marker>
+  </defs>
+  <rect width="960" height="470" fill="#ffffff"/>
+  <style>
+    .t{font-size:13px;fill:#222;text-anchor:middle}
+    .s{font-size:11.5px;fill:#555;text-anchor:middle}
+    .h{font-size:15px;font-weight:bold;fill:#222}
+    .in{fill:#edf2f7;stroke:#555}
+    .kn{fill:#ebf8ff;stroke:#2b6cb0}
+    .le{fill:#fffaf0;stroke:#c05621}
+    .ou{fill:#f0fff4;stroke:#2f855a}
+    .l{stroke:#444;stroke-width:1.5;fill:none}
+  </style>
+
+  <!-- Model -->
+  <text class="h" x="20" y="26">The model</text>
+  <rect class="in" x="20" y="42" width="165" height="52" rx="6"/>
+  <text class="t" x="102" y="63">state c, conditions θ</text>
+  <text class="s" x="102" y="81">hypergraph S</text>
+  <rect class="in" x="20" y="118" width="165" height="52" rx="6"/>
+  <text class="t" x="102" y="139">descriptors ξ</text>
+  <text class="s" x="102" y="157">local state c̄</text>
+
+  <rect class="kn" x="235" y="42" width="190" height="52" rx="6"/>
+  <text class="t" x="330" y="63">known formulas</text>
+  <text class="s" x="330" y="81">driving coordinate f, factor ε</text>
+  <rect class="le" x="235" y="118" width="190" height="52" rx="6"/>
+  <text class="t" x="330" y="139">network</text>
+  <text class="s" x="330" y="157">material coordinate k(ξ, c̄)</text>
+
+  <rect class="kn" x="475" y="80" width="190" height="52" rx="6"/>
+  <text class="t" x="570" y="101">rates of each step</text>
+  <text class="s" x="570" y="119">a, b = k ε e^(±f/2)</text>
+
+  <rect class="ou" x="715" y="80" width="225" height="52" rx="6"/>
+  <text class="t" x="827" y="101">master equation ċ = S (a − b)</text>
+  <text class="s" x="827" y="119">positive adaptive integrator</text>
+
+  <path class="l" d="M185 68 L235 68" marker-end="url(#ar)"/>
+  <path class="l" d="M185 144 L235 144" marker-end="url(#ar)"/>
+  <path class="l" d="M425 68 L475 95" marker-end="url(#ar)"/>
+  <path class="l" d="M425 144 L475 117" marker-end="url(#ar)"/>
+  <path class="l" d="M665 106 L715 106" marker-end="url(#ar)"/>
+  <text class="s" x="330" y="190" style="fill:#2b6cb0">learned inputs of f and ε: standard potentials μ⁰, activity correction ln γ(c), which do not read θ</text>
+
+  <!-- Fit -->
+  <text class="h" x="20" y="232">The fit</text>
+  <rect class="kn" x="20" y="248" width="215" height="72" rx="6"/>
+  <text class="t" x="127" y="270">1. closed-form start</text>
+  <text class="s" x="127" y="289">non-negative least squares</text>
+  <text class="s" x="127" y="305">on one-way class constants (convex)</text>
+  <rect class="le" x="255" y="248" width="215" height="72" rx="6"/>
+  <text class="t" x="362" y="270">2. back to shared parameters</text>
+  <text class="s" x="362" y="289">least squares on the logarithms,</text>
+  <text class="s" x="362" y="305">L-BFGS if classes are coupled</text>
+  <rect class="le" x="490" y="248" width="215" height="72" rx="6"/>
+  <text class="t" x="597" y="270">3. variable projection</text>
+  <text class="s" x="597" y="289">ln γ descends the residual,</text>
+  <text class="s" x="597" y="305">with the constants at their optimum</text>
+  <rect class="le" x="725" y="248" width="215" height="72" rx="6"/>
+  <text class="t" x="832" y="270">4. rollout training</text>
+  <text class="s" x="832" y="289">all parameters on multi-step</text>
+  <text class="s" x="832" y="305">trajectories, Adam</text>
+  <path class="l" d="M235 284 L255 284" marker-end="url(#ar)"/>
+  <path class="l" d="M470 284 L490 284" marker-end="url(#ar)"/>
+  <path class="l" d="M705 284 L725 284" marker-end="url(#ar)"/>
+
+  <!-- Use -->
+  <text class="h" x="20" y="362">At a new condition</text>
+  <rect class="in" x="20" y="378" width="215" height="72" rx="6"/>
+  <text class="t" x="127" y="400">new θ′</text>
+  <text class="s" x="127" y="419">temperature, drive, potential,</text>
+  <text class="s" x="127" y="435">chemostat levels</text>
+  <rect class="kn" x="255" y="378" width="215" height="72" rx="6"/>
+  <text class="t" x="362" y="400">recompute f and ε</text>
+  <text class="s" x="362" y="419">by the same formulas,</text>
+  <text class="s" x="362" y="435">no learned parameter changes</text>
+  <rect class="ou" x="490" y="378" width="215" height="72" rx="6"/>
+  <text class="t" x="597" y="400">trajectory</text>
+  <text class="s" x="597" y="419">the same master equation</text>
+  <text class="s" x="597" y="435">at the new point of the manifold</text>
+  <rect class="ou" x="725" y="378" width="215" height="72" rx="6"/>
+  <text class="t" x="832" y="400">readouts</text>
+  <text class="s" x="832" y="419">flux of each step, cycle affinity,</text>
+  <text class="s" x="832" y="435">entropy production</text>
+  <path class="l" d="M235 414 L255 414" marker-end="url(#ar)"/>
+  <path class="l" d="M470 414 L490 414" marker-end="url(#ar)"/>
+  <path class="l" d="M705 414 L725 414" marker-end="url(#ar)"/>
+</svg>

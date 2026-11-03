@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 340" width="960" height="340" font-family="Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#444"/></marker>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#c53030"/></marker>
+  </defs>
+  <rect width="960" height="340" fill="#ffffff"/>
+
+  <!-- left: the octant of material coordinates -->
+  <text x="235" y="28" text-anchor="middle" font-size="16" font-weight="bold" fill="#222">Library of candidates: a larger manifold</text>
+  <path d="M150 260 L150 70 L300 40 L300 180 Z" fill="#ebf8ff" stroke="#2b6cb0"/>
+  <path d="M150 260 L300 180 L420 240 L270 320 Z" fill="#f0fff4" stroke="#2f855a"/>
+  <g stroke="#444" stroke-width="1.5" fill="none">
+    <path d="M150 260 L150 55" marker-end="url(#ar)"/>
+    <path d="M150 260 L285 330" marker-end="url(#ar)"/>
+    <path d="M150 260 L320 170" marker-end="url(#ar)"/>
+  </g>
+  <text x="136" y="62" font-size="13" fill="#444" text-anchor="end">k₃</text>
+  <text x="330" y="166" font-size="13" fill="#444">k₂</text>
+  <text x="296" y="332" font-size="13" fill="#444">k₁</text>
+  <text x="222" y="108" font-size="12.5" fill="#2b6cb0" text-anchor="middle">boundary face</text>
+  <text x="222" y="125" font-size="12.5" fill="#2b6cb0" text-anchor="middle">k₁ = 0</text>
+  <text x="315" y="262" font-size="12.5" fill="#2f855a" text-anchor="middle">boundary face k₃ = 0,</text>
+  <text x="315" y="279" font-size="12.5" fill="#2f855a" text-anchor="middle">a smaller network</text>
+  <circle cx="270" cy="232" r="6" fill="#c05621"/>
+  <text x="270" y="222" font-size="12.5" fill="#c05621" text-anchor="middle">true network</text>
+
+  <!-- right: observational equivalence -->
+  <text x="715" y="28" text-anchor="middle" font-size="16" font-weight="bold" fill="#222">Directions the trajectories do not see</text>
+  <path d="M520 240 C590 190, 700 195, 760 225 L900 130 C840 95, 720 90, 640 130 Z" fill="#faf5ff" stroke="#6b46c1"/>
+  <path d="M600 195 C650 165, 730 160, 800 180" stroke="#c53030" stroke-width="2.5" fill="none" stroke-dasharray="7 5" marker-start="url(#arr)" marker-end="url(#arr)"/>
+  <circle cx="600" cy="195" r="6" fill="#c05621"/>
+  <circle cx="800" cy="180" r="6" fill="#ffffff" stroke="#c05621" stroke-width="2"/>
+  <text x="610" y="217" font-size="12.5" fill="#c05621" text-anchor="middle">true reaction</text>
+  <text x="790" y="200" font-size="12.5" fill="#c05621" text-anchor="middle">split into half-reactions</text>
+  <text x="700" y="150" font-size="12.5" fill="#c53030" text-anchor="middle">Fisher metric singular here</text>
+  <g font-size="13" fill="#222" text-anchor="middle">
+    <text x="600" y="276">trajectory error 6e-6</text>
+    <text x="600" y="296">entropy production 0.998 × truth</text>
+    <text x="830" y="276">trajectory error 2e-5</text>
+    <text x="830" y="296">entropy production 10.2 × truth</text>
+  </g>
+  <text x="715" y="326" text-anchor="middle" font-size="12" fill="#555">phosphorylation cycle, hypergraph given (left) and library of candidates (right)</text>
+</svg>

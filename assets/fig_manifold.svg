@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 360" width="960" height="360" font-family="Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#444"/></marker>
+    <marker id="arb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#2b6cb0"/></marker>
+    <marker id="aro" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#c05621"/></marker>
+  </defs>
+  <rect width="960" height="360" fill="#ffffff"/>
+
+  <!-- panel titles -->
+  <text x="150" y="30" text-anchor="middle" font-size="17" font-weight="bold" fill="#222">1. Directed hypergraph</text>
+  <text x="480" y="30" text-anchor="middle" font-size="17" font-weight="bold" fill="#222">2. Thermodynamic manifold</text>
+  <text x="815" y="30" text-anchor="middle" font-size="17" font-weight="bold" fill="#222">3. Dynamics</text>
+
+  <!-- panel 1: hypergraph -->
+  <text x="150" y="58" text-anchor="middle" font-size="13" fill="#555">a reaction is a hyperedge</text>
+  <g font-size="13" fill="#222" text-anchor="middle">
+    <circle cx="50" cy="88" r="18" fill="#edf2f7" stroke="#555"/><text x="50" y="93">X</text>
+    <circle cx="50" cy="133" r="18" fill="#edf2f7" stroke="#555"/><text x="50" y="138">E</text>
+    <circle cx="50" cy="178" r="18" fill="#edf2f7" stroke="#555"/><text x="50" y="182" font-size="11">ATP</text>
+    <circle cx="250" cy="88" r="18" fill="#edf2f7" stroke="#555"/><text x="250" y="93">X<tspan font-size="10" dy="3">p</tspan></text>
+    <circle cx="250" cy="133" r="18" fill="#edf2f7" stroke="#555"/><text x="250" y="138">E</text>
+    <circle cx="250" cy="178" r="18" fill="#edf2f7" stroke="#555"/><text x="250" y="182" font-size="11">ADP</text>
+    <rect x="125" y="113" width="50" height="40" rx="6" fill="#fefcbf" stroke="#555"/><text x="150" y="138">h</text>
+  </g>
+  <g stroke="#444" stroke-width="1.5" fill="none">
+    <path d="M68 90 L125 125" marker-end="url(#ar)"/><path d="M68 133 L125 133" marker-end="url(#ar)"/><path d="M68 176 L125 141" marker-end="url(#ar)"/>
+    <path d="M175 125 L232 90" marker-end="url(#ar)"/><path d="M175 133 L232 133" marker-end="url(#ar)"/><path d="M175 141 L232 176" marker-end="url(#ar)"/>
+  </g>
+  <text x="150" y="228" text-anchor="middle" font-size="13" fill="#555">a transfer is an ordinary edge</text>
+  <g font-size="12" fill="#222" text-anchor="middle">
+    <circle cx="90" cy="258" r="18" fill="#edf2f7" stroke="#555"/><text x="90" y="262">cell i</text>
+    <circle cx="210" cy="258" r="18" fill="#edf2f7" stroke="#555"/><text x="210" y="262">cell j</text>
+  </g>
+  <path d="M108 258 L192 258" stroke="#444" stroke-width="1.5" marker-end="url(#ar)"/>
+  <text x="150" y="312" text-anchor="middle" font-size="13" fill="#222">counts ν⁺, ν⁻ and S = ν⁻ − ν⁺</text>
+  <text x="150" y="332" text-anchor="middle" font-size="13" fill="#222">fix the manifold of panel 2</text>
+
+  <!-- arrow 1 to 2 -->
+  <path d="M285 180 L322 180" stroke="#444" stroke-width="2" marker-end="url(#ar)"/>
+
+  <!-- panel 2: curved sheet -->
+  <path d="M335 270 C400 215, 470 225, 540 255 L625 165 C555 135, 480 125, 420 170 Z" fill="#ebf8ff" stroke="#2b6cb0" stroke-width="1.5"/>
+  <g stroke="#90cdf4" stroke-width="1" fill="none">
+    <path d="M356 247 C420 195, 490 205, 562 232"/>
+    <path d="M378 224 C440 175, 510 183, 583 209"/>
+    <path d="M399 197 C460 152, 530 158, 604 187"/>
+    <path d="M388 247 L455 151"/>
+    <path d="M440 232 L505 137"/>
+    <path d="M492 235 L560 143"/>
+  </g>
+  <!-- driving direction -->
+  <path d="M430 203 C470 193, 505 198, 543 212" stroke="#2b6cb0" stroke-width="2.5" fill="none" marker-end="url(#arb)"/>
+  <circle cx="430" cy="203" r="6" fill="#c05621"/>
+  <circle cx="543" cy="212" r="6" fill="#ffffff" stroke="#c05621" stroke-width="2"/>
+  <text x="482" y="186" text-anchor="middle" font-size="12.5" fill="#2b6cb0">new condition θ′</text>
+  <!-- material direction -->
+  <path d="M430 203 L398 248" stroke="#c05621" stroke-width="2.5" marker-start="url(#aro)" marker-end="url(#aro)"/>
+  <text x="362" y="292" text-anchor="middle" font-size="12.5" fill="#c05621">material coordinate k</text>
+  <text x="362" y="308" text-anchor="middle" font-size="12" fill="#c05621">learned, the same law</text>
+  <text x="362" y="323" text-anchor="middle" font-size="12" fill="#c05621">under every condition</text>
+  <text x="560" y="292" text-anchor="middle" font-size="12.5" fill="#2b6cb0">driving coordinate f</text>
+  <text x="560" y="308" text-anchor="middle" font-size="12" fill="#2b6cb0">from the state and the conditions</text>
+  <text x="560" y="323" text-anchor="middle" font-size="12" fill="#2b6cb0">by known formulas</text>
+  <text x="480" y="62" text-anchor="middle" font-size="13" fill="#555">every point is a rate law with local detailed balance</text>
+  <text x="480" y="82" text-anchor="middle" font-size="13" fill="#222">a = k ε e^(f/2),  b = k ε e^(−f/2)</text>
+
+  <!-- arrow 2 to 3 -->
+  <path d="M640 180 L677 180" stroke="#444" stroke-width="2" marker-end="url(#ar)"/>
+
+  <!-- panel 3 -->
+  <text x="815" y="62" text-anchor="middle" font-size="13" fill="#555">a point gives a master equation</text>
+  <text x="815" y="84" text-anchor="middle" font-size="14" fill="#222">ċ = S (a − b)</text>
+  <g stroke="#444" stroke-width="1.2" fill="none">
+    <path d="M700 260 L935 260" marker-end="url(#ar)"/><path d="M700 260 L700 110" marker-end="url(#ar)"/>
+  </g>
+  <text x="935" y="280" text-anchor="end" font-size="12" fill="#444">t</text>
+  <text x="688" y="118" font-size="12" fill="#444">c</text>
+  <path d="M705 230 C735 120, 760 120, 785 195 S 835 255, 860 180 S 905 130, 930 170" stroke="#c05621" stroke-width="2" fill="none"/>
+  <path d="M705 240 C735 160, 765 160, 790 215 S 835 250, 860 215 S 905 180, 930 200" stroke="#2b6cb0" stroke-width="2" fill="none" stroke-dasharray="6 4"/>
+  <text x="815" y="300" text-anchor="middle" font-size="12.5" fill="#c05621">θ</text>
+  <text x="815" y="318" text-anchor="middle" font-size="12.5" fill="#2b6cb0">θ′, same learned parameters</text>
+</svg>
