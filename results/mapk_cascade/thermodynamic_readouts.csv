@@ -11,3 +11,7 @@ CRNN (condition features),"σ, relative error",0.2593353211568281,0.368807828403
 CRNN (condition features),"cycle affinity, model; reference",25.378; 17.033,30.003; 18.437,23.947; 15.429,25.510; 17.089
 Flux-GNN,"σ, relative error",0.5184181066106082,0.16134094122622672,0.25566296241181147,0.49783924540486385
 Flux-GNN,"cycle affinity, model; reference",33.245; 17.033,29.204; 18.437,14.843; 15.429,33.933; 17.089
+"Neural Chart, no convex initialisation","σ, relative error",0.729005258085474,0.7402461728185622,0.6435533275661545,0.6488897155482166
+"Neural Chart, no convex initialisation","cycle affinity, model; reference",3.757; 17.033,5.162; 18.437,2.154; 15.429,3.813; 17.089
+"Neural Chart, reversible (no drive)","σ, relative error",0.7857761833050763,0.852339510265169,0.5968234478712569,0.7828705117186735
+"Neural Chart, reversible (no drive)","cycle affinity, model; reference",-1.1e-15; 17.033,-2.1e-15; 18.437,-1.3e-15; 15.429,-2.7e-15; 17.089

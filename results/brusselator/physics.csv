@@ -5,6 +5,12 @@ Neural Chart,negative concentration values (fraction),0.0,0.0,0.0,0.0,0.0,0.0
 "Neural Chart, given standard potentials (oracle-type information)",hyperedges violating local detailed balance,0.0,0.0,0.0,0.0,0.0,0.0
 "Neural Chart, given standard potentials (oracle-type information)",samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0
 "Neural Chart, given standard potentials (oracle-type information)",negative concentration values (fraction),0.0,0.0,0.0,0.0,0.0,0.0
+"Neural Chart, no convex initialisation",hyperedges violating local detailed balance,0.17777722210192756,0.19346827835915018,0.15035128380385174,0.021723029853846144,0.016565611567789622,0.1264274593173559
+"Neural Chart, no convex initialisation",samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0
+"Neural Chart, no convex initialisation",negative concentration values (fraction),0.0,0.0,0.0,0.0,0.0,0.0
+"Neural Chart, reversible (no drive)",hyperedges violating local detailed balance,0.0,1.5258796823525403e-06,0.0,0.0,0.0,2.4795598437953593e-06
+"Neural Chart, reversible (no drive)",samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0
+"Neural Chart, reversible (no drive)",negative concentration values (fraction),0.0,0.0,0.0,0.0,0.0,0.0
 Oracle (true rates in the Neural Chart class),hyperedges violating local detailed balance,0.0,0.0,0.0,0.0,0.0,0.0
 Oracle (true rates in the Neural Chart class),samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0
 Oracle (true rates in the Neural Chart class),negative concentration values (fraction),0.0,0.0,0.0,0.0,0.0,0.0

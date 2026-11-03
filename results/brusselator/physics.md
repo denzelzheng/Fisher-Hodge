@@ -6,6 +6,12 @@
 | Neural Chart, given standard potentials (oracle-type information) | hyperedges violating local detailed balance | 0 | 0 | 0 | 0 | 0 | 0 |
 | Neural Chart, given standard potentials (oracle-type information) | samples with sigma < 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | Neural Chart, given standard potentials (oracle-type information) | negative concentration values (fraction) | 0 | 0 | 0 | 0 | 0 | 0 |
+| Neural Chart, no convex initialisation | hyperedges violating local detailed balance | 0.178 | 0.193 | 0.150 | 0.022 | 0.017 | 0.126 |
+| Neural Chart, no convex initialisation | samples with sigma < 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Neural Chart, no convex initialisation | negative concentration values (fraction) | 0 | 0 | 0 | 0 | 0 | 0 |
+| Neural Chart, reversible (no drive) | hyperedges violating local detailed balance | 0 | 1.5e-06 | 0 | 0 | 0 | 2.5e-06 |
+| Neural Chart, reversible (no drive) | samples with sigma < 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Neural Chart, reversible (no drive) | negative concentration values (fraction) | 0 | 0 | 0 | 0 | 0 | 0 |
 | Oracle (true rates in the Neural Chart class) | hyperedges violating local detailed balance | 0 | 0 | 0 | 0 | 0 | 0 |
 | Oracle (true rates in the Neural Chart class) | samples with sigma < 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | Oracle (true rates in the Neural Chart class) | negative concentration values (fraction) | 0 | 0 | 0 | 0 | 0 | 0 |

@@ -22,3 +22,7 @@
 | GENERIC-FNO | Kpp fraction at 10T, mean absolute error | 0.886 | 0.821 | 0.842 | 1.119 |
 | Persistence (u(t) = u(0)) | moieties, largest relative drift | 0 | 0 | 0 | 0 |
 | Persistence (u(t) = u(0)) | Kpp fraction at 10T, mean absolute error | 0.194 | 0.391 | 0.129 | 0.458 |
+| Neural Chart, no convex initialisation | moieties, largest relative drift | 3.8e-06 | 1.0e-05 | 5.4e-06 | 6.0e-06 |
+| Neural Chart, no convex initialisation | Kpp fraction at 10T, mean absolute error | 0.353 | 0.353 | 0.121 | 0.367 |
+| Neural Chart, reversible (no drive) | moieties, largest relative drift | 4.3e-05 | 4.3e-05 | 3.9e-05 | 1.0e-05 |
+| Neural Chart, reversible (no drive) | Kpp fraction at 10T, mean absolute error | 0.171 | 0.388 | 0.132 | 0.447 |

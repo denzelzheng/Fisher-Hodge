@@ -21,3 +21,7 @@ GENERIC-FNO,"moieties, largest relative drift",1.5715980346601464,1.912176007927
 GENERIC-FNO,"Kpp fraction at 10T, mean absolute error",0.885889902830844,0.8214688300534683,0.8419160775065944,1.1193689974047736
 Persistence (u(t) = u(0)),"moieties, largest relative drift",0.0,0.0,0.0,0.0
 Persistence (u(t) = u(0)),"Kpp fraction at 10T, mean absolute error",0.19390405267997812,0.3912731201122488,0.12873053629368686,0.45766447037673086
+"Neural Chart, no convex initialisation","moieties, largest relative drift",3.779821761017741e-06,1.0061519919521541e-05,5.350791194365132e-06,6.0220819530391935e-06
+"Neural Chart, no convex initialisation","Kpp fraction at 10T, mean absolute error",0.35258801683281393,0.3525560165075582,0.12058156201025971,0.3669345774693127
+"Neural Chart, reversible (no drive)","moieties, largest relative drift",4.322025368750093e-05,4.3011340272277354e-05,3.8669244448314494e-05,1.0470448089440208e-05
+"Neural Chart, reversible (no drive)","Kpp fraction at 10T, mean absolute error",0.17059166535011946,0.3883533431232262,0.13205979175301855,0.44676448894823695

@@ -12,3 +12,7 @@
 | CRNN (condition features) | cycle affinity, model; reference | 2.733; 5.960 | 3.764; 7.477 | 2.760; 5.990 | 2.206; 5.323 |
 | Flux-GNN | σ, relative error | 0.362 | 0.594 | 0.332 | 0.396 |
 | Flux-GNN | cycle affinity, model; reference | 3.394; 5.960 | 3.224; 7.477 | 3.413; 5.990 | 2.858; 5.323 |
+| Neural Chart, no convex initialisation | σ, relative error | 0.690 | 0.492 | 0.642 | 0.766 |
+| Neural Chart, no convex initialisation | cycle affinity, model; reference | 2.339; 5.960 | 3.856; 7.477 | 2.369; 5.990 | 1.702; 5.323 |
+| Neural Chart, reversible (no drive) | σ, relative error | 0.979 | 0.976 | 0.932 | 0.973 |
+| Neural Chart, reversible (no drive) | cycle affinity, model; reference | 1.9e-16; 5.960 | 5.6e-16; 7.477 | -1.5e-16; 5.990 | 1.0e-15; 5.323 |

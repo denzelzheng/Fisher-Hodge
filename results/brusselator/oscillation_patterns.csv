@@ -15,6 +15,22 @@ Neural Chart,"pattern standard deviation, model / reference",1.0003649220588302,
 "Neural Chart, given standard potentials (oracle-type information)","10T error, spatial starts",6.22728850921904e-05,0.00010041972626608972,3.5106459130916865e-05,7.523608661307035e-05,0.0001706942332490778
 "Neural Chart, given standard potentials (oracle-type information)",dominant wavenumber matches (fraction),1.0,1.0,1.0,1.0,1.0
 "Neural Chart, given standard potentials (oracle-type information)","pattern standard deviation, model / reference",0.9999907332348232,0.99998508078128,0.9999845401272006,0.9999868116766754,0.9999939279491209
+"Neural Chart, no convex initialisation","10T error, homogeneous starts",0.3497426499093802,0.40825657154163125,0.5016745593328027,0.3783091717964681,0.4184399626442513
+"Neural Chart, no convex initialisation",period error,inf,inf,inf,inf,inf
+"Neural Chart, no convex initialisation",amplitude error,0.9999605616116646,0.9999677259981168,0.9998643118217212,0.9999032294191548,0.9850267569875178
+"Neural Chart, no convex initialisation",oscillating trajectories (fraction; reference),0.00 (1.00),0.00 (1.00),0.00 (0.94),0.00 (1.00),0.00 (0.06)
+"Neural Chart, no convex initialisation","late amplitude, model / reference",0.0,0.0,9.0577307623593e-06,2.453356276678172e-06,0.0
+"Neural Chart, no convex initialisation","10T error, spatial starts",0.5181101635565406,0.606712138987002,0.6812324444969948,0.6834020712224578,0.6461124602379827
+"Neural Chart, no convex initialisation",dominant wavenumber matches (fraction),0.0,0.0,0.0,0.0,0.0
+"Neural Chart, no convex initialisation","pattern standard deviation, model / reference",3.820065815893066e-06,3.0910859903946363e-07,8.726614821453898e-07,3.3715589562506216e-06,2.956970693403697e-06
+"Neural Chart, reversible (no drive)","10T error, homogeneous starts",0.7140766439292345,0.7627860424132427,0.8988182294756422,0.8975444942178183,0.8337199237549199
+"Neural Chart, reversible (no drive)",period error,inf,inf,inf,inf,inf
+"Neural Chart, reversible (no drive)",amplitude error,0.9982248391049036,0.9989567105489296,0.9996858477444892,0.9995609126358742,0.6850736388135548
+"Neural Chart, reversible (no drive)",oscillating trajectories (fraction; reference),0.00 (1.00),0.00 (1.00),0.00 (0.94),0.00 (1.00),0.00 (0.06)
+"Neural Chart, reversible (no drive)","late amplitude, model / reference",0.0007837014019650903,0.0004415554723171491,0.00018792525588339507,0.00017393366173088973,93969.39437494674
+"Neural Chart, reversible (no drive)","10T error, spatial starts",0.7016883881377649,0.7812638289132128,0.8453617981017172,0.8489817965384485,0.8836745074584322
+"Neural Chart, reversible (no drive)",dominant wavenumber matches (fraction),0.0,0.0,0.0,0.0,0.0
+"Neural Chart, reversible (no drive)","pattern standard deviation, model / reference",0.0002767517513769372,0.00029868193782744403,0.00015429414121965316,0.00015323377214306532,9.854261459580081e-05
 Oracle (true rates in the Neural Chart class),"10T error, homogeneous starts",0.0004370876760463094,6.878936389280422e-05,4.18762740052046e-05,0.0006264162508907691,2.025800712218257e-06
 Oracle (true rates in the Neural Chart class),period error,2.3645731275595574e-05,1.1783608519825626e-05,1.1929550409749852e-05,5.7338125530522926e-05,0.0024193739644851847
 Oracle (true rates in the Neural Chart class),amplitude error,9.810717755197218e-05,6.806819393841054e-05,0.00014615443518409035,0.00017463609576950912,0.0027060641360167267

@@ -2,4 +2,6 @@
 |---|---|---|---|---|---|---|
 | Neural Chart | 1.8e-06 | 1.2e-06 | 2.3e-06 | 7.9e-07 | 0 | 6 |
 | Neural Chart, given standard potentials (oracle-type information) | 2.2e-06 | 1.7e-06 | 2.0e-06 | 2.1e-06 | 0 | 3 |
+| Neural Chart, no convex initialisation | 2.628 | 4.591 | 0.467 | 0.242 | 0 | 6 |
+| Neural Chart, reversible (no drive) | 1.510 | 3.754 | 0.372 | 0.491 | 0 | 6 |
 | Oracle (true rates in the Neural Chart class) | 2.0e-06 | 1.7e-06 | 2.0e-06 | 2.1e-06 | 0 | 6 |

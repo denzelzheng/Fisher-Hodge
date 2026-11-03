@@ -16,6 +16,22 @@
 | Neural Chart, given standard potentials (oracle-type information) | 10T error, spatial starts | 6.2e-05 | 1.0e-04 | 3.5e-05 | 7.5e-05 | 1.7e-04 |
 | Neural Chart, given standard potentials (oracle-type information) | dominant wavenumber matches (fraction) | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
 | Neural Chart, given standard potentials (oracle-type information) | pattern standard deviation, model / reference | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
+| Neural Chart, no convex initialisation | 10T error, homogeneous starts | 0.350 | 0.408 | 0.502 | 0.378 | 0.418 |
+| Neural Chart, no convex initialisation | period error | diverged | diverged | diverged | diverged | diverged |
+| Neural Chart, no convex initialisation | amplitude error | 1.000 | 1.000 | 1.000 | 1.000 | 0.985 |
+| Neural Chart, no convex initialisation | oscillating trajectories (fraction; reference) | 0.00 (1.00) | 0.00 (1.00) | 0.00 (0.94) | 0.00 (1.00) | 0.00 (0.06) |
+| Neural Chart, no convex initialisation | late amplitude, model / reference | 0 | 0 | 9.1e-06 | 2.5e-06 | 0 |
+| Neural Chart, no convex initialisation | 10T error, spatial starts | 0.518 | 0.607 | 0.681 | 0.683 | 0.646 |
+| Neural Chart, no convex initialisation | dominant wavenumber matches (fraction) | 0 | 0 | 0 | 0 | 0 |
+| Neural Chart, no convex initialisation | pattern standard deviation, model / reference | 3.8e-06 | 3.1e-07 | 8.7e-07 | 3.4e-06 | 3.0e-06 |
+| Neural Chart, reversible (no drive) | 10T error, homogeneous starts | 0.714 | 0.763 | 0.899 | 0.898 | 0.834 |
+| Neural Chart, reversible (no drive) | period error | diverged | diverged | diverged | diverged | diverged |
+| Neural Chart, reversible (no drive) | amplitude error | 0.998 | 0.999 | 1.000 | 1.000 | 0.685 |
+| Neural Chart, reversible (no drive) | oscillating trajectories (fraction; reference) | 0.00 (1.00) | 0.00 (1.00) | 0.00 (0.94) | 0.00 (1.00) | 0.00 (0.06) |
+| Neural Chart, reversible (no drive) | late amplitude, model / reference | 7.8e-04 | 4.4e-04 | 1.9e-04 | 1.7e-04 | diverged |
+| Neural Chart, reversible (no drive) | 10T error, spatial starts | 0.702 | 0.781 | 0.845 | 0.849 | 0.884 |
+| Neural Chart, reversible (no drive) | dominant wavenumber matches (fraction) | 0 | 0 | 0 | 0 | 0 |
+| Neural Chart, reversible (no drive) | pattern standard deviation, model / reference | 2.8e-04 | 3.0e-04 | 1.5e-04 | 1.5e-04 | 9.9e-05 |
 | Oracle (true rates in the Neural Chart class) | 10T error, homogeneous starts | 4.4e-04 | 6.9e-05 | 4.2e-05 | 6.3e-04 | 2.0e-06 |
 | Oracle (true rates in the Neural Chart class) | period error | 2.4e-05 | 1.2e-05 | 1.2e-05 | 5.7e-05 | 2.4e-03 |
 | Oracle (true rates in the Neural Chart class) | amplitude error | 9.8e-05 | 6.8e-05 | 1.5e-04 | 1.7e-04 | 2.7e-03 |

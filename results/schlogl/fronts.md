@@ -11,3 +11,5 @@
 | BSMS-GNN | 2.004 | 2.000 | 0.061 |
 | GENERIC-FNO | no zero crossing | 2.000 | 1.000 |
 | Persistence (u(t) = u(0)) | no zero crossing | 2.000 | 1.000 |
+| Neural Chart, no convex initialisation | no zero crossing | 2.000 | 1.017 |
+| Neural Chart, reversible (no drive) | no zero crossing | 2.000 | 0.989 |
