@@ -1,10 +1,12 @@
 # Neural Chart
 
-A reaction or transport hypergraph fixes the set of all rate laws on it that satisfy local detailed balance, and this set is a manifold.
-Its coordinates are the thermodynamic force of each step and a symmetric part, which factors into a known function of the state and the conditions and a material factor.
+A reaction or transport hypergraph fixes the set of all rate laws on it that satisfy local detailed balance, and this set is a manifold, the thermodynamic manifold.
+Each step has two coordinates on it.
+The driving coordinate $f$ is the thermodynamic force of the step.
+The material coordinate $k$ is what remains of the symmetric part of the rate once a known function of the state and the conditions is taken out.
 The Neural Chart is a chart of this manifold.
-Learning a driven physical system from trajectories then means locating the system on the manifold, and a network does this by learning the material factor.
-The material factor is assumed to follow the same law under every condition, which we call cross-condition invariance.
+Learning a driven physical system from trajectories then means locating the system on the manifold, and a network does this by learning the material coordinate.
+The material coordinate is assumed to follow the same law under every condition, which we call cross-condition invariance.
 Three properties follow from this assumption.
 
 - **Extrapolation in the drive.** A new drive, temperature, potential or chemostat level moves the system along coordinates that are already known, with no retraining.
@@ -72,15 +74,16 @@ Write the two rates in the coordinates
 
 $$f_h=\log\frac{a_h}{b_h},\qquad g_h=\sqrt{a_h b_h}.$$
 
-Local detailed balance says that $f_h$ is the thermodynamic force of the step,
+Local detailed balance says that the driving coordinate $f_h$ is the thermodynamic force of the step,
 
 $$f_h=\langle\nu_h^+-\nu_h^-,\mu\rangle+A_h,\qquad \mu=\log c+U/T+\mu^0/T+\ln\gamma(c),$$
 
 set by the chemical potentials $\mu$ and the drive $A_h$.
-For a given hypergraph the rate laws that satisfy local detailed balance form a manifold with coordinates $f$ and $g$.
+The flux of the step is $J_h=a_h-b_h=g_h\,\Psi(f_h)$ with $\Psi(f)=2\sinh(f/2)$.
+For a given hypergraph the rate laws that satisfy local detailed balance form the thermodynamic manifold, with coordinates $f$ and $g$.
 The hypergraph fixes this manifold: its stoichiometry sets how $f$ and $g$ depend on the chemical potentials, and a different hypergraph gives a different manifold.
 
-### The condition-invariant material factor
+### The condition-invariant material coordinate
 
 The symmetric coordinate $g$ also changes with the state and the conditions $\theta$ (temperature, potential, drive, chemostat levels).
 Part of that change is known.
@@ -91,24 +94,32 @@ $$g_h(c,\theta,\xi)=k_h(\xi,c)\,\varepsilon_h(c,\theta),\qquad \varepsilon_h=\ex
 with the hypergraph factor $\varepsilon_h$ defined above.
 It collects the mass-action factors, the chemostat levels and the potential.
 In porous media a known prefactor $T$ joins it.
-What remains, the mobility $k_h(\xi,c)>0$, belongs to the material and its local state, such as the permeability of a pore or the rate constant of a reaction.
+What remains is the material coordinate $k_h(\xi,c)>0$, the mobility of the step. It belongs to the material and its local state, such as the permeability of a pore or the rate constant of a reaction.
 
 The roles are now divided.
-The scaling factor $\varepsilon(c,\theta)$ and the force $f(c,\theta)$ are computed by known formulas and take up every change of the conditions $\theta$. Their only learned inputs are the standard potentials and, for non-ideal mixtures, the activity correction, neither of which reads $\theta$.
-The mobility $k(\xi,c)$ is the only part a network learns, and it is restricted to a constitutive law that is the same under every condition.
+The scaling factor $\varepsilon(c,\theta)$ and the driving coordinate $f(c,\theta)$ are computed by known formulas and take up every change of the conditions $\theta$. Their only learned inputs are the standard potentials and, for non-ideal mixtures, the activity correction, neither of which reads $\theta$.
+The material coordinate $k(\xi,c)$ is the only part a network learns, and it is restricted to a constitutive law that is the same under every condition.
 Learning the dynamics becomes the task of locating one condition-invariant coordinate $k$ on a manifold whose other coordinates are fixed.
 
-**The central assumption.** Once the known factors are taken out, the mobility does not read the conditions.
+**The central assumption.** Once the known factors are taken out, the material coordinate does not read the conditions.
 Where it depends on them in a known way, that dependence goes into $\varepsilon$.
-In every benchmark here the true mobility has this property.
+In every benchmark here the true material coordinate has this property.
+
+**Geometric remark.** The coordinates $(f,g)$ come from the information geometry of reaction networks and non-equilibrium thermodynamics.
+At a frozen state the forward and backward event counts of a step are Poisson with intensities $a_h$ and $b_h$.
+These laws form a dually flat exponential family, in which $(f_h,\log g_h)$ are natural coordinates and the current and the traffic $a_h+b_h$ are their dual coordinates.
+The entropy production of a step is the Jeffreys divergence between this law and its reverse, which is a symmetrised Bregman divergence.
+The Fisher metric couples $f_h$ and $\log g_h$ in proportion to the current $J_h$, so the two are Fisher-orthogonal only for a step at equilibrium.
+The split used here is a product structure: the condition sets $f$ and the material sets $k$.
+[docs/information_geometry.md](docs/information_geometry.md) says what this geometry contributes.
 
 ### The chart
 
-A Neural Chart is a parametrisation of the manifold under this assumption.
-The force has a fixed physical form.
+A Neural Chart is a chart of the thermodynamic manifold under this assumption, strictly a parametrisation of it.
+The driving coordinate has a fixed physical form.
 In porous media all of it is known.
 On reaction networks it contains learned standard potentials $\mu^0_\theta$, and on non-ideal mixtures a learned activity correction $\ln\gamma_\theta(c)$, a monotone function of the concentration.
-The mobility comes from a network that reads the material descriptors and the local state, and never the conditions,
+The material coordinate comes from a network that reads the material descriptors and the local state, and never the conditions,
 
 $$\log k_h=\log\omega_{c(h)}+g_\theta(\xi_h)+s\,m(\bar c_h),$$
 
@@ -188,7 +199,7 @@ The baselines are:
 
 The tables also show the Neural Chart without its chart, as an ablation.
 In this variant a message-passing network on the same hypergraph emits the forward and backward rate of every step from the state, the conditions and the descriptors, with the same mass-action factors and the same integrator (we call it Flux-GNN).
-It has no split into force and mobility, so none of the properties above apply to it.
+It has no split into driving and material coordinates, so none of the properties above apply to it.
 
 The physics tables count, for every model with its own edge flux, the steps whose flux runs against the true physical force, $J_hf_h<-10^{-6}(a_h+b_h)|f_h|$, and the samples with $\sigma<0$.
 Models that return only a state update have N/A there.
@@ -548,7 +559,7 @@ The tables are in `results/<benchmark>/ablations.md`.
 
 | Part of the model | Variant without it | Benchmark | 10T error, Neural Chart → variant |
 |---|---|---|---|
-| the chart itself, the split into force and mobility | a hypergraph network emits both rates (Flux-GNN) | all | porous media at temperature ×4 0.090 → 2.14, Brusselator 2.6e-3 → 0.075 under the training conditions and up to 0.64 under new ones, up to 52 % of the hyperedges against the true force on the non-ideal Schlögl model |
+| the chart itself, the split into driving and material coordinates | a hypergraph network emits both rates (Flux-GNN) | all | porous media at temperature ×4 0.090 → 2.14, Brusselator 2.6e-3 → 0.075 under the training conditions and up to 0.64 under new ones, up to 52 % of the hyperedges against the true force on the non-ideal Schlögl model |
 | material functional $g_\theta(\xi)$ | one constant mobility for all edges | porous media | 0.064 → 1.18 |
 | state term $s\,m(\bar c)$ | no state input | porous media with crowding | 0.067 → 0.241, the error of the true mobility without the crowding factor |
 | activity functional $\ln\gamma_\theta(c)$ | ideal activities | non-ideal Schlögl | 3.4e-4 → 0.072, and 0.010 → 0.585 at higher concentrations |
@@ -568,8 +579,9 @@ Without it, trajectories do not determine the thermodynamic structure.
 Different hypergraphs can produce nearly the same trajectories with different forces and a different entropy production.
 
 We tested this with the same model on a library of all candidate reactions with up to three state molecules on each side.
-In the language of the chart, this is a larger manifold in which every smaller network is a face where some mobilities are zero.
-A sparsity penalty on the mobilities pushes the fit towards such a face, and the reactions that carry at least 1 % of the flux are read out as the network.
+This library has a larger thermodynamic manifold, and every smaller network is one of its boundary faces, where $k_e=0$ for the reactions it leaves out.
+Finding a sparse network then means projecting the data onto a low-dimensional boundary face.
+A sparsity penalty on $k$ pushes the fit towards such a face, and the reactions that carry at least 1 % of the flux are read out as the network.
 This experiment is not part of the release.
 
 | Benchmark | 10T error, library of candidates | 10T error, hypergraph given | entropy production, library model / truth |
@@ -583,7 +595,7 @@ The library model still predicts the trajectories, but its entropy production is
 The data cannot tell its extra reactions apart from the true ones.
 Two mechanisms produce them.
 
-1. **Equivalent directions.** Conservation laws and catalysts give the manifold directions that the data do not see. In the phosphorylation cycle the product of the ATP and ADP levels is constant in the data, so the phosphorylation step splits into two half-reactions with the same effect on the state. In the Brusselator the reverse of $A\to X$ and the step $X\to E$ both remove $X$ in proportion to its concentration, so their split is not determined.
+1. **Equivalent directions.** Conservation laws and catalysts give the manifold directions along which the Fisher metric of the data is singular, so the trajectories do not determine the internal fluxes. In the phosphorylation cycle the product of the ATP and ADP levels is constant in the data, so the phosphorylation step splits into two half-reactions with the same effect on the state. In the Brusselator the reverse of $A\to X$ and the step $X\to E$ both remove $X$ in proportion to its concentration, so their split is not determined.
 2. **Topology standing in for the constitutive law.** When the chemical potential cannot express the true non-ideality, extra reactions take up what is missing. In the last row the chemostat $A$ varies over 1.5–4.5, so the crowding is much stronger than in the benchmark above. The activity correction of the Neural Chart is a sum of bounded tanh units and cannot follow it, so the given-hypergraph model reaches only 0.091. The library model fits the data better by adding reactions that do not exist.
 
 An accurate trajectory therefore does not imply the right thermodynamics.
@@ -597,7 +609,7 @@ CRNN ([Ji and Deng 2021](https://doi.org/10.1021/acs.jpca.0c09316)) learns mass-
 The global reaction neural network GRNN ([Kircher, Döppel and Votsmeier 2024](https://doi.org/10.1016/j.cej.2024.149863)) embeds the stoichiometry and the thermodynamics.
 A network that can read the temperature and the species state gives the forward rates, and the equilibrium constants give the backward rates.
 The Neural Chart goes one step further in how it splits the rate.
-It writes the symmetric part as $g=k\,\varepsilon$, takes the known state and condition factor $\varepsilon(c,\theta)$ out, and asks the learned material factor $k$ to follow one law across conditions.
+It writes the symmetric part as $g=k\,\varepsilon$, takes the known state and condition factor $\varepsilon(c,\theta)$ out, and asks the learned material coordinate $k$ to follow one law across conditions.
 A GRNN could express this subclass by restricting its network in the same way.
 What the Neural Chart adds is the use of the restriction: the cross-condition error relation, the identifiability criterion, and the readouts of edge fluxes, cycle currents and entropy production that rest on them.
 
@@ -709,7 +721,7 @@ scripts/                train, evaluate, make_tables, make_gifs, physics_summary
 results/<name>/         tables (markdown and csv)
 checkpoints/<name>/     trained Neural Chart checkpoints
 assets/                 animations of this page
-docs/                   method and protocol, theory
+docs/                   method and protocol, theory, information geometry appendix
 tests/                  unit and regression tests
 ```
 
