@@ -47,18 +47,40 @@ The Neural Chart addresses all three with one structural factorization of the ra
 
 ## The idea: what stays the same when the conditions change
 
-Fix the hypergraph.
-Each step $h$ (a reaction, or a transfer between two cells) runs forward at rate $a_h$ and backward at rate $b_h$.
+### Channel fluxes on a directed hypergraph
+
+The Neural Chart treats transport on a mesh and reactions in a network in one way, as channel fluxes on a directed hypergraph.
+A step $h$ takes the species in its reactant count vector $\nu_h^+$ to those in its product count vector $\nu_h^-$, with species at sites as nodes.
+A transfer between two cells moves one unit from one node to another, so an ordinary graph is the special case in which every column of the stoichiometric matrix $S=\nu^--\nu^+$ has one entry $-1$ and one entry $+1$.
+A reaction joins several reactants to several products, for example $X+E+\mathrm{ATP}\to X_p+E+\mathrm{ADP}$ in the phosphorylation cycle.
+
+The stoichiometry enters every formula below.
+The force of a step is the difference of the chemical potentials on its two sides, weighted by the counts, $f_h=\langle\nu_h^+-\nu_h^-,\mu\rangle+A_h$.
+The known scaling factor $\varepsilon_h=\exp\big(\tfrac12\langle\nu_h^++\nu_h^-,\mu\rangle\big)$ is the geometric mean of the mass-action terms of the two sides.
+With both written this way, the rate of a step is linear in its mobility however many molecules take part, and this linearity gives the convex closed-form start.
+
+The cycles of the hypergraph are the vectors $z\in\ker S$, combinations of steps that leave every species unchanged.
+Along a cycle the chemical potentials of the intermediate species cancel in $\sum_hz_hf_h$, and what remains is the drive that the chemostats and external fields supply.
+In the phosphorylation cycle this is the free energy of ATP hydrolysis.
+The model reads this cycle affinity as 5.945 against a true 5.960.
+It can do so only because the stoichiometry of every reaction, including ATP, ADP and the enzyme, is part of the hypergraph.
+
+### Two coordinates for each step
+
+On a fixed hypergraph each step $h$ runs forward at rate $a_h$ and backward at rate $b_h$.
 Write the two rates in the coordinates
 
 $$f_h=\log\frac{a_h}{b_h},\qquad g_h=\sqrt{a_h b_h}.$$
 
 Local detailed balance says that $f_h$ is the thermodynamic force of the step,
 
-$$f_h=-\langle S_h,\mu\rangle+A_h,\qquad \mu=\log c+U/T+\mu^0/T+\ln\gamma(c),$$
+$$f_h=\langle\nu_h^+-\nu_h^-,\mu\rangle+A_h,\qquad \mu=\log c+U/T+\mu^0/T+\ln\gamma(c),$$
 
 set by the chemical potentials $\mu$ and the drive $A_h$.
-The rate laws that satisfy local detailed balance form a manifold with coordinates $f$ and $g$.
+For a given hypergraph the rate laws that satisfy local detailed balance form a manifold with coordinates $f$ and $g$.
+The hypergraph fixes this manifold: its stoichiometry sets how $f$ and $g$ depend on the chemical potentials, and a different hypergraph gives a different manifold.
+
+### The condition-invariant material factor
 
 The symmetric coordinate $g$ also changes with the state and the conditions $\theta$ (temperature, potential, drive, chemostat levels).
 Part of that change is known.
@@ -66,8 +88,8 @@ We write
 
 $$g_h(c,\theta,\xi)=k_h(\xi,c)\,\varepsilon_h(c,\theta),\qquad \varepsilon_h=\exp\Big(\tfrac12\big\langle\nu_h^++\nu_h^-,\mu(c,\theta)\big\rangle\Big),$$
 
-where $\nu_h^\pm$ are the reactant and product counts of the step.
-The factor $\varepsilon_h$ collects the mass-action factors, the chemostat levels and the potential.
+with the hypergraph factor $\varepsilon_h$ defined above.
+It collects the mass-action factors, the chemostat levels and the potential.
 In porous media a known prefactor $T$ joins it.
 What remains, the mobility $k_h(\xi,c)>0$, belongs to the material and its local state, such as the permeability of a pore or the rate constant of a reaction.
 
@@ -79,6 +101,8 @@ Learning the dynamics becomes the task of locating one condition-invariant coord
 **The central assumption.** Once the known factors are taken out, the mobility does not read the conditions.
 Where it depends on them in a known way, that dependence goes into $\varepsilon$.
 In every benchmark here the true mobility has this property.
+
+### The chart
 
 A Neural Chart is a parametrisation of the manifold under this assumption.
 The force has a fixed physical form.
