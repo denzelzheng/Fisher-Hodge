@@ -1,9 +1,17 @@
 # Neural Chart
 
-The Neural Chart is a way to learn the dynamics of a driven physical system from trajectories without learning the dynamics directly.
-Thermodynamics fixes the space of all valid simulators on a given reaction or transport hypergraph.
-This space is a manifold with two kinds of coordinates: the thermodynamic force of each step, which physics determines, and the mobility of each step, which depends on the material.
-The Neural Chart keeps the force as physics gives it and uses a neural network only to place the material on this manifold.
+The Neural Chart learns a driven physical system from trajectories by separating what changes with the conditions from what stays the same.
+On a given reaction or transport hypergraph, each rate is split into two factors.
+The first is known as a function of the state and the conditions.
+The second belongs to the material and is learned.
+The model assumes that this material factor follows the same law under every condition, which we call cross-condition invariance.
+Three properties follow from this assumption.
+
+- **Extrapolation in the drive.** The model can be moved to a new drive, temperature, potential or chemostat level without retraining.
+- **Optimization.** The fit has a convex closed-form start, from which rollout training succeeds.
+- **Identifiability.** The theory states when trajectories determine the flux of every step, the cycle currents and the entropy production, and when they cannot.
+
+On top of these, the model dissipates non-negatively for every value of its parameters.
 
 The model receives the state, the hypergraph of reaction and transport steps, and the conditions of each trajectory: the temperature, an external potential and drive, and the chemostat levels.
 Each reaction is a hyperedge that joins its reactants to its products, and each transport step is an edge between two cells.
@@ -12,14 +20,15 @@ The model returns a master equation on that hypergraph.
 **Contents**
 
 - [The problem](#the-problem)
-- [The idea: a chart of the thermodynamic manifold](#the-idea-a-chart-of-the-thermodynamic-manifold)
-- [Three consequences](#three-consequences)
+- [The idea: what stays the same when the conditions change](#the-idea-what-stays-the-same-when-the-conditions-change)
+- [What the invariance gives](#what-the-invariance-gives)
 - [What is learned in each benchmark](#what-is-learned-in-each-benchmark)
 - [Results at a glance](#results-at-a-glance)
 - [Learned constitutive laws under new conditions](#learned-constitutive-laws-under-new-conditions): porous media, porous media with crowding, non-ideal Schlögl model, phosphorylation cycle
 - [Ideal reaction networks](#ideal-reaction-networks): Schlögl model, Brusselator, MAPK cascade
 - [How each part contributes](#how-each-part-contributes)
 - [Why the hypergraph is an input](#why-the-hypergraph-is-an-input)
+- [Related work](#related-work)
 - [Scope and limits](#scope-and-limits)
 - [Reproduce](#reproduce)
 - [Repository layout](#repository-layout)
@@ -32,9 +41,9 @@ This has three consequences, which the benchmarks below show.
 
 1. **New conditions break the model.** Trained at one temperature and drive, FNO reaches an error of 2.3 at four times the temperature in porous media, and the UDE closure 1.0.
 2. **The second law is not guaranteed.** In porous media up to 69 % of the edges of the UDE closure carry flux against the physical force, and most of its samples have negative entropy production. On the non-ideal Schlögl model up to 40 % of the hyperedges of CRNN with condition features do. A penalty can reduce such violations but cannot remove them for all inputs.
-3. **Training is hard.** On the oscillating Brusselator every black-box model stays above an error of 0.29, and above 0.3 once the conditions change.
+3. **An accurate trajectory says little about the inside.** A model that fits the state can still assign the wrong flux to each step. Fluxes that circulate around a cycle leave the state unchanged and change the entropy production (Theorem 1 of [docs/theory.md](docs/theory.md)). Without further structure, data on the state cannot rule them out.
 
-## The idea: a chart of the thermodynamic manifold
+## The idea: what stays the same when the conditions change
 
 Fix the hypergraph.
 Each step $h$ (a reaction, or a transfer between two cells) runs forward at rate $a_h$ and backward at rate $b_h$.
@@ -46,41 +55,58 @@ Local detailed balance says that $f_h$ is the thermodynamic force of the step,
 
 $$f_h=-\langle S_h,\mu\rangle+A_h,\qquad \mu=\log c+U/T+\mu^0/T+\ln\gamma(c),$$
 
-set by the chemical potentials $\mu$ and the drive $A_h$, and so by the state and the conditions.
-The rate laws that satisfy local detailed balance form a manifold.
-On this manifold the force coordinate $f$ is a known function of the state and the conditions.
-The other coordinate is free: $g_h=k_h\varepsilon_h$, where $\varepsilon_h$ is a known mass-action factor and $k_h>0$ is the mobility of the step.
+set by the chemical potentials $\mu$ and the drive $A_h$.
+The rate laws that satisfy local detailed balance form a manifold with coordinates $f$ and $g$.
 
-The two coordinates answer two different questions.
-The force $f$ says what pushes the step.
-Physics gives it from the temperature, the potential $U$, the drive and the chemostat levels.
-The mobility $k$ says how easily the step happens.
-It is a property of the material and of its local state, such as the permeability of a pore or the rate constant of a reaction.
+The symmetric coordinate $g$ also changes with the state and the conditions $\theta$ (temperature, potential, drive, chemostat levels).
+Part of that change is known.
+We write
 
-A Neural Chart is a parametrisation of this manifold.
-Physics supplies $f$.
-A network supplies the mobility from what the step sees,
+$$g_h=k_h\,\varepsilon_h(c,\theta),\qquad \varepsilon_h=\exp\Big(\tfrac12\big\langle\nu_h^++\nu_h^-,\mu(c,\theta)\big\rangle\Big),$$
+
+where $\nu_h^\pm$ are the reactant and product counts of the step.
+The factor $\varepsilon_h$ collects the mass-action factors, the chemostat levels and the potential.
+In porous media a known prefactor $T$ joins it.
+What remains, the mobility $k_h>0$, belongs to the material and its local state, such as the permeability of a pore or the rate constant of a reaction.
+
+**The central assumption.** Once the known factors are taken out, the mobility does not read the conditions.
+Where it depends on them in a known way, that dependence goes into $\varepsilon$.
+In every benchmark here the true mobility has this property.
+
+A Neural Chart is a parametrisation of the manifold under this assumption.
+The force has a fixed physical form.
+In porous media all of it is known.
+On reaction networks it contains learned standard potentials $\mu^0_\theta$, and on non-ideal mixtures a learned activity correction $\ln\gamma_\theta(c)$, a monotone function of the concentration.
+The mobility comes from a network that reads the material descriptors and the local state, and never the conditions,
 
 $$\log k_h=\log\omega_{c(h)}+g_\theta(\xi_h)+s\,m(\bar c_h),$$
 
 with one constant $\omega_c$ per class of steps, an MLP $g_\theta$ of local material descriptors $\xi_h$, and a monotone term $m$ of the local state $\bar c_h$.
-The force is fully given by physics only in porous media.
-On reaction networks it also contains the standard potentials $\mu^0_\theta$, and on non-ideal mixtures an activity correction $\ln\gamma_\theta(c)$, a monotone function of the concentration.
-Both are learned.
-So the structure of the force is fixed, while its values depend on how well these quantities are learned.
-The model therefore learns a constitutive functional, a map from material descriptors and local state to mobilities and chemical potentials.
-It does not learn the dynamics.
-The dynamics follow from the chart through the master equation $\dot c=\sum_h S_h\,(a_h-b_h)$.
+What the model learns is thus a constitutive functional, a map from material descriptors and local state to mobilities and chemical potentials.
+The dynamics follow from it through the master equation $\dot c=\sum_h S_h\,(a_h-b_h)$.
 
-## Three consequences
+## What the invariance gives
 
-The structure of the chart has three consequences.
-[docs/theory.md](docs/theory.md) states and proves them (Theorem 0, Proposition 4 and IG2).
-It also shows that gray-box models whose learned part reads the conditions, or learns the force freely, lose them.
+[docs/theory.md](docs/theory.md) states and proves the results below (Theorem 0, Theorem 1, Proposition 4 and IG2).
+It also shows what a gray-box model loses when its learned part reads the conditions or learns the force freely.
 
-1. **Non-negative dissipation by construction.** For every parameter value the flux of each step runs along the model's own force, so the entropy production computed with that force is non-negative. Local detailed balance with respect to that force, conservation of every moiety and positivity also hold, with no penalty or projection. Whether the model's force equals the true physical force depends on whether the learned standard potentials and activity correction are right. In porous media nothing in the force is learned. On the reaction networks we measure the gap and report it in every physics table as the fraction of steps whose flux runs against the true force.
-2. **Conditions enter as coordinates.** The temperature, the potential, the drive and the chemostat levels enter only through $f$, and the mobility never reads them. A new condition therefore changes no learned parameter. At a fixed state, if the true mobility lies in the model class and the force is right, the flux error at any condition has a closed form, $\|J-J^{\rm true}\|^2_{\Lambda^{-1}}=\sum_h\delta_h^2\,\sigma_h^{\rm true}$ with $\delta_h=k_h/k_h^{\rm true}-1$ (IG2(c) of the theory notes). This does not make transfer automatic. A new condition can drive the system into states that training never visited, and it can change the true mobility of the material. Over long rollouts the error also depends on the stability of the dynamics.
-3. **A convex closed-form start.** Every one-way rate is a class constant times a factor that the current force and activity fix. With those held fixed, the change of the state over a sampling interval is linear in the one-way class constants, and fitting it is a non-negative least-squares problem. This relaxation is convex and its optimum is global. The constants are then mapped back to the shared physical parameters, the class mobilities $\omega_c$ and the standard potentials, by least squares on their logarithms. When the classes are coupled through shared parameters, the code then minimises the residual over those parameters with L-BFGS, which is not convex. The variable projection that fits the activity correction and the rollout training that follows are not convex either. The start puts them close to a good solution, and without it the same training fails (see [How each part contributes](#how-each-part-contributes)).
+### Extrapolation in the drive
+
+A new condition changes $f$ and $\varepsilon$ by known formulas and changes no learned parameter. At a fixed state, if the true mobility lies in the model class and the force is right, the flux error at any condition has a closed form, $\|J-J^{\rm true}\|^2_{\Lambda^{-1}}=\sum_h\delta_h^2\,\sigma_h^{\rm true}$ with $\delta_h=k_h/k_h^{\rm true}-1$ (IG2(c)). This does not make transfer automatic. A new condition can drive the system into states that training never visited, and it can change the true mobility of the material. Over long rollouts the error also depends on the stability of the dynamics.
+In the benchmarks, eight times the training drive in porous media gives an error of 0.41, against 0.81 for the best baseline, and the stronger drive of the phosphorylation cycle leaves the error at 6.5e-6.
+
+### Optimization
+
+Every one-way rate is a class constant times a factor that the current force and activity fix. With those held fixed, the change of the state over a sampling interval is linear in the one-way class constants, and fitting it is a non-negative least-squares problem. This relaxation is convex and its optimum is global. The constants are then mapped back to the shared physical parameters, the class mobilities $\omega_c$ and the standard potentials, by least squares on their logarithms. When the classes are coupled through shared parameters, the code then minimises the residual over those parameters with L-BFGS, which is not convex. The variable projection that fits the activity correction and the rollout training that follows are not convex either. The start puts them close to a good solution. Without it the same training ends 100 to 10^6 times less accurate on every reaction network (see [How each part contributes](#how-each-part-contributes)).
+
+### Identifiability
+
+Under the invariance, trajectories recorded at different conditions constrain the same mobilities. The flux of step $h$ is $J_h=k_h\varphi_h(c,\theta)$ with a known $\varphi_h$. Noise-free data determine every $k_h$ exactly when no nonzero $v$ satisfies $\mathrm{diag}(\varphi^i)\,v\in\ker S$ at every data point $i$ (Theorem 0(iii)(d)). New conditions add data points with new $\varphi^i$ and shrink this set. Once $k$ and the force are determined, so are the flux of every step, the cycle currents and the entropy production. When the set is not empty, the data cannot separate the mechanisms it contains. In the phosphorylation cycle, for example, the two rate constants are identified when the cycle affinity is nonzero and the data contain two ratios of phosphorylated to unphosphorylated substrate. At zero affinity only their sum is. Two steps that remove the same species in the same proportion at every data point are never separated (the parallel-channel lemma).
+In the benchmarks the model reads the cycle affinity of the phosphorylation cycle as 5.945 against a true 5.960, and the entropy production of the Schlögl model to a relative error of 1e-5. Without the hypergraph these readouts fail ([Why the hypergraph is an input](#why-the-hypergraph-is-an-input)).
+
+### Non-negative dissipation
+
+This part comes from local detailed balance alone. For every parameter value the flux of each step runs along the model's own force, so the entropy production computed with that force is non-negative. Local detailed balance with respect to that force, conservation of every moiety and positivity also hold, with no penalty or projection. Whether the model's force equals the true force depends on whether the learned standard potentials and activity correction are right. In porous media nothing in the force is learned. On the reaction networks we measure the gap and report it in every physics table as the fraction of steps whose flux runs against the true force.
 
 [docs/method.md](docs/method.md) gives the fit and the evaluation protocol.
 
@@ -131,11 +157,10 @@ The baselines are:
 
 The tables also show the Neural Chart without its chart, as an ablation.
 In this variant a message-passing network on the same hypergraph emits the forward and backward rate of every step from the state, the conditions and the descriptors, with the same mass-action factors and the same integrator (we call it Flux-GNN).
-It has no split into force and mobility, so it has none of the three consequences.
+It has no split into force and mobility, so none of the properties above apply to it.
 
 The physics tables count, for every model with its own edge flux, the steps whose flux runs against the true physical force, $J_hf_h<-10^{-6}(a_h+b_h)|f_h|$, and the samples with $\sigma<0$.
 Models that return only a state update have N/A there.
-The oracle is the Neural Chart class with the true rates, so its error is the discretisation and integration floor.
 Full tables, including training times, are in `results/<benchmark>/`.
 In the animations negative values are magenta, and the panel title counts the negative cells.
 Each benchmark also has a tracer animation.
@@ -159,7 +184,6 @@ The tests use 16 unseen media, other temperatures and drives, unseen low-porosit
 | Method | training conditions | temperature ×0.25 | temperature ×4 | drive ×4 | drive ×8 | unseen low-porosity media | 64×64 grid | point cloud | parameters |
 |---|---|---|---|---|---|---|---|---|---|
 | **Neural Chart** | **0.064** | **0.084** | **0.090** | **0.195** | **0.407** | **0.081** | **0.071** | **0.090** | 5,381 |
-| Oracle (true rates in the Neural Chart class) | 0.046 | 0.107 | 0.032 | 0.143 | 0.231 | 0.037 | 0.034 | 0.083 | 0 (true rates) |
 | No chart (Flux-GNN) | 0.078 | 0.797 | 2.138 | 1.046 | 1.091 | 0.116 | 0.515 | 0.458 | 151,234 |
 | UDE closure | 0.077 | 0.700 | 1.023 | 0.588 | 0.811 | 0.104 | 0.093 | 0.255 | 5,441 |
 | BSMS-GNN | 0.736 | 0.911 | 2.430 | 2.945 | 3.050 | 0.737 | 1.079 | 0.915 | 1,724,417 |
@@ -171,7 +195,6 @@ The tests use 16 unseen media, other temperatures and drives, unseen low-porosit
 | Method | edges with flux against the true force | samples with σ < 0 | negative values |
 |---|---|---|---|
 | Neural Chart | 0 | 0 | 0 |
-| Oracle | 0 | 0 | 0 |
 | No chart (Flux-GNN) | 0.311 | 0 | 0 |
 | UDE closure | 0.688 | 0.882 | 0.236 |
 | BSMS-GNN | N/A | N/A | 0.518 |
@@ -181,7 +204,7 @@ The tests use 16 unseen media, other temperatures and drives, unseen low-porosit
 
 Under the training conditions the UDE closure and the variant without the chart are close to the Neural Chart (0.077 and 0.078 against 0.064).
 Under changed temperature and drive their errors grow to 0.6–2.1.
-The Neural Chart stays between 0.08 and 0.41, within a factor of 3 of the oracle.
+The Neural Chart stays between 0.08 and 0.41.
 The UDE closure produces negative densities on all 64 test trajectories.
 
 **The learned law.** Mapped back to space, the learned mobility matches the true mobility of unseen media (`results/porous_media/law.md`).
@@ -222,7 +245,6 @@ It reads $\bar\rho_e$ through its monotone state term.
 | Method | training conditions | temperature ×0.25 | temperature ×4 | drive ×4 | drive ×8 | unseen low-porosity media | 64×64 grid | point cloud | parameters |
 |---|---|---|---|---|---|---|---|---|---|
 | **Neural Chart** | 0.067 | **0.114** | **0.101** | **0.168** | **0.376** | **0.062** | **0.077** | **0.091** | 5,381 |
-| Oracle (true rates in the Neural Chart class) | 0.049 | 0.069 | 0.033 | 0.103 | 0.197 | 0.028 | 0.031 | 0.079 | 0 (true rates) |
 | No chart (Flux-GNN) | 0.057 | 0.808 | 2.053 | 0.856 | 1.049 | 0.057 | 0.573 | 0.473 | 151,234 |
 | UDE closure | **0.066** | 0.679 | 1.916 | 0.601 | 0.917 | 0.075 | 0.756 | 0.485 | 5,441 |
 | BSMS-GNN | 0.592 | 0.837 | 2.739 | 1.386 | 1.355 | 0.435 | 1.008 | 0.713 | 1,724,417 |
@@ -234,7 +256,6 @@ It reads $\bar\rho_e$ through its monotone state term.
 | Method | edges with flux against the true force | samples with σ < 0 | negative values |
 |---|---|---|---|
 | Neural Chart | 0 | 0 | 0 |
-| Oracle | 0 | 0 | 0 |
 | No chart (Flux-GNN) | 0.304 | 0 | 0 |
 | UDE closure | 0.808 | 0.999 | 0.194 |
 | BSMS-GNN | N/A | N/A | 0.704 |
@@ -245,7 +266,7 @@ It reads $\bar\rho_e$ through its monotone state term.
 Under the training conditions the UDE closure and the variant without the chart are as accurate as the Neural Chart or slightly better (0.066 and 0.057 against 0.067).
 Under changed temperature, drive and discretisation the Neural Chart is 2.4 to 17.5 times more accurate than the best baseline of each column.
 Without the state input the Neural Chart reaches 0.241 under the training conditions.
-This equals the error of the oracle without the crowding factor, so the state term is what captures the crowding.
+The true mobility without its crowding factor gives the same error, so the state term is what captures the crowding.
 The learned mobility matches the true crowded mobility with a flux-weighted relative error of 0.11 on unseen media (`results/porous_media_crowding/law.md`).
 
 ### Non-ideal Schlögl model
@@ -260,7 +281,6 @@ In the closed-form start the rate constants are projected out, so $\ln\gamma$ is
 |---|---|---|---|---|
 | **Neural Chart** | **3.4e-04** | **0.010** | **3.1e-04** | 55 |
 | Neural Chart with given standard potentials | 5.3e-04 | 0.012 | 4.0e-04 | 52 |
-| Oracle (true rates in the Neural Chart class) | 1.4e-06 | 1.1e-07 | 1.9e-06 | 0 (true rates) |
 | No chart (Flux-GNN) | 1.8e-03 | 0.265 | 2.7e-03 | 150,850 |
 | CRNN (mass action) | 0.060 | 0.726 | 0.062 | 6 |
 | CRNN (condition features) | 0.026 | 0.340 | 0.035 | 4,674 |
@@ -273,7 +293,6 @@ In the closed-form start the rate constants are projected out, so $\ln\gamma$ is
 | Method | hyperedges with flux against the true force | samples with σ < 0 | negative values |
 |---|---|---|---|
 | Neural Chart | 2.2e-05 | 0 | 0 |
-| Oracle | 0 | 0 | 0 |
 | No chart (Flux-GNN) | 0.517 | 0.890 | 0 |
 | CRNN (mass action) | 0.253 | 0 | 0 |
 | CRNN (condition features) | 0.395 | 0.604 | 0 |
@@ -310,7 +329,6 @@ The animation shows the phosphorylated fraction $X_p/(X+X_p)$.
 |---|---|---|---|---|---|
 | **Neural Chart** | **5.9e-06** | **6.5e-06** | **5.9e-06** | **8.2e-06** | 9 |
 | Neural Chart with given standard potentials | 3.3e-06 | 2.3e-06 | 2.6e-06 | 3.4e-06 | 4 |
-| Oracle (true rates in the Neural Chart class) | 2.0e-06 | 1.7e-06 | 1.4e-06 | 1.9e-06 | 0 (true rates) |
 | No chart (Flux-GNN) | 2.1e-03 | 0.038 | 0.113 | 4.1e-03 | 151,170 |
 | CRNN (mass action) | 0.017 | 0.018 | 0.021 | 0.025 | 10 |
 | CRNN (condition features) | 5.2e-03 | 0.045 | 0.011 | 7.6e-03 | 4,866 |
@@ -323,7 +341,6 @@ The animation shows the phosphorylated fraction $X_p/(X+X_p)$.
 | Method | hyperedges with flux against the true force | samples with σ < 0 | negative values |
 |---|---|---|---|
 | Neural Chart | 0 | 0 | 0 |
-| Oracle | 0 | 0 | 0 |
 | No chart (Flux-GNN) | 0.140 | 0 | 0 |
 | CRNN (mass action) | 0.068 | 0 | 0 |
 | CRNN (condition features) | 0.222 | 0 | 0 |
@@ -332,7 +349,7 @@ The animation shows the phosphorylated fraction $X_p/(X+X_p)$.
 | BSMS-GNN | N/A | N/A | 0.191 |
 | GENERIC-FNO | N/A | N/A | 0.109 |
 
-The Neural Chart stays within a factor of 5 of the oracle on every test set, including the stronger drive and the new potential.
+The Neural Chart stays between 5.9e-6 and 8.2e-6 on every test set, including the stronger drive and the new potential, close to the integration floor of about 2e-6.
 The best baseline, CRNN with condition features, is at 5e-3 under the training conditions and at 0.011 in the new potential. The variant without the chart is at 2e-3 and 0.11.
 CRNN with mass action has the right graph but one rate constant per class of steps, so it cannot represent the spatial potential, and it stays near 0.02.
 The entropy production read from the model has a relative error of 1.3e-3 to 2.5e-3, and the cycle affinity is 5.945 against 5.960 under the training conditions and 7.462 against 7.477 under the stronger drive (`results/phosphorylation_cycle/thermodynamic_readouts.md`).
@@ -360,7 +377,6 @@ It is bistable, and a planar front between the two states travels with a speed w
 |---|---|---|---|---|---|
 | **Neural Chart** | **1.8e-06** | **1.2e-06** | 2.3e-06 | **7.9e-07** | 6 |
 | Neural Chart with given standard potentials | 2.2e-06 | 1.7e-06 | **2.0e-06** | 2.1e-06 | 3 |
-| Oracle (true rates in the Neural Chart class) | 2.0e-06 | 1.7e-06 | 2.0e-06 | 2.1e-06 | 0 (true rates) |
 | No chart (Flux-GNN) | 0.018 | 0.943 | 6.4e-03 | 1.4e-03 | 150,850 |
 | CRNN (mass action) | 4.1e-06 | 3.7e-06 | 5.8e-06 | 3.5e-06 | 6 |
 | CRNN (condition features) | 0.059 | 1.405 | 0.073 | 0.010 | 4,674 |
@@ -373,7 +389,6 @@ It is bistable, and a planar front between the two states travels with a speed w
 | Method | hyperedges with flux against the true force | samples with σ < 0 | negative values |
 |---|---|---|---|
 | Neural Chart | 0 | 0 | 0 |
-| Oracle | 0 | 0 | 0 |
 | No chart (Flux-GNN) | 0.241 | 0.235 | 0 |
 | CRNN (mass action) | 0 | 0 | 0 |
 | CRNN (condition features) | 0.164 | 0 | 0 |
@@ -382,7 +397,7 @@ It is bistable, and a planar front between the two states travels with a speed w
 | BSMS-GNN | N/A | N/A | 0.240 |
 | GENERIC-FNO | N/A | N/A | 0 |
 
-The Neural Chart and CRNN with mass action are both at the floor of the integrator, which the oracle shows at about 2e-6.
+The Neural Chart and CRNN with mass action are both at the floor of the integrator, about 2e-6, which the true rates also reach.
 The learned standard potentials give the cycle affinity of the reference to four digits, and the entropy production has a relative error of 1e-5 (`results/schlogl/thermodynamic_readouts.md`).
 The black boxes reach 1e-3 to 1e-2 in the training ranges and fail at the new chemostat levels, with errors near 1.
 GENERIC-FNO equals persistence on this task: its instance normalisation removes the spatial mean of every update, and the update collapses to zero.
@@ -405,7 +420,6 @@ Depending on the chemostat levels it shows a limit cycle or Turing patterns.
 |---|---|---|---|---|---|---|---|
 | **Neural Chart** | 2.6e-03 | **3.0e-03** | **3.4e-03** | **3.7e-03** | **2.1e-03** | **0.013** | 12 |
 | Neural Chart with given standard potentials | 1.6e-04 | 4.7e-05 | 3.7e-05 | 1.3e-04 | 3.8e-05 | 1.7e-04 | 6 |
-| Oracle (true rates in the Neural Chart class) | 1.4e-04 | 5.6e-05 | 2.6e-05 | 1.2e-04 | 6.4e-06 | 7.1e-05 | 0 (true rates) |
 | No chart (Flux-GNN) | 0.075 | 0.499 | 0.639 | 0.638 | 0.292 | 0.201 | 151,170 |
 | CRNN (mass action) | **2.4e-03** | 3.0e-03 | 3.4e-03 | 4.1e-03 | 0.026 | 0.013 | 12 |
 | CRNN (condition features) | 0.724 | 0.755 | 0.771 | 0.802 | 0.698 | 0.749 | 4,866 |
@@ -418,7 +432,6 @@ Depending on the chemostat levels it shows a limit cycle or Turing patterns.
 | Method | hyperedges with flux against the true force | samples with σ < 0 | negative values |
 |---|---|---|---|
 | Neural Chart | 0.022 | 0 | 0 |
-| Oracle | 0 | 0 | 0 |
 | No chart (Flux-GNN) | 0.139 | 0 | 0 |
 | CRNN (mass action) | 0.067 | 0 | 0 |
 | CRNN (condition features) | 0.311 | 0 | 0 |
@@ -435,7 +448,7 @@ Without the chart the model reaches 0.075 under the training conditions, but it 
 
 The steps of the Brusselator are close to irreversible, and the affinity of such a step, and with it the standard potentials, is only weakly determined by data (Theorem 0(iii)(d) and Theorem 2 of the theory notes).
 With learned potentials the model's force differs from the true force on up to 2.2 % of the hyperedges, and the entropy production is overestimated by 20 to 27 %, as for CRNN with mass action.
-With the given standard potentials the error drops to the oracle level, and the entropy production error to 4e-5 (`results/brusselator/entropy_readout.md`).
+With the given standard potentials the error drops to 4e-5 to 1.7e-4, and the entropy production error to 4e-5 (`results/brusselator/entropy_readout.md`).
 
 In the Turing regime half of the test trajectories start from a uniform state, which is unstable to spatial perturbations.
 In FP32 integration rounding noise can break the symmetry and grow into a pattern, so the error of these trajectories depends on rounding.
@@ -465,7 +478,6 @@ The animation shows all 22 species at the 16 sites.
 |---|---|---|---|---|---|
 | **Neural Chart** | **6.6e-03** | **0.021** | **0.011** | **6.6e-03** | 48 |
 | Neural Chart with given standard potentials | 6.0e-03 | 4.2e-03 | 9.9e-04 | 6.1e-03 | 23 |
-| Oracle (true rates in the Neural Chart class) | 7.1e-06 | 5.8e-06 | 7.3e-06 | 6.0e-06 | 0 (true rates) |
 | No chart (Flux-GNN) | 6.3e-03 | 0.115 | 0.409 | 6.1e-03 | 153,410 |
 | CRNN (mass action) | 8.5e-03 | 0.027 | 0.020 | 8.7e-03 | 46 |
 | CRNN (condition features) | 8.1e-03 | 0.032 | 0.099 | 8.3e-03 | 5,890 |
@@ -478,7 +490,6 @@ The animation shows all 22 species at the 16 sites.
 | Method | hyperedges with flux against the true force | samples with σ < 0 | negative values |
 |---|---|---|---|
 | Neural Chart | 0.021 | 0 | 0 |
-| Oracle | 0 | 0 | 0 |
 | No chart (Flux-GNN) | 0.133 | 0 | 0 |
 | CRNN (mass action) | 0.054 | 0 | 0 |
 | CRNN (condition features) | 0.232 | 0 | 0 |
@@ -508,13 +519,13 @@ The tables are in `results/<benchmark>/ablations.md`.
 |---|---|---|---|
 | the chart itself, the split into force and mobility | a hypergraph network emits both rates (Flux-GNN) | all | porous media at temperature ×4 0.090 → 2.14, Brusselator 2.6e-3 → 0.075 under the training conditions and up to 0.64 under new ones, up to 52 % of the hyperedges against the true force on the non-ideal Schlögl model |
 | material functional $g_\theta(\xi)$ | one constant mobility for all edges | porous media | 0.064 → 1.18 |
-| state term $s\,m(\bar c)$ | no state input | porous media with crowding | 0.067 → 0.241, the level of the oracle without crowding |
+| state term $s\,m(\bar c)$ | no state input | porous media with crowding | 0.067 → 0.241, the error of the true mobility without the crowding factor |
 | activity functional $\ln\gamma_\theta(c)$ | ideal activities | non-ideal Schlögl | 3.4e-4 → 0.072, and 0.010 → 0.585 at higher concentrations |
 | variable projection in the closed-form start | ideal least-squares start, then rollouts | non-ideal Schlögl | 3.4e-4 → 0.016, and 0.010 → 0.119 at higher concentrations |
 | convex start | $\omega=1$, $\mu^0=0$ at initialisation | Schlögl, phosphorylation cycle, non-ideal Schlögl, Brusselator, MAPK | 1.8e-6 → 2.6, 5.9e-6 → 0.014, 3.4e-4 → 0.47, 2.6e-3 → 0.50, 6.6e-3 → 0.69 |
 | drive $A$ | $A=0$, a reversible model | the same five | errors of 0.08 to 1.5 under the training conditions: the driven steady states cannot be represented |
 | force fixed by physics | a learned global scale on the drive | porous media | no change in accuracy (the scale converges to 0.996), but 0.1 % of the edges then carry flux against the true force |
-| thermochemical data | standard potentials given instead of learned | reaction networks | similar in the training ranges, but on the Brusselator 2.6e-3 → 1.6e-4 and on the MAPK cascade at low ATP 0.011 → 9.9e-4 |
+| thermochemical data | standard potentials taken from the data generator | reaction networks | similar in the training ranges, but on the Brusselator 2.6e-3 → 1.6e-4 and on the MAPK cascade at low ATP 0.011 → 9.9e-4 |
 
 Without the convex start the same model, trained with the same budget, is 100 to 10^6 times less accurate on every reaction network.
 
@@ -547,6 +558,25 @@ Two mechanisms produce them.
 An accurate trajectory therefore does not imply the right thermodynamics.
 Fixing the hypergraph removes the first mechanism.
 The second calls for an activity correction that is flexible enough for the mixture at hand.
+
+## Related work
+
+**Reaction neural networks.**
+CRNN ([Ji and Deng 2021](https://doi.org/10.1021/acs.jpca.0c09316)) learns mass-action rate constants on a reaction network, and is one of our baselines.
+The global reaction neural network GRNN ([Kircher, Döppel and Votsmeier 2024](https://doi.org/10.1016/j.cej.2024.149863)) embeds the stoichiometry and the thermodynamics.
+A network that can read the temperature and the species state gives the forward rates, and the equilibrium constants give the backward rates.
+The Neural Chart goes one step further in how it splits the rate.
+It writes the symmetric part as $g=k\,\varepsilon$, takes the known state and condition factor $\varepsilon(c,\theta)$ out, and asks the learned material factor $k$ to follow one law across conditions.
+A GRNN could express this subclass by restricting its network in the same way.
+What the Neural Chart adds is the use of the restriction: the cross-condition error relation, the identifiability criterion, and the readouts of edge fluxes, cycle currents and entropy production that rest on them.
+
+**Networks that learn free energy and dissipation.**
+OnsagerNet ([Yu, Tian, E and Li 2021](https://doi.org/10.1103/PhysRevFluids.6.114402)) learns dynamics with a generalized Onsager principle, including a free energy, a dissipation and external forces.
+VONNs ([Huang et al. 2022](https://arxiv.org/abs/2112.09085)) learn a free energy and a dissipation potential from spatiotemporal data, guarantee the second law through the network structure, and discuss why these potentials cannot be recovered uniquely.
+Learning constitutive laws with neural networks, building the second law into the architecture, and asking about identifiability are therefore not new in themselves.
+VONNs learn a general dissipation potential and cover a broader class of systems.
+The Neural Chart assumes more, namely a known network and a known rate structure.
+With these assumptions it can ask more specific questions: which part of the rate law stays fixed when the conditions change, what error follows at a new condition, and when a change of conditions makes two mechanisms in the model distinguishable.
 
 ## Scope and limits
 
