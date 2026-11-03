@@ -23,7 +23,7 @@ The Neural Chart is a master equation on graphs and hypergraphs whose thermodyna
 The Neural Chart is a learned map onto the set $\mathfrak G(S)$ of rate laws that satisfy local detailed balance on a fixed graph (Theorem 0, formulation).
 The second law for every parameter value is Theorem 0(iii)(a).
 Conditions as coordinates is Theorem 0(iii)(b) and Proposition 4.
-The convex start is Theorem 0(iii)(c).
+The convex relaxation behind the closed-form start is Theorem 0(iii)(c). It covers the fit of the class factors at fixed force, and not the mapping back to coupled parameters, the activity correction or the rollout training.
 Why the standard potentials are weakly determined on networks with nearly irreversible steps is the example after Theorem 0(iii)(d) and Theorem 2.
 Theorem 0(iv) shows what a model loses when its learned part reads the conditions or learns the force freely.
 
