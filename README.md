@@ -578,6 +578,12 @@ On a fixed hypergraph the data determine the coordinates of the model, up to the
 Without it, trajectories do not determine the thermodynamic structure.
 Different hypergraphs can produce nearly the same trajectories with different forces and a different entropy production.
 
+On the reaction networks the hypergraph does three concrete things.
+
+1. **Hyperedges turn high-order reactions into a problem that is linear in $k$.** The step $2X+Y\rightleftharpoons3X$ of the Brusselator is cubic in the concentrations. On its hyperedge the rate is one class constant times a factor that the stoichiometry and the current chemical potentials fix, so the closed-form start treats it in the same way as a transfer between two cells.
+2. **Hypergraph cycles fix the energy balance.** ATP, ADP, the enzyme and the substrate are bound together on one hyperedge, so a sum of forces around a cycle cancels the intermediates and leaves the free energy of hydrolysis. With the hypergraph given, the phosphorylation cycle gives an entropy production of 0.998 times the truth and a cycle affinity of 5.945 against 5.960. On a library of candidates the phosphorylation step splits into two half-reactions, and the entropy production becomes 10.2 times the truth. The right hypergraph is necessary for these readouts, and it does not suffice on its own. On the Brusselator and the MAPK cascade nearly irreversible steps leave the learned potentials uncertain, and the readouts inherit that error.
+3. **The true hypergraph makes the activity correction carry the non-ideality.** With the true reactions, $\ln\gamma$ is the only learned term that can express crowding, and on the non-ideal Schlögl model it has slope 0.998 against the truth. On a library of candidates extra reactions can take up the same effect, which the last row of the table below shows.
+
 We tested this with the same model on a library of all candidate reactions with up to three state molecules on each side.
 This library has a larger thermodynamic manifold, and every smaller network is one of its boundary faces, where $k_e=0$ for the reactions it leaves out.
 Finding a sparse network then means projecting the data onto a low-dimensional boundary face.
