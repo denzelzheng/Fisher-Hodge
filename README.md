@@ -1,21 +1,21 @@
 # Neural Chart
 
-The Neural Chart learns a driven physical system from trajectories by separating what changes with the conditions from what stays the same.
-On a given reaction or transport hypergraph, each rate is split into two factors.
-The first is known as a function of the state and the conditions.
-The second belongs to the material and is learned.
-The model assumes that this material factor follows the same law under every condition, which we call cross-condition invariance.
+A reaction or transport hypergraph fixes the set of all rate laws on it that satisfy local detailed balance, and this set is a manifold.
+Its coordinates are the thermodynamic force of each step and a symmetric part, which factors into a known function of the state and the conditions and a material factor.
+The Neural Chart is a chart of this manifold.
+Learning a driven physical system from trajectories then means locating the system on the manifold, and a network does this by learning the material factor.
+The material factor is assumed to follow the same law under every condition, which we call cross-condition invariance.
 Three properties follow from this assumption.
 
-- **Extrapolation in the drive.** The model can be moved to a new drive, temperature, potential or chemostat level without retraining.
+- **Extrapolation in the drive.** A new drive, temperature, potential or chemostat level moves the system along coordinates that are already known, with no retraining.
 - **Optimization.** The fit has a convex closed-form start, from which rollout training succeeds.
 - **Identifiability.** The theory states when trajectories determine the flux of every step, the cycle currents and the entropy production, and when they cannot.
 
-On top of these, the model dissipates non-negatively for every value of its parameters.
+In addition, every point of the chart dissipates non-negatively with respect to its own force.
 
-The model receives the state, the hypergraph of reaction and transport steps, and the conditions of each trajectory: the temperature, an external potential and drive, and the chemostat levels.
+The inputs are the state, the hypergraph of reaction and transport steps, and the conditions of each trajectory: the temperature, an external potential and drive, and the chemostat levels.
 Each reaction is a hyperedge that joins its reactants to its products, and each transport step is an edge between two cells.
-The model returns a master equation on that hypergraph.
+A point of the manifold is a master equation on that hypergraph, so the dynamics follow once the point is known.
 
 **Contents**
 
