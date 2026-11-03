@@ -1,7 +1,10 @@
 """The Neural Chart: one model class, one configuration per benchmark, one fit.
 
     a_h, b_h = k_h exp(+- f_h / 2)                    (each rate also carries the mass-action factor of its reactants)
-    f   fixed by physics: the conditions (temperature, drive, chemostat potentials) and thermodynamic data (U, mu0)
+    f   the force from the chemical potential and the drive: mu = log c + U / T + mu0_theta / T (+ ln gamma_theta(c)),
+        with the conditions (temperature, drive, chemostat levels) entering only through U / T, the drive and the
+        chemostat log-activities.  On the reaction networks the standard potentials mu0_theta are learned (the
+        variant chart-given-mu0 takes them from thermochemical data); porous media has no mu0.
     log k_h = log omega_c(h) + g_theta(xi_h) + s * m(log s_h)     (times fixed geometric and physical prefactors)
         omega_c   one positive constant per hyperedge class
         g_theta   an MLP of the local material descriptors xi; its last layer is zero at initialisation (absent
@@ -36,7 +39,8 @@ BUILDERS = dict(porous_media='benchmarks.porous_media.models', brusselator='benc
 @dataclasses.dataclass(frozen=True)
 class ChartConfig:
     """one Neural Chart.
-    mu0          'given' (thermochemical data) or 'learned' (ablation)
+    mu0          'learned' (the default of the reaction networks) or 'given' (thermochemical data, an oracle-type input;
+                 porous media has no standard potentials and uses 'given', i.e. none)
     drive        'fixed' (the physical drive), 'off' (A = 0: the reversible ablation) or 'learned_scale' (a learned
                  global drive scale)
     descriptors  g_theta(xi) in log k;  state: s * m(log state) in log k (needs descriptors)
@@ -75,18 +79,18 @@ class ChartConfig:
 
 
 _PM = ChartConfig(task='porous_media', descriptors=True, state=True, rtol=0.3)
-_BR = ChartConfig(task='brusselator', rtol=5e-5)
-_C5 = ChartConfig(task='schlogl_nonideal', activity='learned', rtol=1e-4)
+_BR = ChartConfig(task='brusselator', mu0='learned', rtol=5e-5)
+_C5 = ChartConfig(task='schlogl_nonideal', mu0='learned', activity='learned', rtol=1e-4)
 
 
 def _reaction(task):
-    base = ChartConfig(task=task, rtol=1e-4)
+    base = ChartConfig(task=task, mu0='learned', rtol=1e-4)
     return {
         'chart': base,
-        'chart-learned-mu0': base.replace(mu0='learned'),
+        'chart-given-mu0': base.replace(mu0='given'),
         'chart-zero-init': base.replace(init='one'),
         'chart-reversible': base.replace(drive='off'),
-        'oracle': base.replace(kappa='true', train=False),
+        'oracle': base.replace(mu0='given', kappa='true', train=False),
     }
 
 
@@ -102,19 +106,19 @@ CONFIGS = {
     },
     'brusselator': {
         'chart': _BR,
-        'chart-learned-mu0': _BR.replace(mu0='learned'),
+        'chart-given-mu0': _BR.replace(mu0='given'),
         'chart-zero-init': _BR.replace(init='one'),
         'chart-reversible': _BR.replace(drive='off'),
-        'oracle': _BR.replace(kappa='true', train=False),
+        'oracle': _BR.replace(mu0='given', kappa='true', train=False),
     },
     'schlogl_nonideal': {
         'chart': _C5,
         'chart-ideal': _C5.replace(activity='ideal'),
-        'chart-learned-mu0': _C5.replace(mu0='learned'),
+        'chart-given-mu0': _C5.replace(mu0='given'),
         'chart-zero-init': _C5.replace(init='one'),
         'chart-reversible': _C5.replace(drive='off'),
         'chart-no-varpro': _C5.replace(varpro=False),
-        'oracle': _C5.replace(activity='true', kappa='true', train=False),
+        'oracle': _C5.replace(mu0='given', activity='true', kappa='true', train=False),
     },
     'schlogl': _reaction('schlogl'),
     'phosphorylation_cycle': _reaction('phosphorylation_cycle'),
@@ -125,7 +129,7 @@ CONFIGS = {
 ABLATIONS = {
     'chart-no-state': 'the state input s * m(log state) of the mobility',
     'chart-const-k': 'the material network g_theta: one constant omega for all edges',
-    'chart-learned-mu0': 'the given standard potentials: mu0 is learned together with k',
+    'chart-given-mu0': 'nothing: it adds the standard potentials from thermochemical data (oracle-type information)',
     'chart-zero-init': 'the closed-form NNLS start: omega starts at 1',
     'chart-reversible': 'the drive: A = 0, so the model is reversible',
     'chart-learned-drive': 'the fixed drive scale: a global scale of the drive is learned',

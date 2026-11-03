@@ -10,7 +10,7 @@
 
 Data: --data, default $NEURALCHART_DATA/brusselator if set, else data/brusselator.  The device defaults to cuda.
 
-Models: chart, chart-learned-mu0, chart-zero-init, chart-reversible, oracle (neuralchart.chart.CONFIGS['brusselator'])
+Models: chart, chart-given-mu0, chart-zero-init, chart-reversible, oracle (neuralchart.chart.CONFIGS['brusselator'])
 and the baselines crnn_mass_action, crnn_features, flux_gnn, ude, fno, bsms, generic_fno, persistence.
 --fast uses neuralchart.fast with error control (rtol 5e-5) in float32, the setting of every reported number; the
 UDE closure then integrates with error control only.  Optional speed flags: --compact, --compile_rates, --fuse_net.

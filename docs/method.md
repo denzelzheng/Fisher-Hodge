@@ -15,13 +15,18 @@ $$a_h=k_h\,e^{\langle\nu_h^+,\mu\rangle+A_h/2},\qquad b_h=k_h\,e^{\langle\nu_h^-
 Equivalently $a_h,b_h=g_h\,e^{\pm f_h/2}$ with the force $f_h=\log(a_h/b_h)=-\langle S_h,\mu\rangle+A_h$.
 Each rate carries the mass-action factor of the species it consumes.
 
-**The force is fixed by physics.**
-The chemical potential is $\mu=\log c+U/T+\mu^0/T$, plus an activity correction $\ln\gamma(c)$ on the non-ideal Schlögl model.
-The drive $A_h$ is the line integral of the external force divided by $T$, plus the chemical potentials of the chemostatted species.
-The temperature, the drive amplitude and the chemostat levels are the conditions of a test set.
-They enter only through $f$.
+**What the model receives.**
+The model receives the state $c$, the reaction and transport graph (the stoichiometry $\nu^\pm$ and the hyperedge classes), and the conditions of a trajectory: the temperature $T$, an external potential $U$ and the line integrals of an external force, and the chemostat levels.
+It does not receive thermochemical data.
 
-**Only the mobility is learned.**
+**The force has a fixed physical structure.**
+The chemical potential is $\mu=\log c+U/T+\mu^0_\theta/T$, plus a learned activity correction $\ln\gamma_\theta(c)$ on the non-ideal Schlögl model.
+The standard potentials $\mu^0_\theta$ of the species and of the chemostats are learned constants.
+Porous media has a single species and no standard potentials.
+The drive $A_h$ is the line integral of the external force divided by $T$, plus the chemical potentials of the chemostatted species, $\log c_{\rm chem}+\mu^0_{\theta,\rm chem}/T$.
+The conditions enter only through $U/T$, the drive and the chemostat log-activities, so they enter only through $f$.
+
+**The mobility.**
 
 $$\log k_h=\log\omega_{c(h)}+g_\theta(\xi_h)+s\,m(\log s_h).$$
 
@@ -31,17 +36,35 @@ $$\log k_h=\log\omega_{c(h)}+g_\theta(\xi_h)+s\,m(\log s_h).$$
 - Fixed geometric and physical prefactors stay outside $k$. In porous media $k_e=D\,T\,w_e\,\omega\,e^{g+s\,m}$, with $w_e$ the geometric weight of the finite-volume scheme on the grid or on the Voronoi cells.
 
 **What holds for every parameter value.**
-$\log(a_h/b_h)=f_h$ is local detailed balance.
-$J_hf_h\ge0$ on every hyperedge, so the entropy production $\sigma=\sum_hJ_hf_h$ is non-negative.
+$\log(a_h/b_h)=f_h$ is local detailed balance with respect to the model's own force.
+$J_hf_h\ge0$ on every hyperedge, so the model's entropy production $\sigma=\sum_hJ_hf_h$ is non-negative.
 Every moiety in $\ker S^\top$ is conserved, and the positive integrator keeps $c>0$.
 None of this needs a penalty or a projection.
+The model's force equals the true physical force only as far as the learned $\mu^0_\theta$ (and $\ln\gamma_\theta$) are right.
+We therefore measure how many hyperedges carry flux against the true force and report it in the physics tables.
+In porous media the force contains no learned part, so it equals the physical force.
 Because the conditions enter only through $f$ and $k$ does not read them, a change of temperature, drive or chemostat level maps the model by substitution.
+
+**Configurations.** The variants in `neuralchart/chart.py` change one thing each.
+
+| Variant | Change |
+|---|---|
+| Neural Chart | the method: learned $\mu^0_\theta$ on the reaction networks |
+| Neural Chart, given standard potentials | $\mu^0$ taken from the thermochemical data of the generator (oracle-type information) |
+| Neural Chart, no convex initialisation | $\omega$ and $\mu^0_\theta$ start at 1 and 0 instead of the closed-form estimate |
+| Neural Chart, reversible (no drive) | $A=0$ |
+| Neural Chart, ideal activities | $\ln\gamma=0$ (non-ideal Schlögl) |
+| Neural Chart, ideal-fit initialisation | no variable projection (non-ideal Schlögl) |
+| Neural Chart, no state input | no state term (porous media) |
+| Neural Chart, constant mobility | no material network $g_\theta$ (porous media) |
+| Neural Chart, learned drive scale | a learned global factor on the drive (porous media) |
+| Oracle | the true rates in the Neural Chart class, nothing learned |
 
 ## The four-step fit
 
-1. **Physics.** Build $f$ from the conditions and the thermodynamic data ($U$, $\mu^0$). Nothing is learned here.
+1. **Force.** Build $f$ from the conditions with the structure above. On the reaction networks it contains the learned constants $\mu^0_\theta$.
 2. **Mobility.** Set up $\log k$ as above for the task (the configurations are in `neuralchart/chart.py`).
-3. **Closed-form start, then rollout refinement.** At initialisation $g=0$ and $s=0$, so $k$ is linear in $\omega$. The derivative fit $c(t+2\Delta t)-c(t)=\sum_r\kappa_r\,S\int\Phi_r\,dt$ (Simpson rule) is a non-negative least-squares problem in the class factors $\kappa_r$. Its optimum is global, and $\omega$ starts there (`neuralchart.fit.fit_linear`). When $\mu$ carries a learned activity correction $\ln\gamma_\theta$, the step is variable projected. $\omega$ is the NNLS optimum at every value of $\ln\gamma_\theta$, and $\ln\gamma_\theta$ descends the projected residual (Adam, learning rate 1e-2, gradient clip 1, stop when the residual improves by less than 5 % over 100 iterations, at most 2000 iterations, `fit_varpro`). Then every parameter is refined on multi-step rollouts (`neuralchart.fit.train`).
+3. **Closed-form start, then rollout refinement.** At initialisation $g=0$ and $s=0$. Then $\log\omega$ and $\mu^0_\theta$ enter $\log a$ and $\log b$ linearly, so the rates are linear in the class factors. The derivative fit $c(t+2\Delta t)-c(t)=\sum_r\kappa_r\,S\int\Phi_r\,dt$ (Simpson rule) is a non-negative least-squares problem in the class factors $\kappa_r$. Its optimum is global, and $\omega$ and $\mu^0_\theta$ start there (`neuralchart.fit.fit_linear`). When $\mu$ carries a learned activity correction $\ln\gamma_\theta$, the step is variable projected. $\omega$ is the NNLS optimum at every value of $\ln\gamma_\theta$, and $\ln\gamma_\theta$ descends the projected residual (Adam, learning rate 1e-2, gradient clip 1, stop when the residual improves by less than 5 % over 100 iterations, at most 2000 iterations, `fit_varpro`). Then every parameter is refined on multi-step rollouts (`neuralchart.fit.train`).
 4. **Integration.** A positivity-preserving adaptive SSP-RK2 (`neuralchart.fast`). Each substep is limited so that no species can be consumed below zero, and an embedded error estimate controls the step size per trajectory.
 
 ## Protocol
@@ -62,7 +85,7 @@ The same protocol applies to the Neural Chart, its ablations and every baseline.
 - **Precision.** Training and evaluation integrate in FP32. The step control (time, step size) stays in FP64.
 - **Tolerances.** The tolerance of each task was chosen against the oracle (the true rates in the Neural Chart class): it is the largest rtol whose integration error is negligible against the oracle's 10T error (`python -m benchmarks.<name>.run calibrate` on the reaction networks). In porous media the error control does not bind below rtol = 0.3, because the oracle's error there is the discretisation error of the 32×32 grid.
 - **Metric.** The relative L2 error of the full state at 10T (200 sampling steps), median over the test trajectories. A rollout that is not finite, or whose error exceeds 1e3, is reported as diverged.
-- **Local detailed balance.** A hyperedge violates local detailed balance when its flux runs against the physical force of the test condition beyond rounding: $J_hf_h<-10^{-6}\,(a_h+b_h)\,|f_h|$. The rounding error of $J=a-b$ scales with the gross rate $a+b$. For a model with a single edge flux and no forward and backward rates (the UDE closure) the scale is $|J_h|$. The same rule (`neuralchart.diagnostics.ldb_violation`) applies to every model and every task.
+- **Local detailed balance.** A hyperedge violates local detailed balance when its flux runs against the true physical force of the test condition beyond rounding (the true potentials and drive, evaluated at the model's own state): $J_hf_h<-10^{-6}\,(a_h+b_h)\,|f_h|$. The rounding error of $J=a-b$ scales with the gross rate $a+b$. For a model with a single edge flux and no forward and backward rates (the UDE closure) the scale is $|J_h|$. The same rule (`neuralchart.diagnostics.ldb_violation`) applies to every model and every task.
 - **Entropy production.** $\sigma_{\rm phys}=\sum_hJ_hf_h$ with the physical force, sampled along the rollout. Models without their own edge flux (FNO, BSMS-GNN, GENERIC-FNO, HelmFluid, persistence) return a state update only, so these columns are N/A for them. A flux reconstructed from the state change would be curl-free and could not carry a driven circulation.
 - **Negative values.** Counted for every model, as the fraction of negative state values and the number of trajectories that reach a negative value.
 

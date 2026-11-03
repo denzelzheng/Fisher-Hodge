@@ -23,10 +23,12 @@ from .training import accelerate, default_fast, set_max_sub
 
 ASSETS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'assets')
 # Okabe-Ito colours (readable with colour-vision deficiency)
-COLORS = {'reference': '#000000', 'chart': '#0072B2', 'chart-reversible': '#56B4E9', 'crnn_mass_action': '#009E73',
+COLORS = {'reference': '#000000', 'chart': '#0072B2', 'chart-given-mu0': '#56B4E9', 'chart-reversible': '#56B4E9',
+          'crnn_mass_action': '#009E73',
           'flux_gnn': '#E69F00', 'fno': '#CC79A7', 'ude': '#D55E00'}
-PHASE_MODELS = ['chart', 'chart-reversible', 'crnn_mass_action', 'flux_gnn', 'fno', 'ude']
-ENTROPY_MODELS = ['chart', 'chart-reversible', 'crnn_mass_action', 'flux_gnn', 'ude']
+# the reversible ablation joins both figures when its run is available (append 'chart-reversible')
+PHASE_MODELS = ['chart', 'crnn_mass_action', 'flux_gnn', 'fno', 'ude']
+ENTROPY_MODELS = ['chart', 'chart-given-mu0', 'crnn_mass_action', 'flux_gnn', 'ude']
 FLOAT32 = ('flux_gnn', 'ude', 'fno', 'bsms', 'generic_fno')
 VIOL_COLOR = '#009E73'
 
@@ -137,7 +139,8 @@ def entropy_maps(device, data_kw, weights, path, set_name='b_far', t=100):
         at, bt = true_rates(hg, lab, cmd)
         f = torch.log(at / bt)[0]
         viol = ldb_violation(J, f, gross=None if isinstance(model, UDE) else a + b)
-        panels.append((LABELS[m], site_map(hg, torch.nan_to_num(J * f)).numpy(), site_map(hg, viol.double(), half=False).numpy() > 0,
+        short = LABELS[m].split(' (oracle-type')[0]                 # panel titles stay on one line
+        panels.append((short, site_map(hg, torch.nan_to_num(J * f)).numpy(), site_map(hg, viol.double(), half=False).numpy() > 0,
                        float(viol.double().mean())))
     ref = panels[0][1]
     lim = float(np.abs(ref).max())

@@ -3,9 +3,10 @@
 Neural Chart.  mu = log c + mu0 for X and Y; the drive is the chemostat force of (a, b, d, e); log k is a table over the
 six hyperedge types (R1-R4, transport of X and Y), log omega_c; there are no material descriptors and no state term.
 The chemostats also enter k through their symmetric mass-action factor.  The standard potentials mu0 of X, Y and of
-the chemostats are given (thermochemical data) and fixed, so the force f of every hyperedge is fixed and only k is
-learned.  The gauge of mu0 is the minimum-norm solution of <nu+ - nu-, mu0> = log(k_r / eps); any other gauge is
-absorbed by k.
+the chemostats are learned together with k (they enter log a and log b linearly, so the closed-form step fits them
+with k).  The variant chart-given-mu0 takes them from thermochemical data and fixes them; then the force f of every
+hyperedge is the true force and only k is learned.  Its gauge of mu0 is the minimum-norm solution of
+<nu+ - nu-, mu0> = log(k_r / eps); any other gauge is absorbed by k.
 
 Baselines (all see the same data):
   crnn_mass_action  CRNN with a log rate table over the hyperedge types and the chemostats as mass-action factors

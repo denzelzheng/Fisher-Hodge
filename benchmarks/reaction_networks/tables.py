@@ -3,11 +3,11 @@ import os
 
 import json
 
-from ..common import RESULTS, LABELS, OWN_FLUX, fmt, write_table, param_cell
+from ..common import RESULTS, LABELS, OWN_FLUX, fmt, write_table
 from . import config as C
 
-MAIN = ['chart', 'oracle', 'crnn_mass_action', 'crnn_features', 'ude', 'flux_gnn', 'fno', 'bsms', 'generic_fno', 'persistence']
-ABLATIONS = ['chart', 'chart-ideal', 'chart-no-varpro', 'chart-learned-mu0', 'chart-zero-init', 'chart-reversible', 'oracle']
+MAIN = ['chart', 'chart-given-mu0', 'oracle', 'crnn_mass_action', 'crnn_features', 'ude', 'flux_gnn', 'fno', 'bsms', 'generic_fno', 'persistence']
+ABLATIONS = ['chart', 'chart-given-mu0', 'chart-ideal', 'chart-no-varpro', 'chart-zero-init', 'chart-reversible', 'oracle']
 
 
 def _cols():
@@ -27,7 +27,7 @@ def main_table(R, models, stem):
             continue
         r = R[m]
         neg = [r['sets'][s]['n_neg_traj'] for s, _ in cols if r['sets'].get(s)]
-        rows.append([LABELS[m]] + [_err(r, s) for s, _ in cols] + [str(max(neg)) if neg else 'N/A', param_cell(m, r)])
+        rows.append([LABELS[m]] + [_err(r, s) for s, _ in cols] + [str(max(neg)) if neg else 'N/A', f'{r["params"]:,}'])
     return write_table(stem, ['Method'] + [lab for _, lab in cols] + ['trajectories with a negative value', 'parameters'], rows)
 
 
@@ -92,7 +92,8 @@ def front_table(R, models, stem):
     for m in models:
         f = ((R.get(m) or {}).get('sets', {}).get('planar_fronts') or {}).get('front')
         if f:
-            rows.append([LABELS[m], f['b_star_model'], f['b_star_true'], f['speed_relerr_median']])
+            nan = lambda x: 'no zero crossing' if x is None or x != x else x
+            rows.append([LABELS[m], nan(f['b_star_model']), nan(f['b_star_true']), f['speed_relerr_median']])
     return write_table(stem, ['Method', 'b where the front stops, model', 'reference', 'front speed, median relative error'], rows)
 
 
@@ -113,11 +114,11 @@ def make_tables(runs=None):
     physics_table(R, MAIN, os.path.join(out, 'physics'))
     main_table(R, ABLATIONS, os.path.join(out, 'ablations'))
     physics_table(R, ABLATIONS, os.path.join(out, 'ablations_physics'))
-    readout_table(R, MAIN[:-1] + ABLATIONS[1:], os.path.join(out, 'thermodynamic_readouts'))
+    readout_table(R, MAIN[:-1] + ABLATIONS[2:-1], os.path.join(out, 'thermodynamic_readouts'))
     if C.SYSTEM == 'schlogl_nonideal':
         lngamma_table(R, os.path.join(out, 'activity_coefficient'))
     if C.SYSTEM == 'mapk_cascade':
-        mapk_table(R, MAIN + ABLATIONS[1:], os.path.join(out, 'conservation_and_output'))
+        mapk_table(R, MAIN + ABLATIONS[2:-1], os.path.join(out, 'conservation_and_output'))
     if C.SYSTEM == 'schlogl':
-        front_table(R, MAIN + ABLATIONS[1:], os.path.join(out, 'fronts'))
+        front_table(R, MAIN + ABLATIONS[2:-1], os.path.join(out, 'fronts'))
     print(open(os.path.join(out, 'main.md')).read())

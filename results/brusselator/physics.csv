@@ -1,16 +1,10 @@
 Method,quantity,training conditions,b 3.2–3.7,b 4.0–4.6,a 1.3–1.5 (a and b outside training),Turing regime (below the Hopf line),64×64 grid
-Neural Chart,hyperedges violating local detailed balance,0.0,0.0,0.0,0.0,0.0,0.0
+Neural Chart,hyperedges violating local detailed balance,0.016693882419301965,0.020977793872982722,0.017170482852278204,0.021701569468978613,0.010701245804149832,0.013907244473885435
 Neural Chart,samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0
 Neural Chart,negative concentration values (fraction),0.0,0.0,0.0,0.0,0.0,0.0
-"Neural Chart, learned standard potentials",hyperedges violating local detailed balance,0.016693882419301965,0.020977793872982722,0.017170482852278204,0.021701569468978613,0.010701245804149832,0.013907244473885435
-"Neural Chart, learned standard potentials",samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0
-"Neural Chart, learned standard potentials",negative concentration values (fraction),0.0,0.0,0.0,0.0,0.0,0.0
-"Neural Chart, no convex initialisation",hyperedges violating local detailed balance,0.0,0.0,0.0,0.0,0.0,0.0
-"Neural Chart, no convex initialisation",samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0
-"Neural Chart, no convex initialisation",negative concentration values (fraction),0.0,0.0,0.0,0.0,0.0,0.0
-"Neural Chart, reversible (no drive)",hyperedges violating local detailed balance,0.331768277067348,0.3325703525505303,0.32391471049408854,0.3328462215349871,0.3329917016563626,0.24999332419320014
-"Neural Chart, reversible (no drive)",samples with sigma < 0,0.0078125,0.00625,0.0015625,0.0265625,0.01875,0.0
-"Neural Chart, reversible (no drive)",negative concentration values (fraction),0.0,0.0,0.0,0.0,0.0,0.0
+"Neural Chart, given standard potentials (oracle-type information)",hyperedges violating local detailed balance,0.0,0.0,0.0,0.0,0.0,0.0
+"Neural Chart, given standard potentials (oracle-type information)",samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0
+"Neural Chart, given standard potentials (oracle-type information)",negative concentration values (fraction),0.0,0.0,0.0,0.0,0.0,0.0
 Oracle (true rates in the Neural Chart class),hyperedges violating local detailed balance,0.0,0.0,0.0,0.0,0.0,0.0
 Oracle (true rates in the Neural Chart class),samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0
 Oracle (true rates in the Neural Chart class),negative concentration values (fraction),0.0,0.0,0.0,0.0,0.0,0.0

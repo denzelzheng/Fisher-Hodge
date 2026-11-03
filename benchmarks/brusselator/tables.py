@@ -7,15 +7,15 @@ results/brusselator/{main, physics, ablations, oscillation_patterns, entropy_rea
 import json
 import os
 
-from benchmarks.common import LABELS, OWN_FLUX, write_table, fmt, param_cell
+from benchmarks.common import LABELS, OWN_FLUX, write_table, fmt
 from neuralchart.chart import ABLATIONS
 from .config import RESULTS
 from .test_sets import TEST_SETS, LABELS as SET_LABELS
 
-MODELS = ['chart', 'chart-learned-mu0', 'chart-zero-init', 'chart-reversible', 'oracle', 'crnn_mass_action',
+MODELS = ['chart', 'chart-given-mu0', 'chart-zero-init', 'chart-reversible', 'oracle', 'crnn_mass_action',
           'crnn_features', 'ude', 'flux_gnn', 'bsms', 'fno', 'generic_fno', 'persistence']
-MAIN = ['chart', 'oracle', 'crnn_mass_action', 'crnn_features', 'ude', 'flux_gnn', 'bsms', 'fno', 'generic_fno', 'persistence']
-ABLATION_MODELS = ['chart', 'chart-learned-mu0', 'chart-zero-init', 'chart-reversible', 'oracle']
+MAIN = ['chart', 'chart-given-mu0', 'oracle', 'crnn_mass_action', 'crnn_features', 'ude', 'flux_gnn', 'bsms', 'fno', 'generic_fno', 'persistence']
+ABLATION_MODELS = ['chart', 'chart-given-mu0', 'chart-zero-init', 'chart-reversible', 'oracle']
 
 
 def _set(r, s):
@@ -32,7 +32,7 @@ def main_table(R, models):
         neg = [(_set(r, s) or {}).get('n_neg_traj') for s in TEST_SETS]
         neg = [x for x in neg if x is not None]
         rows.append([LABELS[m]] + [(_set(r, s) or {}).get('err_10T') for s in TEST_SETS]
-                    + [str(max(neg)) if neg else 'N/A', param_cell(m, r)])
+                    + [str(max(neg)) if neg else 'N/A', f'{r["params"]:,}'])
     return header, rows
 
 
@@ -59,7 +59,7 @@ def ablation_table(R):
             continue
         r = R[m]
         rows.append([LABELS[m], ABLATIONS.get(m, 'nothing (the method)')] + [(_set(r, s) or {}).get('err_10T') for s in TEST_SETS]
-                    + [param_cell(m, r)])
+                    + [f'{r["params"]:,}'])
     return header, rows
 
 

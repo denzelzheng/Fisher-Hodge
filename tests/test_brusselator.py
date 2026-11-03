@@ -33,7 +33,7 @@ def test_ablations_are_one_override():
     base = CONFIGS['brusselator']['chart']
     for name, cfg in CONFIGS['brusselator'].items():
         diff = [k for k in base.__dataclass_fields__ if getattr(cfg, k) != getattr(base, k)]
-        assert len(diff) <= (2 if name == 'oracle' else 1), (name, diff)        # the oracle is also not trained
+        assert len(diff) <= (3 if name == 'oracle' else 1), (name, diff)        # the oracle: given mu0, true k, not trained
 
 
 @torch.no_grad()
@@ -46,10 +46,23 @@ def test_oracle_equals_reference_rates():
 
 
 @torch.no_grad()
-def test_force_is_fixed_and_sigma_nonnegative():
-    """with the given standard potentials the force log(a / b) is the reference force for every k, so local detailed
-    balance and sigma >= 0 hold for any parameter value"""
+def test_sigma_nonnegative_for_any_parameters():
+    """the Neural Chart (learned standard potentials): for random k and mu0 every hyperedge flux runs along the
+    model's own force log(a / b), so sigma >= 0"""
     m = build_chart(chart_config('brusselator', 'chart'), n=N)
+    g = torch.Generator().manual_seed(3)
+    for p in m.linear_parameters():
+        p.data.copy_(torch.randn(p.shape, generator=g, dtype=torch.float64))
+    a, b = m.rates(_states(5, N), _conditions(5))
+    J, f = a - b, torch.log(a / b)
+    assert bool((J * f >= 0).all()) and bool(((J * f).sum(-1) >= 0).all())
+
+
+@torch.no_grad()
+def test_given_mu0_fixes_the_force():
+    """with the given standard potentials the force log(a / b) is the reference force for every k, so local detailed
+    balance against the true force and sigma >= 0 hold for any parameter value"""
+    m = build_chart(chart_config('brusselator', 'chart-given-mu0'), n=N)
     m.kinetics.core.copy_(torch.randn(m.kinetics.core.shape, generator=torch.Generator().manual_seed(2), dtype=torch.float64))
     c, dr = _states(5, N), _conditions(5)
     a, b = m.rates(c, dr)
@@ -82,7 +95,7 @@ def test_nnls_recovers_the_rate_constants():
         sol = solve_ivp(TruthNP(N, a, b).rhs, (0, ts[-1]), c0, method='DOP853', t_eval=ts, rtol=1e-12, atol=1e-14)
         cs.append(sol.y.T); labs.append([math.log(a), math.log(b)])
     tr = dict(c=torch.as_tensor(np.stack(cs)), drive=dict(logab=torch.tensor(labs, dtype=torch.float64)))
-    m = build_chart(chart_config('brusselator', 'chart'), n=N)
+    m = build_chart(chart_config('brusselator', 'chart-given-mu0'), n=N)
     fit_linear(m, dict(train=tr), dt, log=lambda *a: None)
     err = np.abs(m.kinetics.core.detach().numpy() - np.array(true_log_k()))
     assert err.max() < 1e-4, err
@@ -90,6 +103,7 @@ def test_nnls_recovers_the_rate_constants():
 
 DATA_OK = os.path.exists(os.path.join(C.DATA, 'train.pt'))
 CKPT = os.path.join(C.CHECKPOINTS, 'chart.pt')
+CKPT_GIVEN = os.path.join(C.CHECKPOINTS, 'chart-given-mu0.pt')
 
 
 @pytest.mark.slow
@@ -102,15 +116,18 @@ def test_generator_reproduces_stored_data():
 
 
 @pytest.mark.slow
-@pytest.mark.skipif(not (DATA_OK and os.path.exists(CKPT)), reason='data or checkpoint missing')
+@pytest.mark.skipif(not (DATA_OK and os.path.exists(CKPT) and os.path.exists(CKPT_GIVEN)), reason='data or checkpoints missing')
+@pytest.mark.parametrize('name,tol', [('chart', 1e-2), ('chart-given-mu0', 1e-3)])
 @torch.no_grad()
-def test_shipped_checkpoint():
-    """the shipped Neural Chart on four test trajectories, with the reference integrator in float64"""
-    m = build_chart(chart_config('brusselator', 'chart'), n=C.N_TRAIN)
-    m.load_state_dict(torch.load(CKPT, map_location='cpu'))
-    assert np.abs(m.kinetics.core.numpy() - np.array(true_log_k())).max() < 1e-3
+def test_shipped_checkpoint(name, tol):
+    """the shipped Neural Charts on four test trajectories over 40 sampling steps, with the reference integrator in
+    float64; with given potentials the learned log k is the true one"""
+    m = build_chart(chart_config('brusselator', name), n=C.N_TRAIN)
+    m.load_state_dict(torch.load(os.path.join(C.CHECKPOINTS, name + '.pt'), map_location='cpu'))
+    if name == 'chart-given-mu0':
+        assert np.abs(m.kinetics.core.numpy() - np.array(true_log_k())).max() < 1e-3
     sd = load_set('training')
     idx = [0, 1, 16, 17]
     R, _, _ = rollout(m, {k: v[idx] for k, v in sd['drive'].items()}, sd['c'][idx, 0], 40, C.DT)
     e = relerr_traj(R.double(), sd['c'][idx, :41].double())[:, -1]
-    assert float(e.max()) < 1e-3
+    assert float(e.max()) < tol

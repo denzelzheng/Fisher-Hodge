@@ -80,12 +80,26 @@ def _noiseless_schlogl(n_traj=6, steps=30):
 
 
 def test_closed_form_step_recovers_the_true_constants():
+    """with the standard potentials given, NNLS recovers log k exactly"""
+    C.configure('schlogl')
+    tr = _noiseless_schlogl()
+    m = build_chart(chart.CONFIGS['schlogl']['chart-given-mu0'])
+    info = fit_linear(m, dict(train=tr), C.DT, log=lambda *a: None)
+    assert info['residual_theta'] < 1e-6
+    assert np.allclose(m.kinetics.core.detach().numpy(), true_log_k(), atol=1e-3)
+
+
+def test_closed_form_step_with_learned_potentials_fits_the_rates():
+    """with learned standard potentials (the default chart), the closed-form step reproduces the true one-way rates"""
     C.configure('schlogl')
     tr = _noiseless_schlogl()
     m = build_chart(chart.CONFIGS['schlogl']['chart'])
     info = fit_linear(m, dict(train=tr), C.DT, log=lambda *a: None)
     assert info['residual_theta'] < 1e-6
-    assert np.allclose(m.kinetics.core.detach().numpy(), true_log_k(), atol=1e-3)
+    c, drive = tr['c'][:2, 5], {k: v[:2] for k, v in tr['drive'].items()}
+    a, b = m.rates(c, drive)
+    at, bt = TR.true_rates(m.hg, drive, c)
+    assert float(((a - at).abs() / at).max()) < 1e-3 and float(((b - bt).abs() / bt).max()) < 1e-3
 
 
 def test_variable_projection_runs():

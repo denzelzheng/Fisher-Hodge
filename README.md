@@ -1,14 +1,20 @@
 # Neural Chart: thermodynamically consistent learned master equations
 
-The Neural Chart is a learned master equation on graphs and hypergraphs that is thermodynamically consistent by construction.
+The Neural Chart is a learned master equation on graphs and hypergraphs with a thermodynamic structure built in.
+It receives the state, the reaction and transport graph, and the conditions of a trajectory: the temperature, an external potential and drive, and the chemostat levels.
+It receives no thermochemical data.
 Every reaction or transport step $h$ has forward and backward rates $a_h, b_h = k_h\,e^{\pm f_h/2}$, each with the mass-action factor of the species it consumes.
-The thermodynamic force $f_h$ is fixed by physics: chemical potentials, chemostat levels, the external drive and the temperature.
-Only the mobility $k_h$ is learned, as $\log k_h = \log\omega_{c(h)} + g_\theta(\xi_h) + s\,m(\log s_h)$, with one constant $\omega_c$ per class of hyperedges, an MLP $g_\theta$ of local material descriptors $\xi_h$ and a monotone state term $m$.
-Local detailed balance, non-negative entropy production $\sigma\ge0$, conservation of every moiety and positivity therefore hold for every parameter value.
-The conditions enter only through $f$, and $k$ never reads them.
-This is why the model extrapolates in temperature, drive and chemostat levels.
+The force $f_h=-\langle S_h,\mu\rangle+A_h$ comes from a chemical potential $\mu=\log c+U/T+\mu^0_\theta/T$ and the drive $A_h$.
+The standard potentials $\mu^0_\theta$ are learned constants, and on the non-ideal Schlögl model $\mu$ also carries a learned activity correction $\ln\gamma_\theta(c)$.
+The conditions are wired in as $U/T$, the line integral of the external force divided by $T$, and the chemostat log-activities.
+The mobility is learned as $\log k_h = \log\omega_{c(h)} + g_\theta(\xi_h) + s\,m(\log s_h)$, with one constant $\omega_c$ per class of hyperedges, an MLP $g_\theta$ of local material descriptors $\xi_h$ and a monotone state term $m$.
 
-The fit has four steps. Physics fixes $f$. The mobility takes the form that the task supports. In porous media $\omega$ has one class (transport), $\xi_h$ holds 12 local porosity and connectivity descriptors, and $s_h$ is the mean density of the two cells of the edge. In the Brusselator and the other reaction networks $\omega$ has one class per reaction type and per diffusing species, and there are no descriptors and no state term. $\omega$ starts at its closed-form non-negative least-squares estimate, and all parameters are then refined on rollouts. A positivity-preserving adaptive SSP-RK2 integrates the model.
+Three consequences follow for every parameter value.
+Local detailed balance and $\sigma\ge0$ hold exactly with respect to the model's own force, and conservation of every moiety and positivity hold as well.
+The model's force matches the true physical force only as far as the learned $\mu^0_\theta$ are right, so we measure the fraction of hyperedges with flux against the true force and report it in the physics tables.
+The conditions still enter only through $f$, and $k$ never reads them, so the model extrapolates in temperature, drive and chemostat levels.
+
+The fit has four steps. The force takes the structure above. The mobility takes the form that the task supports. In porous media $\omega$ has one class (transport), $\xi_h$ holds 12 local porosity and connectivity descriptors, and $s_h$ is the mean density of the two cells of the edge. Porous media has no standard potentials. In the Brusselator and the other reaction networks $\omega$ has one class per reaction type and per diffusing species, and there are no descriptors and no state term. $\omega$ and $\mu^0_\theta$ start at their closed-form non-negative least-squares estimate, and all parameters are then refined on rollouts. A positivity-preserving adaptive SSP-RK2 integrates the model.
 [docs/method.md](docs/method.md) gives the details and the protocol.
 [docs/theory.md](docs/theory.md) gives the theory.
 
@@ -467,8 +473,9 @@ tests/                  unit and regression tests
 ## Theory
 
 [docs/theory.md](docs/theory.md) states the results behind the design.
-Theorem 0 shows that fixing the force and learning only the mobility gives the second law, exact transfer across conditions, a convex closed-form fit and a clear identifiability criterion for every parameter value.
-It also shows that gray-box models whose learned part sees the conditions, or that learn the force, lose these properties.
+Theorem 0 shows what the thermodynamic structure gives when the force is fixed by physics and only the mobility is learned: the second law, exact transfer across conditions, a convex closed-form fit and a clear identifiability criterion for every parameter value.
+It also shows which of these properties a model keeps when it learns part of the force, as the Neural Chart does with $\mu^0_\theta$, and that gray-box models whose learned part sees the conditions lose them.
+Theorem 0(iii)(d) and Theorem 2 explain why the standard potentials are only weakly identifiable from concentration data.
 The other results cover minimal observables, a Cramér–Rao bound for near-irreversible steps, closed-form coarse graining, and the information geometry of the chart.
 
 ## Licence

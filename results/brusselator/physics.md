@@ -1,17 +1,11 @@
 | Method | quantity | training conditions | b 3.2–3.7 | b 4.0–4.6 | a 1.3–1.5 (a and b outside training) | Turing regime (below the Hopf line) | 64×64 grid |
 |---|---|---|---|---|---|---|---|
-| Neural Chart | hyperedges violating local detailed balance | 0 | 0 | 0 | 0 | 0 | 0 |
+| Neural Chart | hyperedges violating local detailed balance | 0.017 | 0.021 | 0.017 | 0.022 | 0.011 | 0.014 |
 | Neural Chart | samples with sigma < 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | Neural Chart | negative concentration values (fraction) | 0 | 0 | 0 | 0 | 0 | 0 |
-| Neural Chart, learned standard potentials | hyperedges violating local detailed balance | 0.017 | 0.021 | 0.017 | 0.022 | 0.011 | 0.014 |
-| Neural Chart, learned standard potentials | samples with sigma < 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| Neural Chart, learned standard potentials | negative concentration values (fraction) | 0 | 0 | 0 | 0 | 0 | 0 |
-| Neural Chart, no convex initialisation | hyperedges violating local detailed balance | 0 | 0 | 0 | 0 | 0 | 0 |
-| Neural Chart, no convex initialisation | samples with sigma < 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| Neural Chart, no convex initialisation | negative concentration values (fraction) | 0 | 0 | 0 | 0 | 0 | 0 |
-| Neural Chart, reversible (no drive) | hyperedges violating local detailed balance | 0.332 | 0.333 | 0.324 | 0.333 | 0.333 | 0.250 |
-| Neural Chart, reversible (no drive) | samples with sigma < 0 | 7.8e-03 | 6.3e-03 | 1.6e-03 | 0.027 | 0.019 | 0 |
-| Neural Chart, reversible (no drive) | negative concentration values (fraction) | 0 | 0 | 0 | 0 | 0 | 0 |
+| Neural Chart, given standard potentials (oracle-type information) | hyperedges violating local detailed balance | 0 | 0 | 0 | 0 | 0 | 0 |
+| Neural Chart, given standard potentials (oracle-type information) | samples with sigma < 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Neural Chart, given standard potentials (oracle-type information) | negative concentration values (fraction) | 0 | 0 | 0 | 0 | 0 | 0 |
 | Oracle (true rates in the Neural Chart class) | hyperedges violating local detailed balance | 0 | 0 | 0 | 0 | 0 | 0 |
 | Oracle (true rates in the Neural Chart class) | samples with sigma < 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | Oracle (true rates in the Neural Chart class) | negative concentration values (fraction) | 0 | 0 | 0 | 0 | 0 | 0 |

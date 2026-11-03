@@ -1,7 +1,10 @@
 Method,quantity,training conditions (ATP 0.5–2),ATP 3–5,ATP 0.15–0.3,phosphorylated initial states
-Neural Chart,hyperedges violating local detailed balance,0.0,0.0,0.0,0.0
+Neural Chart,hyperedges violating local detailed balance,0.002897493131868132,0.0019101991758241758,0.021098042582417584,0.004700377747252747
 Neural Chart,samples with σ < 0,0.0,0.0,0.0,0.0
 Neural Chart,negative values,0.0,0.0,0.0,0.0
+"Neural Chart, given standard potentials (oracle-type information)",hyperedges violating local detailed balance,0.0,0.0,0.0,0.0
+"Neural Chart, given standard potentials (oracle-type information)",samples with σ < 0,0.0,0.0,0.0,0.0
+"Neural Chart, given standard potentials (oracle-type information)",negative values,0.0,0.0,0.0,0.0
 Oracle (true rates in the Neural Chart class),hyperedges violating local detailed balance,0.0,0.0,0.0,0.0
 Oracle (true rates in the Neural Chart class),samples with σ < 0,0.0,0.0,0.0,0.0
 Oracle (true rates in the Neural Chart class),negative values,0.0,0.0,0.0,0.0

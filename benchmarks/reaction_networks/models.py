@@ -1,9 +1,10 @@
 """Models of the reaction-network benchmarks: the Neural Chart of each network and the baselines.
 
-Neural Chart.  mu = log c + mu0 (+ ln gamma_theta(c) on the non-ideal Schloegl model), the drive is the chemostat force
-with the given chemostat potentials, log k is one value per hyperedge type (omega_c), and the chemostats also enter k
-through their mass-action factor.  The standard potentials mu0 are given (the reference model's values); the ablation
-chart-learned-mu0 learns them with k.  Schloegl models use the activity form of the rates (mass action in the activity),
+Neural Chart.  mu = log c + mu0 (+ ln gamma_theta(c) on the non-ideal Schloegl model), the drive is the chemostat force,
+log k is one value per hyperedge type (omega_c), and the chemostats also enter k through their mass-action factor.  The
+standard potentials mu0 of the species and the chemostats are learned together with k: they enter log a and log b
+linearly, so the closed-form step fits them with omega.  The variant chart-given-mu0 takes them from the reference model
+instead (the information an oracle would have) and learns k only.  Schloegl models use the activity form of the rates (mass action in the activity),
 the phosphorylation cycle and the MAPK cascade the split form.
 
 Baselines (inputs: the hyperedge type and the z-scored conditions; the phosphorylation cycle adds the potential):
@@ -163,8 +164,8 @@ def true_log_k():
 
 
 def build_chart(cfg, n=None, norm=None):
-    """the Neural Chart of a ChartConfig: log k = log omega over the hyperedge types; mu0 given (the reference values,
-    frozen) or learned; activity ideal, learned (ln gamma_theta with a zero gate) or true (oracle)"""
+    """the Neural Chart of a ChartConfig: log k = log omega over the hyperedge types; mu0 learned (with omega) or given
+    (the reference values, frozen); activity ideal, learned (ln gamma_theta with a zero gate) or true (oracle)"""
     n = C.N_TRAIN if n is None else n
     assert cfg.task in chart.REACTION_TASKS and cfg.kappa in ('learned', 'true') and not cfg.descriptors and not cfg.state
     if cfg.task != C.SYSTEM:
