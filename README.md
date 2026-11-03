@@ -104,6 +104,9 @@ Models that return only a state update have N/A there.
 The oracle is the Neural Chart class with the true rates, so its error is the discretisation and integration floor.
 Full tables, including training times, are in `results/<benchmark>/`.
 In the animations negative values are magenta, and the panel title counts the negative cells.
+Each benchmark also has a tracer animation.
+Tracers move with the probability velocity $v=J/\rho$ of one diffusing species, computed from each model's own flux.
+A tracer turns magenta in a cell with negative local entropy production, or in a cell touched by a step whose flux runs against the true force.
 
 ## Learned constitutive laws under new conditions
 
@@ -251,6 +254,12 @@ The learned $\ln\gamma$ has slope 0.998 against the truth over the training rang
 The entropy production read from the model has a relative error of 1.6e-3 to 0.022, and the cycle affinity matches the reference to three digits (`results/schlogl_nonideal/thermodynamic_readouts.md`).
 The few hyperedges counted against the true force (2e-5) sit where that force is close to zero.
 
+![Tracers, non-ideal Schlögl model](assets/schlogl_nonideal_track_high_concentration.gif)
+
+The tracers follow the transport flux of $X$ at higher concentrations, ten times faster than the clock in every panel.
+Over the clip 0.03 % of the cells of the Neural Chart are flagged.
+CRNN with mass action flags 83 %, the UDE closure 35 % and Flux-GNN almost every cell.
+
 ### Driven phosphorylation cycle
 
 A substrate $X$ is phosphorylated by an immobile enzyme, $X+E+\mathrm{ATP}\rightleftharpoons X_p+E+\mathrm{ADP}$, and dephosphorylated, $X_p\rightleftharpoons X$, on an 8×8 periodic grid.
@@ -293,6 +302,12 @@ The Neural Chart stays within a factor of 5 of the oracle on every test set, inc
 The best baseline, Flux-GNN, is at 2e-3 under the training conditions and at 0.11 in the new potential.
 CRNN with mass action has the right graph but one rate constant per class of steps, so it cannot represent the spatial potential, and it stays near 0.02.
 The entropy production read from the model has a relative error of 1.3e-3 to 2.5e-3, and the cycle affinity is 5.945 against 5.960 under the training conditions and 7.462 against 7.477 under the stronger drive (`results/phosphorylation_cycle/thermodynamic_readouts.md`).
+
+![Tracers, phosphorylation cycle](assets/phosphorylation_cycle_track_strong_drive.gif)
+
+The tracers follow the transport flux of $X$ under the stronger drive, four times faster than the clock.
+No cell of the Neural Chart is flagged over the clip.
+CRNN with mass action flags 41 % of the cells, Flux-GNN 72 % and the UDE closure 91 %.
 
 ## Ideal reaction networks
 
@@ -337,6 +352,11 @@ The Neural Chart and CRNN with mass action are both at the floor of the integrat
 The learned standard potentials give the cycle affinity of the reference to four digits, and the entropy production has a relative error of 1e-5 (`results/schlogl/thermodynamic_readouts.md`).
 The black boxes reach 1e-3 to 1e-2 in the training ranges and fail at the new chemostat levels, with errors near 1.
 GENERIC-FNO equals persistence on this task: its instance normalisation removes the spatial mean of every update, and the update collapses to zero.
+
+![Tracers, Schlögl model](assets/schlogl_track_high_a_low_b.gif)
+
+At new chemostat levels (a = 3.32, b = 0.40) the tracers of the Neural Chart and of CRNN with mass action follow the reference, and no cell is flagged.
+Flux-GNN flags 83 % of the cells and the UDE closure 97 %.
 
 ### Brusselator: oscillations and Turing patterns
 
@@ -387,6 +407,14 @@ In the Turing regime half of the test trajectories start from a uniform state, w
 In FP32 integration rounding noise can break the symmetry and grow into a pattern, so the error of these trajectories depends on rounding.
 This is the source of the 0.026 of CRNN with mass action in that column (`results/brusselator/NOTES.md`).
 
+![Tracers, Brusselator Turing regime](assets/brusselator_track_turing.gif)
+
+The tracer animation of the Turing trajectory above shows the limit of learned standard potentials.
+In the spots of high $X$ the step $A\to X$ runs backwards in the Neural Chart and in CRNN with mass action, and both flag 16 % of the cells.
+Its reverse rate is about 1e-3 of the forward rate and is not fixed by the training data.
+Flux-GNN flags 72 % of the cells.
+The UDE closure flags almost none, but its field collapses.
+
 ![Brusselator phase portraits](assets/brusselator_phase_portraits.png)
 
 ### MAPK cascade
@@ -429,6 +457,13 @@ Flux-GNN matches the Neural Chart under the training conditions (6.3e-3 against 
 At new ATP levels its error grows to 0.12 and 0.41, while the Neural Chart stays at 0.021 and 0.011 and CRNN with mass action at 0.027 and 0.020.
 ATP enters the Neural Chart only through the force, so a new ATP level changes no learned parameter.
 Here too the standard potentials are weakly determined: the cycle affinity of the first futile cycle is 20.7 against 17.0, and with the given potentials the error at low ATP drops from 0.011 to 1e-3 (`results/mapk_cascade/thermodynamic_readouts.md`).
+
+![Tracers, MAPK cascade](assets/mapk_cascade_track_low_atp.gif)
+
+The tracers follow phosphorylated MAPK ($K_p+K_{pp}$) at low ATP.
+Here the Neural Chart flags 57 % of the cells over the clip: at 12 of the 16 sites the step in which active MAPKKK binds MAPKK runs against a weak true force (about 0.27), because its learned force has the opposite sign.
+The state still follows the reference to 0.011.
+CRNN with mass action, Flux-GNN and the UDE closure flag 91 to 100 % of the cells.
 
 ## How each part contributes
 
