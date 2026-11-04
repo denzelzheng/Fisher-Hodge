@@ -1,0 +1,8 @@
+Method,"RMSE, training range","largest error, training range","RMSE, extension to the high-concentration range","slope, learned against true"
+Neural Chart,0.006050161929360007,0.009874328079622158,0.0018725904250562811,0.992995736006715
+"Neural Chart, given standard potentials (oracle-type information)",0.0031788522658444287,0.008484318927436618,0.013946461098625261,1.0019563290438451
+"Neural Chart, ideal activities",0.6135445394696019,1.2556675663616619,1.3042204081160589,0.0
+"Neural Chart, ideal-fit initialisation",0.9134422923369635,1.8344234899050902,1.8975099443751935,-0.4881588121329344
+"Neural Chart, no convex initialisation",0.9070657288967937,1.7492626965986544,1.806485682207358,-0.38475515901596286
+"Neural Chart, reversible (no drive)",0.6135445394696019,1.2556675663616619,1.3042204081160589,0.0
+Oracle (true rates in the Neural Chart class),0.0,0.0,0.0,1.0

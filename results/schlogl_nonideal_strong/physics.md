@@ -1,0 +1,32 @@
+| Method | quantity | training conditions | a 4.6–5.0, b 2.0–3.5 | 16×16 grid |
+|---|---|---|---|---|
+| Neural Chart | hyperedges violating local detailed balance | 1.9e-05 | 6.3e-05 | 9.5e-06 |
+| Neural Chart | samples with σ < 0 | 0 | 0 | 0 |
+| Neural Chart | negative values | 0 | 0 | 0 |
+| Neural Chart, given standard potentials (oracle-type information) | hyperedges violating local detailed balance | 1.9e-05 | 2.1e-05 | 0 |
+| Neural Chart, given standard potentials (oracle-type information) | samples with σ < 0 | 0 | 0 | 0 |
+| Neural Chart, given standard potentials (oracle-type information) | negative values | 0 | 0 | 0 |
+| Oracle (true rates in the Neural Chart class) | hyperedges violating local detailed balance | 0 | 0 | 0 |
+| Oracle (true rates in the Neural Chart class) | samples with σ < 0 | 0 | 0 | 0 |
+| Oracle (true rates in the Neural Chart class) | negative values | 0 | 0 | 0 |
+| CRNN (mass action) | hyperedges violating local detailed balance | 0.109 | 0.160 | 0.186 |
+| CRNN (mass action) | samples with σ < 0 | 0 | 0.021 | 0 |
+| CRNN (mass action) | negative values | 0 | 0 | 0 |
+| CRNN (condition features) | hyperedges violating local detailed balance | 0.107 | 0.106 | 0.098 |
+| CRNN (condition features) | samples with σ < 0 | 0 | 0.060 | 0 |
+| CRNN (condition features) | negative values | 0 | 0 | 0 |
+| UDE closure | hyperedges violating local detailed balance | 0.300 | 0.404 | 0.287 |
+| UDE closure | samples with σ < 0 | 0.467 | 0.631 | 0.381 |
+| UDE closure | negative values | 0 | 0 | 0 |
+| Flux-GNN | hyperedges violating local detailed balance | 0.544 | 0.499 | 0.490 |
+| Flux-GNN | samples with σ < 0 | 0.955 | 1.000 | 0.851 |
+| Flux-GNN | negative values | 0 | 0 | 0 |
+| FNO | hyperedges violating local detailed balance | N/A | N/A | N/A |
+| FNO | samples with σ < 0 | N/A | N/A | N/A |
+| FNO | negative values | 0 | 0 | 2.9e-04 |
+| BSMS-GNN | hyperedges violating local detailed balance | N/A | N/A | N/A |
+| BSMS-GNN | samples with σ < 0 | N/A | N/A | N/A |
+| BSMS-GNN | negative values | 0 | 0 | 0 |
+| GENERIC-FNO | hyperedges violating local detailed balance | N/A | N/A | N/A |
+| GENERIC-FNO | samples with σ < 0 | N/A | N/A | N/A |
+| GENERIC-FNO | negative values | 0 | 0 | 0 |
