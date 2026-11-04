@@ -23,6 +23,13 @@ def random_condition(bench, n, B, g):
     if bench == 'phosphorylation_cycle':
         return dict(U=0.5 * torch.randn(B, n * n, generator=g, dtype=torch.float64),
                     dG=torch.empty(B, dtype=torch.float64).uniform_(0.5, 4, generator=g))
+    if bench == 'phosphorylation_heterogeneous':
+        H = TR.hg_of(n).H
+        return dict(U=0.5 * torch.randn(B, n * n, generator=g, dtype=torch.float64),
+                    dG=torch.empty(B, dtype=torch.float64).uniform_(0.5, 4, generator=g),
+                    logm=0.5 * torch.randn(B, H, generator=g, dtype=torch.float64),
+                    edge=torch.randn(B, H, 3, generator=g, dtype=torch.float64),
+                    dsite=torch.randn(B, n * n, 3, generator=g, dtype=torch.float64))
     return dict(logab=torch.stack([torch.empty(B, dtype=torch.float64).uniform_(1.0, 1.4, generator=g),
                                    torch.empty(B, dtype=torch.float64).uniform_(-1.5, 1.3, generator=g)], 1))
 
@@ -100,6 +107,43 @@ def test_closed_form_step_with_learned_potentials_fits_the_rates():
     a, b = m.rates(c, drive)
     at, bt = TR.true_rates(m.hg, drive, c)
     assert float(((a - at).abs() / at).max()) < 1e-3 and float(((b - bt).abs() / bt).max()) < 1e-3
+
+
+def test_rejected_activity_term_is_frozen():
+    from neuralchart.fit import apply_activity_decision
+    C.configure('schlogl')
+    m = build_chart(chart.CONFIGS['schlogl']['chart'])
+    apply_activity_decision(m, dict(kept=False))
+    assert not any(p.requires_grad for p in state_function_parameters(m)) and float(m.free_energy.s_mu.abs().max()) == 0
+    m = build_chart(chart.CONFIGS['schlogl']['chart'])
+    apply_activity_decision(m, dict(kept=True))
+    assert all(p.requires_grad for p in state_function_parameters(m))
+
+
+def test_heterogeneous_medium():
+    """the descriptors enter only through g_theta, which starts at zero, and k does not read the conditions; the medium
+    is reproducible and the law is the documented one on a constant map"""
+    C.configure('phosphorylation_heterogeneous')
+    cfg = chart.CONFIGS['phosphorylation_heterogeneous']
+    m = build_chart(cfg['chart'])
+    g = torch.Generator().manual_seed(2)
+    dr = random_condition('phosphorylation_heterogeneous', C.N_TRAIN, 3, g)
+    k = m.prepare(dr)['k']
+    typ = torch.as_tensor(m.hg.meta['typ'])
+    for t in range(4):
+        assert float(k[:, typ == t].std()) < 1e-12                 # g = 0 at initialisation: one constant per class
+    assert m.kinetics.residual is not None and build_chart(cfg['chart-const-k']).kinetics.residual is None
+    with torch.no_grad():
+        for p in m.kinetics.residual.parameters():
+            p.add_(0.1 * torch.randn(p.shape, generator=g, dtype=p.dtype))
+    k1 = m.prepare(dr)['k']
+    dr2 = dict(dr, dG=dr['dG'] + 1.0, U=dr['U'] * 0.5)
+    assert torch.allclose(m.prepare(dr2)['k'], k1)                  # conditions do not enter k
+    n, P = C.N_TRAIN, TR.PIXELS
+    logm = TR.medium_log_factors(np.zeros((n * P, n * P)), TR.hg_of(n), n)
+    tm = np.asarray(TR.hg_of(n).meta['typ'])
+    assert abs(logm[tm == 0]).max() < 1e-12 and abs(logm[tm == 1] + 1.0).max() < 1e-12      # exp(1 - 2) at H = 0
+    C.configure('schlogl')
 
 
 def test_variable_projection_runs():

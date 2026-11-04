@@ -11,6 +11,16 @@ R1  X + E + ATP <-> Xp + E + ADP, driven by dG = log(ATP / ADP) with ATP ADP = 1
 R2  Xp <-> X (phosphatase), k2 Xp and k2' X;  X and Xp diffuse in a smooth potential U,
 J = D (c_i e^{(U_i - U_j)/2} - c_j e^{(U_j - U_i)/2}).  k1 = 2, k2 = 1, k2' = 0.02, D = 1.
 
+Heterogeneous phosphorylation cycle (phosphorylation_heterogeneous): the same network and conditions on a medium, a
+hidden periodic map H(x) drawn per medium at 8 pixels per site.  Every hyperedge's symmetric rate constant is multiplied
+by a nonlinear function of H, which does not read the conditions (the thermodynamic force is unchanged):
+    R1 at site v   mean over the pixels of the cell of exp(1.2 tanh(1.5 H))
+    R2 at site v   mean over the pixels of the cell of exp(1 - 2 exp(-H^2))        (non-monotone: inhibited near H = 0)
+    transport of X  harmonic mean of exp(0.8 tanh(1.5 H)) over the 8 pixels between the two cell centres
+    transport of Xp harmonic mean of exp(-0.6 tanh(1.5 H)) over the same pixels
+The models never see H or k.  They see 3 descriptors per hyperedge, from the mean and the standard deviation of H in the
+cells (medium_descriptors).
+
 MAPK cascade (mapk_cascade): three tiers with the Huang-Ferrell structure on the 4 x 4 grid.  Dual phosphorylation of
 MAPKK and MAPK; every enzymatic step is binding E + S <-> ES followed by catalysis ES (+ ATP) <-> E + P (+ ADP or Pi);
 mass action throughout; ATP, ADP and Pi are chemostats.  The rate constants are dimensionless example values (the
@@ -58,7 +68,8 @@ def phi_of():
 
 def n_channels():
     """state species per site"""
-    return dict(schlogl_nonideal=1, schlogl_nonideal_strong=1, schlogl=1, phosphorylation_cycle=3, mapk_cascade=22)[C.SYSTEM]
+    return dict(schlogl_nonideal=1, schlogl_nonideal_strong=1, schlogl=1, phosphorylation_cycle=3,
+                phosphorylation_heterogeneous=3, mapk_cascade=22)[C.SYSTEM]
 
 
 # ------------------------------------------------------------------------------------------ Schloegl
@@ -183,11 +194,11 @@ def schlogl_hg(n=8):
 
 
 def hg_of(n):
-    key = (C.SYSTEM if C.SYSTEM in ('phosphorylation_cycle', 'mapk_cascade') else 'schlogl', n)
+    key = ('mapk_cascade' if C.SYSTEM == 'mapk_cascade' else 'phosphorylation_cycle' if C.is_pc() else 'schlogl', n)
     if key not in _HG:
         if C.SYSTEM == 'mapk_cascade':
             _HG[key] = mapk_hg(n)
-        elif C.SYSTEM == 'phosphorylation_cycle':
+        elif C.is_pc():
             _HG[key] = Hypergraph.reaction_transport(PC_SPECIES, PC_RX, grid_n=n, diffusing=['X', 'Xp'], chemostats=['ATP', 'ADP'])
         else:
             _HG[key] = schlogl_hg(n)
@@ -211,6 +222,8 @@ def pc_log_constants(hg, drive):
     Bn, V = U.shape
     typ = torch.as_tensor(hg.meta['typ'])
     lk = torch.tensor([math.log(PC_K1), 0.5 * math.log(PC_K2 * PC_K2R), math.log(PC_D), math.log(PC_D)], dtype=torch.float64)[typ]
+    if drive.get('logm') is not None:                          # the medium: log factor of k per hyperedge
+        lk = lk + drive['logm'].double().cpu()
     A = torch.zeros(Bn, hg.H, dtype=torch.float64)
     A[:, typ == 0] = dG[:, None]
     A[:, typ == 1] = math.log(PC_K2 / PC_K2R)
@@ -224,7 +237,7 @@ def true_rates(hg, drive, c):
     dict (or the (log a, log b) tensor of the Schloegl models)"""
     if C.SYSTEM == 'mapk_cascade':
         return mapk_true_rates(hg, drive['logc'].double().cpu())(c.double().cpu())
-    if C.SYSTEM == 'phosphorylation_cycle':
+    if C.is_pc():
         la, lb = pc_log_constants(hg, drive)
         c = c.double().cpu()
         return torch.exp(la) * hg.mass_action(c, '+'), torch.exp(lb) * hg.mass_action(c, '-')
@@ -256,7 +269,7 @@ def model_cycle_affinity(la, V):
 
 
 def truth_cycle_affinity(drive):
-    if C.SYSTEM == 'phosphorylation_cycle':
+    if C.is_pc():
         return (drive['dG'].double().cpu().reshape(-1) + math.log(PC_K2 / PC_K2R)).numpy()
     return np.array([true_cycle_affinity(math.exp(x), math.exp(y)) for x, y in drive['logab'].double().cpu().tolist()])
 
@@ -287,10 +300,76 @@ def solve_schlogl(n, a, b, c0, nsteps):
     return sol.y.T
 
 
-def solve_pc(n, U, dG, c0, nsteps):
+PIXELS = 8                                       # pixels of the hidden map per site, heterogeneous media
+
+
+def medium_map(rng, n, smooth_field):
+    """the hidden map H on (n * PIXELS)^2 pixels, standard deviation 1: wavenumbers up to 2 n / 8 (weight 0.7 of the
+    variance) and up to 6 n / 8 (0.3), so the same correlation length in sites on every grid"""
+    N, s = n * PIXELS, n // 8
+    H = np.sqrt(0.7) * smooth_field(rng, N, 2 * s, 1.0) + np.sqrt(0.3) * smooth_field(rng, N, 6 * s, 1.0)
+    return (H / H.std()).reshape(N, N)
+
+
+def _cell_mean(f, n):
+    return f.reshape(n, PIXELS, n, PIXELS).mean((1, 3)).ravel()
+
+
+def _segments(hg, n):
+    """pixels (rows, cols) (E, PIXELS) on the straight line between the cell centres of every transport hyperedge"""
+    odd = np.asarray(hg.meta['odd'])
+    et, eh = np.asarray(hg.meta['et'])[odd], np.asarray(hg.meta['eh'])[odd]
+    ri, ci, rj, cj = et // n, et % n, eh // n, eh % n
+    wrap = lambda d: (d + n // 2) % n - n // 2
+    dr, dc = wrap(rj - ri), wrap(cj - ci)
+    t = (np.arange(PIXELS) + 0.5) / PIXELS
+    row = np.floor((ri[:, None] + 0.5 + t * dr[:, None]) * PIXELS).astype(int) % (n * PIXELS)
+    col = np.floor((ci[:, None] + 0.5 + t * dc[:, None]) * PIXELS).astype(int) % (n * PIXELS)
+    return row, col
+
+
+def medium_log_factors(H, hg, n):
+    """log factor of the true k per hyperedge (H,) for the map H (the law in the module docstring)"""
+    typ, odd = np.asarray(hg.meta['typ']), np.asarray(hg.meta['odd'])
+    V = n * n
+    out = np.zeros(hg.H)
+    site = np.arange(hg.H) % V
+    r1 = _cell_mean(np.exp(1.2 * np.tanh(1.5 * H)), n)
+    r2 = _cell_mean(np.exp(1.0 - 2.0 * np.exp(-H ** 2)), n)
+    out[typ == 0] = np.log(r1[site[typ == 0]])
+    out[typ == 1] = np.log(r2[site[typ == 1]])
+    row, col = _segments(hg, n)
+    tt = typ[odd]
+    gx, gp = np.exp(0.8 * np.tanh(1.5 * H)), np.exp(-0.6 * np.tanh(1.5 * H))
+    harm = lambda g: PIXELS / (1.0 / g[row, col]).sum(1)
+    out[odd] = np.log(np.where(tt == 2, harm(gx), harm(gp)))
+    return out
+
+
+def medium_descriptors(H, hg, n):
+    """what the models see of the medium.  Per site (V, 3): mean of H in the cell m, its standard deviation s in the
+    cell, the mean of m over the 4 neighbours.  Per hyperedge (H, 3): the site values on a reaction; on a transport
+    hyperedge the mean of m at the two ends, the mean of s, and |m_i - m_j| (orientation invariant)."""
+    typ, odd = np.asarray(hg.meta['typ']), np.asarray(hg.meta['odd'])
+    V = n * n
+    mean = _cell_mean(H, n)
+    std = np.sqrt(np.maximum(_cell_mean(H ** 2, n) - mean ** 2, 0.0))
+    g = mean.reshape(n, n)
+    nb = 0.25 * (np.roll(g, 1, 0) + np.roll(g, -1, 0) + np.roll(g, 1, 1) + np.roll(g, -1, 1)).ravel()
+    site = np.stack([mean, std, nb], 1)
+    edge = np.zeros((hg.H, 3))
+    idx = np.arange(hg.H) % V
+    edge[~odd] = site[idx[~odd]]
+    et, eh = np.asarray(hg.meta['et'])[odd], np.asarray(hg.meta['eh'])[odd]
+    edge[odd] = np.stack([0.5 * (mean[et] + mean[eh]), 0.5 * (std[et] + std[eh]), np.abs(mean[et] - mean[eh])], 1)
+    return site, edge
+
+
+def solve_pc(n, U, dG, c0, nsteps, logm=None):
     from scipy.integrate import solve_ivp
     hg = hg_of(n)
-    la, lb = pc_log_constants(hg, dict(U=torch.as_tensor(U)[None], dG=torch.tensor([dG])))
+    la, lb = pc_log_constants(hg, dict(U=torch.as_tensor(U)[None], dG=torch.tensor([dG]),
+                                       logm=None if logm is None else torch.as_tensor(logm)[None]))
     ka, kb = np.exp(la[0].numpy()), np.exp(lb[0].numpy())
     Np, Nm = hg.Np.tocsr(), hg.Nm.tocsr()
     S = (hg.Nm - hg.Np).T.tocsr()

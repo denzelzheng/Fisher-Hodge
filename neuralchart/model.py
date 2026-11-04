@@ -239,12 +239,14 @@ class Mobility(nn.Module):
       core     one log rate per hyperedge type (core='type') or per hyperedge (core='edge'), zero at initialisation;
       r_theta  an MLP of the orientation-invariant hyperedge features, gated by s_k, which starts at zero.
                table=True drops it (log k is the core table alone).
+    descriptors=True: the MLP is g_theta of the class one-hot and the local descriptors (64 hidden units, no gate, the last
+    layer starts at zero), as on porous media.
     p = 1 is the Einstein relation, p = 0 keeps k independent of temperature.  chem_prefactor=True: chemostatted
     reactants and products also multiply k by their mass-action factor exp(<nu+ + nu-, log c_chem> / 2)."""
     rho_dependent = False
 
     def __init__(s, n_edge_feats, hidden=32, k_ref=1.0, T_exponent=1.0, hg=None, table=False, chem_prefactor=True,
-                 core='type', residual=None):
+                 core='type', residual=None, descriptors=False):
         super().__init__()
         assert core in ('type', 'edge') and hg is not None
         s.chem_prefactor, s.core_kind = chem_prefactor, core
@@ -252,6 +254,8 @@ class Mobility(nn.Module):
         s.core = nn.Parameter(torch.zeros(n_core))
         s.residual = MLP(n_edge_feats, hidden, 1) if (residual if residual is not None else not table) else None
         s.s_k = nn.Parameter(torch.zeros(())) if s.residual is not None else None
+        if descriptors:                                # g_theta of the local descriptors, the last layer starts at zero
+            s.residual, s.s_k = MLP(n_edge_feats, 64, 1, last='zero'), None
         s.register_buffer('k_ref', torch.as_tensor(k_ref, dtype=torch.get_default_dtype()))
         s.p = T_exponent
         s.hg = hg
@@ -262,7 +266,8 @@ class Mobility(nn.Module):
         core = s.core.to(x.dtype)
         kap = (core[s.hg.on(x.device, x.dtype)['typ']] if s.core_kind == 'type' else core)[None].expand(x.shape[0], -1)
         if s.residual is not None:
-            kap = kap + s.s_k.to(x.dtype) * s.residual(x).squeeze(-1)
+            g = s.residual(x.to(s.residual.net[0].weight.dtype)).squeeze(-1).to(x.dtype)
+            kap = kap + (g if s.s_k is None else s.s_k.to(x.dtype) * g)
         return kap
 
     def forward(s, feats, hg=None, c=None):
@@ -351,12 +356,13 @@ class MasterEquation(nn.Module):
     @classmethod
     def from_parts(cls, hg, hidden=32, k_ref=1.0, T_exponent=1.0, harmonic=True, featurizer=None, step=None,
               learn_mu0=False, learn_chem_mu0=False, kinetics_table=False, chem_prefactor=True, kinetics_core='type',
-              activity_correction=False, rho_scale=1.0, chem_mu0_known=None, activity_anchor=False):
+              activity_correction=False, rho_scale=1.0, chem_mu0_known=None, activity_anchor=False,
+              kinetics_descriptors=False):
         """kinetics_table=True: log k is the core table alone; kinetics_core='edge': one log rate per hyperedge;
         activity_correction=True: the learned activity correction of FreeEnergy."""
         feat = featurizer or globals()['featurizer'](hg)
         kin = Mobility(feat.n_edge_sym, hidden, k_ref=k_ref, T_exponent=T_exponent, hg=hg, table=kinetics_table,
-                       chem_prefactor=chem_prefactor, core=kinetics_core)
+                       chem_prefactor=chem_prefactor, core=kinetics_core, descriptors=kinetics_descriptors)
         fe = FreeEnergy(hg, learn_mu0, residual=activity_correction, rho_scale=rho_scale, residual_anchor=activity_anchor)
         dr = Drive(hg, harmonic, learn_chem_mu0, chem_mu0_known)
         return cls(hg, fe, kin, dr, feat, step)

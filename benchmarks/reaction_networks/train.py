@@ -159,7 +159,7 @@ def run_generic_fno(model, tr, iters, seed, device, log, norm):
     N, T1 = tr['c'].shape[:2]
     X = (tr['c'].float().cpu() / norm['c_scale']).reshape(N, T1, model.NS, n, n)
     ctx = model.prepare({k: v.float() for k, v in tr['drive'].items()})
-    cond = model.cond_fields(ctx['z'], ctx.get('U'), n).cpu()
+    cond = model.cond_fields(ctx['z'], ctx.get('U'), n, ctx.get('dsite')).cpu()
     t0 = time.time()
     info = train_generic(model.net, X, cond, steps=iters, device=device, seed=seed, log=log)
     info.pop('loss_curve', None)

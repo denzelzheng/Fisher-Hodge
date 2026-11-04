@@ -7,7 +7,7 @@ from ..common import RESULTS, LABELS, OWN_FLUX, activity_table, fmt, write_table
 from . import config as C
 
 MAIN = ['chart', 'chart-given-mu0', 'flux_gnn', 'crnn_mass_action', 'crnn_features', 'ude', 'fno', 'bsms', 'generic_fno', 'persistence']
-ABLATIONS = ['chart', 'chart-given-mu0', 'chart-ideal', 'chart-no-varpro', 'chart-zero-init', 'chart-reversible', 'flux_gnn']
+ABLATIONS = ['chart', 'chart-given-mu0', 'chart-const-k', 'chart-ideal', 'chart-no-varpro', 'chart-zero-init', 'chart-reversible', 'flux_gnn']
 
 
 def _cols():
@@ -86,6 +86,18 @@ def lngamma_curve_table(R, stem, models=('chart', 'chart-given-mu0')):
     return write_table(stem, ['concentration x', 'true ln γ'] + [f'{LABELS[m]}, learned ln γ' for m, _ in G], rows)
 
 
+def k_law_table(R, models, stem):
+    """the learned rate constant against the true one on unseen media, per test set and hyperedge class"""
+    rows = []
+    for m in models:
+        S = (R.get(m) or {}).get('sets', {})
+        for s, lab in _cols():
+            for cl, g in ((S.get(s) or {}).get('k_law') or {}).items():
+                rows.append([LABELS[m], lab, cl, g['pearson_logk'], g['spearman_logk'], g['relerr_k'], f'{g["median_logratio"]:+.2f}', g['std_log_true']])
+    return write_table(stem, ['Method', 'test set', 'hyperedges', 'Pearson r of log k', 'Spearman r of log k', 'relative L2 error of k',
+                              'median log ratio (learned / true)', 'standard deviation of the true log k'], rows)
+
+
 def mapk_table(R, models, stem):
     cols = _cols()
     rows = []
@@ -132,6 +144,8 @@ def make_tables(runs=None):
         lngamma_curve_table(R, os.path.join(out, 'activity_coefficient_curve'))
     if C.SYSTEM == 'mapk_cascade':
         mapk_table(R, MAIN + ABLATIONS[2:-1], os.path.join(out, 'conservation_and_output'))
+    if C.hetero():
+        k_law_table(R, ['chart', 'chart-given-mu0', 'chart-const-k'], os.path.join(out, 'law'))
     if C.SYSTEM == 'schlogl':
         front_table(R, MAIN + ABLATIONS[2:-1], os.path.join(out, 'fronts'))
     print(open(os.path.join(out, 'main.md')).read())

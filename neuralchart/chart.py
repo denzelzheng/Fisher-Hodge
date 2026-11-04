@@ -31,8 +31,9 @@ from .model import MasterEquation
 from .fit import fit_chart  # noqa: F401  (re-exported)
 
 TASKS = ('porous_media', 'brusselator', 'schlogl', 'schlogl_nonideal', 'schlogl_nonideal_strong', 'phosphorylation_cycle',
-         'mapk_cascade')
-REACTION_TASKS = ('schlogl', 'schlogl_nonideal', 'schlogl_nonideal_strong', 'phosphorylation_cycle', 'mapk_cascade')
+         'phosphorylation_heterogeneous', 'mapk_cascade')
+REACTION_TASKS = ('schlogl', 'schlogl_nonideal', 'schlogl_nonideal_strong', 'phosphorylation_cycle',
+                  'phosphorylation_heterogeneous', 'mapk_cascade')
 # the module that assembles the Neural Chart of each task (build_chart(cfg, **task inputs))
 BUILDERS = dict(porous_media='benchmarks.porous_media.models', brusselator='benchmarks.brusselator.models',
                 **{t: 'benchmarks.reaction_networks.models' for t in REACTION_TASKS})
@@ -45,7 +46,8 @@ class ChartConfig:
                  porous media has no standard potentials and uses 'given', i.e. none)
     drive        'fixed' (the physical drive), 'off' (A = 0: the reversible ablation) or 'learned_scale' (a learned
                  global drive scale)
-    descriptors  g_theta(xi) in log k;  state: s * m(log state) in log k (needs descriptors)
+    descriptors  g_theta(xi) in log k, where the benchmark has local descriptors;  state: s * m(log state) in log k (needs
+                 descriptors; only the mobility of porous media implements it)
     kappa        'learned', 'true' (the true k: oracle) or 'true_material' (porous media with crowding: the true
                  material mobility without the crowding factor)
     init         'nnls' (closed-form omega) or 'one' (omega = 1: the ablation without convex initialisation)
@@ -73,7 +75,6 @@ class ChartConfig:
         assert s.activity in ('ideal', 'learned', 'true') and (s.activity != 'true' or s.task in REACTION_TASKS)
         assert s.kappa in ('learned', 'true', 'true_material') and s.init in ('nnls', 'one')
         assert s.descriptors or not s.state, 'the state term needs the descriptor model'
-        assert s.task == 'porous_media' or not (s.descriptors or s.state), 'only porous media has descriptors'
         assert s.task == 'porous_media' or s.kappa != 'true_material'
 
     def replace(s, **kw):
@@ -97,15 +98,16 @@ def _nonideal(base):
     }
 
 
-def _reaction(task):
-    base = ChartConfig(task=task, mu0='learned', rtol=1e-4)
+def _reaction(task, descriptors=False):
+    base = ChartConfig(task=task, mu0='learned', rtol=1e-4, descriptors=descriptors)
     return {
         'chart': base,
+        **({'chart-const-k': base.replace(descriptors=False)} if descriptors else {}),
         'chart-ideal': base.replace(activity='ideal'),
         'chart-given-mu0': base.replace(mu0='given'),
         'chart-zero-init': base.replace(init='one'),
         'chart-reversible': base.replace(drive='off'),
-        'oracle': base.replace(mu0='given', activity='ideal', kappa='true', train=False),
+        'oracle': base.replace(mu0='given', activity='ideal', kappa='true', descriptors=False, train=False),
     }
 
 
@@ -132,6 +134,7 @@ CONFIGS = {
     'schlogl_nonideal_strong': _nonideal(_C5.replace(task='schlogl_nonideal_strong')),
     'schlogl': _reaction('schlogl'),
     'phosphorylation_cycle': _reaction('phosphorylation_cycle'),
+    'phosphorylation_heterogeneous': _reaction('phosphorylation_heterogeneous', descriptors=True),
     'mapk_cascade': _reaction('mapk_cascade'),
 }
 

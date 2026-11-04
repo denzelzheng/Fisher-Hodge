@@ -12,6 +12,8 @@ Schloegl model with strong crowding (schlogl_nonideal_strong; a and b uniform, n
   high_a (16 x 200): a 4.6–5.0, b 2.0–3.5
 Phosphorylation cycle (DT 0.05): train (48 x 100 steps), train_conditions (dG 1–3, potential amplitude 0.7),
   strong_drive (dG 3–4), strong_potential (amplitude 1.2 and finer: wavenumbers up to 3 instead of 2), grid16.
+Heterogeneous phosphorylation cycle (phosphorylation_heterogeneous; DT 0.05): the sets of the phosphorylation cycle, every
+  trajectory on its own random medium (truth.medium_map), so the test sets are on unseen media.
 MAPK cascade (DT 0.5): train (48 x 20 steps), train_conditions (ATP 0.5–2), high_atp (3–5), low_atp (0.15–0.3),
   phosphorylated_start (ATP 0.5–2, most of every tier phosphorylated at t = 0); ADP = Pi = 1; 200 test steps.
 
@@ -108,15 +110,24 @@ def make_set_schlogl(name):
 
 def make_set_pc(name):
     count, nsteps, n, seed, kind = GEN_PC[name]
-    rng = np.random.default_rng(seed)
+    rng = np.random.default_rng(seed + (700 if C.hetero() else 0))
     out = dict(c=[], U=[], dG=[])
+    if C.hetero():
+        out.update(logm=[], edge=[], dsite=[])
     s = n // 8                                       # smooth fields scaled to the grid size
     for i in range(count):
         U = smooth_field(rng, n, 3 * s, 1.2) if kind == 'potential' else smooth_field(rng, n, 2 * s, 0.7)
         dG = rng.uniform(3, 4) if kind == 'drive' else rng.uniform(1, 3)
         X0 = 0.6 * np.exp(smooth_field(rng, n, 2 * s, 0.4)); Xp0 = 0.4 * np.exp(smooth_field(rng, n, 2 * s, 0.4))
         E0 = np.exp(smooth_field(rng, n, 2 * s, 0.4))
-        out['c'].append(TR.solve_pc(n, U, dG, np.concatenate([X0, Xp0, E0]), nsteps)); out['U'].append(U); out['dG'].append(dG)
+        logm = None
+        if C.hetero():
+            hg = TR.hg_of(n)
+            H = TR.medium_map(rng, n, smooth_field)
+            logm = TR.medium_log_factors(H, hg, n)
+            site, edge = TR.medium_descriptors(H, hg, n)
+            out['logm'].append(logm); out['edge'].append(edge); out['dsite'].append(site)
+        out['c'].append(TR.solve_pc(n, U, dG, np.concatenate([X0, Xp0, E0]), nsteps, logm)); out['U'].append(U); out['dG'].append(dG)
     d = {k: torch.tensor(np.array(v)) for k, v in out.items()}
     d['n'] = n
     return d
@@ -174,7 +185,7 @@ def generate(names=None, out=None):
         res = make_sets_mapk(names)
     else:
         from multiprocessing import get_context
-        fn = make_set_pc if C.SYSTEM == 'phosphorylation_cycle' else make_set_schlogl
+        fn = make_set_pc if C.is_pc() else make_set_schlogl
         with get_context('fork').Pool(len(names)) as pool:
             res = dict(zip(names, pool.map(fn, names)))
     for name, d in res.items():
@@ -189,8 +200,10 @@ def load_set(name, device='cpu'):
     d['c'] = d['c'].to(device)
     if C.SYSTEM == 'mapk_cascade':
         d['drive'] = dict(logc=d['logc'].double().to(device))
-    elif C.SYSTEM == 'phosphorylation_cycle':
+    elif C.is_pc():
         d['drive'] = dict(U=d['U'].double().to(device), dG=d['dG'].double().to(device))
+        if C.hetero():
+            d['drive'].update({k: d[k].double().to(device) for k in ('logm', 'edge', 'dsite')})
     else:
         d['drive'] = dict(logab=d['logab'].double().to(device))
     return d
@@ -202,7 +215,7 @@ def train_norm():
     if C.SYSTEM == 'mapk_cascade':
         return dict(logATP_mean=float(tr['logc'][:, 0].mean()), logATP_std=float(tr['logc'][:, 0].std()),
                     c_scale=float(tr['c'].mean()), c_min=float(tr['c'].min()), c_max=float(tr['c'].max()))
-    if C.SYSTEM == 'phosphorylation_cycle':
+    if C.is_pc():
         V = tr['n'] ** 2
         return dict(dG_mean=float(tr['dG'].mean()), dG_std=float(tr['dG'].std()), U_std=float(tr['U'].std()),
                     c_scale=float(tr['c'].mean()), c_min=float(tr['c'].min()), c_max=float(tr['c'].max()), V=V)

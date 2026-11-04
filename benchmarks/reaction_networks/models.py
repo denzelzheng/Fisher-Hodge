@@ -25,7 +25,7 @@ import torch.nn.functional as Fn
 
 from neuralchart import fast
 from neuralchart import chart
-from neuralchart.model import FreeEnergy, MLP, Context, featurizer as base_featurizer
+from neuralchart.model import FreeEnergy, MLP, Mobility, Context, featurizer as base_featurizer
 from neuralchart.fit import set_to_rates
 from neuralchart.graphs import grid_edge_list
 from . import config as C
@@ -73,16 +73,30 @@ def chem_featurizer(hg):
     return feat
 
 
-def pc_featurizer(hg):
+DESCRIPTORS = ('m', 's', 'n')                   # the 3 local descriptors per hyperedge of the heterogeneous media
+
+
+def pc_featurizer(hg, descriptors=False):
     """phosphorylation cycle: drive dict(U (B, V), dG (B,)) -> potential U on X and Xp (0 on E), chemostats ATP, ADP at
-    log c = +-dG / 2 (ATP ADP = 1), the hyperedge type as the only mobility feature"""
-    base = base_featurizer(hg)
+    log c = +-dG / 2 (ATP ADP = 1); mobility features: the hyperedge type and, when they exist, the local descriptors"""
+    base = base_featurizer(hg, DESCRIPTORS if descriptors else ())
 
     def feat(F):
         U, dG = F['U'], F['dG'].reshape(-1)
-        return base(dict(U=torch.cat([U, U, torch.zeros_like(U)], 1), chem_logc=torch.stack([0.5 * dG, -0.5 * dG], 1)))
+        d = dict(U=torch.cat([U, U, torch.zeros_like(U)], 1), chem_logc=torch.stack([0.5 * dG, -0.5 * dG], 1))
+        if descriptors:
+            d['edge'] = F['edge']
+        if 'logm' in F:                                  # read only by the oracle (TrueMediumMobility)
+            d['logm'] = F['logm']
+        return base(d)
     feat.n_edge_sym = base.n_edge_sym
     return feat
+
+
+class TrueMediumMobility(Mobility):
+    """the oracle on heterogeneous media: the class constants times the true factor of the medium"""
+    def forward(s, feats, hg=None, c=None):
+        return super().forward(feats, hg, c) * torch.exp(feats['raw']['logm'].to(feats['edge_sym'].dtype))
 
 
 def _base(hg, cls, activity='ideal', **kw):
@@ -101,9 +115,10 @@ def base_model(n, activity, cls=None):
     return _base(hg, cls or chart.NeuralChart, activity, featurizer=chem_featurizer(hg))
 
 
-def base_model_pc(n, activity='ideal', cls=None):
+def base_model_pc(n, activity='ideal', cls=None, descriptors=False):
     hg = TR.hg_of(n)
-    return _base(hg, cls or chart.NeuralChart, activity, featurizer=pc_featurizer(hg))
+    return _base(hg, cls or chart.NeuralChart, activity, featurizer=pc_featurizer(hg, descriptors),
+                 kinetics_descriptors=descriptors)
 
 
 def base_model_mapk(n, activity='ideal', cls=None):
@@ -115,6 +130,8 @@ def _pc_ref_state(hg):
     g = torch.Generator().manual_seed(3)
     c = 0.3 + torch.rand(1, hg.M, generator=g, dtype=torch.float64)
     drive = dict(U=0.5 * torch.randn(1, hg.V, generator=g, dtype=torch.float64), dG=torch.tensor([1.7], dtype=torch.float64))
+    if C.hetero():                                       # the class constants are set at descriptors 0, without a medium
+        drive.update(edge=torch.zeros(1, hg.H, n_desc(), dtype=torch.float64))
     return c, drive
 
 
@@ -138,7 +155,7 @@ def set_true(m):
         drive = dict(logc=torch.tensor([[0.4, -0.1, 0.2]], dtype=torch.float64))
         a, b = TR.true_rates(m.hg, drive, c)
         err = set_to_rates(m, c, drive, a[0], b[0])
-    elif C.SYSTEM == 'phosphorylation_cycle':
+    elif C.is_pc():
         c, drive = _pc_ref_state(m.hg)
         a, b = TR.true_rates(m.hg, drive, c)
         err = set_to_rates(m, c, drive, a[0], b[0])
@@ -154,7 +171,7 @@ _TRUE_LOGK = {}
 def true_log_k():
     """log k per hyperedge type of the reference model, in the gauge of the given standard potentials"""
     if C.SYSTEM not in _TRUE_LOGK:
-        m = set_true(base_model_mapk(4) if C.SYSTEM == 'mapk_cascade' else base_model_pc(4) if C.SYSTEM == 'phosphorylation_cycle'
+        m = set_true(base_model_mapk(4) if C.SYSTEM == 'mapk_cascade' else base_model_pc(4) if C.is_pc()
                      else base_model(4, 'ideal'))
         _TRUE_LOGK[C.SYSTEM] = m.kinetics.core.detach().cpu().tolist()
     return _TRUE_LOGK[C.SYSTEM]
@@ -164,14 +181,15 @@ def build_chart(cfg, n=None, norm=None):
     """the Neural Chart of a ChartConfig: log k = log omega over the hyperedge types; mu0 learned (with omega) or given
     (the reference values, frozen); activity ideal, learned (ln gamma_theta with a zero gate) or true (oracle)"""
     n = C.N_TRAIN if n is None else n
-    assert cfg.task in chart.REACTION_TASKS and cfg.kappa in ('learned', 'true') and not cfg.descriptors and not cfg.state
+    assert cfg.task in chart.REACTION_TASKS and cfg.kappa in ('learned', 'true') and not cfg.state
+    assert not cfg.descriptors or cfg.task == 'phosphorylation_heterogeneous', 'this benchmark has no descriptors'
     if cfg.task != C.SYSTEM:
         C.configure(cfg.task)
     activity = 'learned' if cfg.activity == 'learned' else 'ideal'
     if cfg.task == 'mapk_cascade':
         m = base_model_mapk(n, activity)
-    elif cfg.task == 'phosphorylation_cycle':
-        m = base_model_pc(n, activity)
+    elif cfg.task in ('phosphorylation_cycle', 'phosphorylation_heterogeneous'):
+        m = base_model_pc(n, activity, descriptors=cfg.descriptors)
     else:
         m = base_model(n, activity)
     if cfg.kappa == 'true' or cfg.mu0 == 'given':
@@ -183,6 +201,8 @@ def build_chart(cfg, n=None, norm=None):
         m.linear_parameters = lambda: [m.kinetics.core]
     if cfg.activity == 'true':
         m.free_energy.__class__ = TrueActivity
+    if cfg.kappa == 'true' and C.hetero():
+        m.kinetics.__class__ = TrueMediumMobility
     if cfg.drive == 'off':
         m.knobs['drive_scale'] = 0.0
     m.drive.s_A.requires_grad_(False)                   # no external force field (s_A multiplies nothing)
@@ -197,14 +217,20 @@ def cond_z(drive, norm):
     if C.SYSTEM == 'mapk_cascade':
         lc = drive['logc']
         return ((lc[:, :1] - norm['logATP_mean']) / norm['logATP_std'])
-    if C.SYSTEM == 'phosphorylation_cycle':
+    if C.is_pc():
         return ((drive['dG'].reshape(-1, 1) - norm['dG_mean']) / norm['dG_std'])
     lab = drive['logab']
     return (lab - torch.tensor(norm['lab_mean']).to(lab)) / torch.tensor(norm['lab_std']).to(lab)
 
 
 def n_cond():
-    return dict(schlogl_nonideal=2, schlogl_nonideal_strong=2, schlogl=2, phosphorylation_cycle=1, mapk_cascade=1)[C.SYSTEM]
+    return dict(schlogl_nonideal=2, schlogl_nonideal_strong=2, schlogl=2, phosphorylation_cycle=1,
+                phosphorylation_heterogeneous=1, mapk_cascade=1)[C.SYSTEM]
+
+
+def n_desc():
+    """local descriptors per site and per hyperedge given to the baselines that can take them"""
+    return len(DESCRIPTORS) if C.hetero() else 0
 
 
 def edge_potential(hg, drive):
@@ -221,7 +247,7 @@ def bb_featurizer(hg, norm):
     """black-box inputs: hyperedge type one-hot and the z-scored conditions; the phosphorylation cycle also the
     potential (node feature, and the oriented difference along transport edges)"""
     ntyp = int(hg.meta['typ'].max()) + 1
-    pc = C.SYSTEM == 'phosphorylation_cycle'
+    pc = C.is_pc()
 
     def feat(F):
         z = cond_z(F, norm)
@@ -235,9 +261,12 @@ def bb_featurizer(hg, norm):
             cols += [dU.abs()[..., None], Um[..., None]]
             node['U'] = F['U']
             ori = dU
+        if C.hetero():
+            cols.append(F['edge'])
+            node.update({f'd{i}': F['dsite'][..., i] for i in range(n_desc())})
         sym = torch.cat(cols, -1)
         return dict(U=torch.zeros(B, hg.V, dtype=dt, device=dev), node=node, edge_sym=sym, edge_ori=ori, force=None, raw=F, z=z)
-    feat.n_edge_sym = ntyp + n_cond() + (2 if pc else 0)
+    feat.n_edge_sym = ntyp + n_cond() + (2 if pc else 0) + n_desc()
     return feat
 
 
@@ -246,7 +275,7 @@ def mass_action_featurizer(hg):
     phosphorylation cycle also the oriented potential difference"""
     if C.SYSTEM == 'mapk_cascade':
         return TR.mapk_featurizer(hg, False)
-    if C.SYSTEM != 'phosphorylation_cycle':
+    if not C.is_pc():
         return chem_featurizer(hg)
     base = base_featurizer(hg)
 
@@ -268,7 +297,7 @@ def make_crnn(n, norm, mass_action):
         difference), w+- start at 0"""
         def __init__(s, *a, **k):
             super().__init__(*a, **k)
-            if C.SYSTEM == 'phosphorylation_cycle' and s.chem:
+            if C.is_pc() and s.chem:
                 s.kdu = nn.Parameter(torch.zeros(2))
 
         def prepare(s, drive):
@@ -281,7 +310,7 @@ def make_crnn(n, norm, mass_action):
     hg = TR.hg_of(n)
     f = mass_action_featurizer(hg) if mass_action else bb_featurizer(hg, norm)
     # on the phosphorylation cycle the condition-feature CRNN also sees the oriented potential difference (as Flux-GNN)
-    ori = (not mass_action) and C.SYSTEM == 'phosphorylation_cycle'
+    ori = (not mass_action) and C.is_pc()
     with default_dtype(torch.float64):
         m = PotentialCRNN(hg, f.n_edge_sym + (1 if ori else 0), f, oriented=ori, chem=mass_action, table=mass_action,
                           step=C.STEP)
@@ -297,6 +326,9 @@ def make_flux_gnn(n, norm):
     ex = {k: v[:1].cpu() for k, v in load_set('train')['drive'].items()}
     if 'U' in ex:                                       # an example drive on this grid (only the shapes matter)
         ex['U'] = torch.zeros(1, hg.V, dtype=ex['U'].dtype)
+    if 'edge' in ex:
+        ex['edge'] = torch.zeros(1, hg.H, n_desc(), dtype=ex['edge'].dtype)
+        ex['dsite'] = torch.zeros(1, hg.V, n_desc(), dtype=ex['dsite'].dtype)
     fx = f(ex)
     nn_in = 1 + len(fx['node']) + (hg.n_species if hg.n_species > 1 else 0)
     ne_in = fx['edge_sym'].shape[-1] + 1
@@ -317,8 +349,8 @@ class UDE(nn.Module):
         s.norm = norm
         s.ntyp = int(TR.hg_of(n).meta['typ'].max()) + 1
         s.NS = TR.n_channels()
-        s.extra = 1 if C.SYSTEM == 'phosphorylation_cycle' else 0
-        s.net = MLP(s.ntyp + 2 * (s.NS + s.extra) + n_cond(), hidden, 1, last='zero')
+        s.extra = 1 if C.is_pc() else 0
+        s.net = MLP(s.ntyp + 2 * (s.NS + s.extra) + n_cond() + n_desc(), hidden, 1, last='zero')
         s.step = dict(C.STEP)
         s.set_n(n)
 
@@ -339,6 +371,8 @@ class UDE(nn.Module):
                       oh=Fn.one_hot(s._typ.to(dev), s.ntyp).to(z.dtype))
         if s.extra:
             ctx['U'] = drive['U']
+        if n_desc():
+            ctx['edge'] = drive['edge']
         return ctx
 
     def context(s, drive):
@@ -355,7 +389,8 @@ class UDE(nn.Module):
         p, q = u[:, ctx['P']], u[:, ctx['Q']]
         oh = ctx['oh'][None].expand(B, H, s.ntyp); z = ctx['z'][:, None, :].expand(B, H, ctx['z'].shape[1])
         w = s.net.net[0].weight.dtype
-        g = lambda x, y: s.net(torch.cat([oh, x, y, z], -1).to(w)).squeeze(-1).to(c.dtype)
+        cols = [oh, z] + ([ctx['edge'].to(z.dtype)] if 'edge' in ctx else [])
+        g = lambda x, y: s.net(torch.cat([cols[0], x, y] + cols[1:], -1).to(w)).squeeze(-1).to(c.dtype)
         return g(p, q) - ctx['tr'][None].to(c.dtype) * g(q, p)
 
     def rates(s, c, drive):
@@ -401,7 +436,7 @@ class FNO(nn.Module):
         super().__init__()
         s.norm, s.NS = norm, TR.n_channels()
         modes = C.N_TRAIN // 2
-        cin = s.NS + n_cond() + (1 if C.SYSTEM == 'phosphorylation_cycle' else 0)
+        cin = s.NS + n_cond() + (1 if C.is_pc() else 0) + n_desc()
         s.lift = nn.Conv2d(cin, width, 1)
         s.spec = nn.ModuleList([SpectralConv2d(width, width, modes, modes + 1) for _ in range(layers)])
         s.w = nn.ModuleList([nn.Conv2d(width, width, 1) for _ in range(layers)])
@@ -417,8 +452,10 @@ class FNO(nn.Module):
 
     def prepare(s, drive):
         ctx = Context(z=cond_z(drive, s.norm).float())
-        if C.SYSTEM == 'phosphorylation_cycle':
+        if C.is_pc():
             ctx['U'] = drive['U'].float()
+        if n_desc():
+            ctx['dsite'] = drive['dsite'].float()
         return ctx
 
     def context(s, drive):
@@ -432,6 +469,8 @@ class FNO(nn.Module):
         cols = [u, ctx['z'][:, :, None, None].expand(B, ctx['z'].shape[1], n, n)]
         if 'U' in ctx:
             cols.append(ctx['U'].reshape(B, 1, n, n))
+        if 'dsite' in ctx:
+            cols.append(ctx['dsite'].transpose(1, 2).reshape(B, n_desc(), n, n))
         return ((u + s.net(torch.cat(cols, 1))) * s.norm['c_scale']).reshape(B, -1).to(c.dtype), 1
 
 
@@ -445,7 +484,7 @@ class BSMS(nn.Module):
         from neuralchart.baselines.bsms_gnn import BSMSGNN
         s.norm, s.NS = norm, TR.n_channels()
         s.levels = 3 if C.N_TRAIN >= 8 else 2
-        s.ncond = n_cond() + (1 if C.SYSTEM == 'phosphorylation_cycle' else 0)
+        s.ncond = n_cond() + (1 if C.is_pc() else 0) + n_desc()
         s.net = BSMSGNN(s.NS + s.ncond, 3, s.levels, latent, n_out=s.NS)
         for k in ('c_mean', 'c_std', 'd_mean', 'd_std'):
             s.register_buffer(k, torch.zeros(s.NS))
@@ -470,8 +509,10 @@ class BSMS(nn.Module):
         B = z.shape[0]
         V = s.n * s.n
         cnd = z[:, None, :].expand(B, V, z.shape[1])
-        if C.SYSTEM == 'phosphorylation_cycle':
+        if C.is_pc():
             cnd = torch.cat([cnd, drive['U'].float()[..., None]], -1)
+        if n_desc():
+            cnd = torch.cat([cnd, drive['dsite'].float()], -1)
         return Context(cond=cnd, H=s._H, xe=s._H['geo'][0][None].expand(B, -1, -1))
 
     def context(s, drive):
@@ -500,20 +541,24 @@ class GenericFNOOp(nn.Module):
         from neuralchart.baselines.generic_fno import GenericFNO
         s.norm = norm
         s.NS = TR.n_channels()
-        s.NC = n_cond() + (1 if C.SYSTEM == 'phosphorylation_cycle' else 0)
+        s.NC = n_cond() + (1 if C.is_pc() else 0) + n_desc()
         s.net = GenericFNO(n_fields=s.NS, n_cond=s.NC)
 
-    def cond_fields(s, z, U, n):
+    def cond_fields(s, z, U, n, dsite=None):
         Bn = z.shape[0]
         cols = [z[:, :, None, None].expand(Bn, z.shape[1], n, n)]
         if U is not None:
             cols.append(U.reshape(Bn, 1, n, n).float())
+        if dsite is not None:
+            cols.append(dsite.transpose(1, 2).reshape(Bn, n_desc(), n, n).float())
         return torch.cat(cols, 1).contiguous()
 
     def prepare(s, drive):
         ctx = Context(z=cond_z(drive, s.norm).float())
-        if C.SYSTEM == 'phosphorylation_cycle':
+        if C.is_pc():
             ctx['U'] = drive['U'].float()
+        if n_desc():
+            ctx['dsite'] = drive['dsite'].float()
         return ctx
 
     def context(s, drive):
@@ -524,7 +569,7 @@ class GenericFNOOp(nn.Module):
         Bn = c.shape[0]
         n = int(round((c.shape[1] // s.NS) ** 0.5))
         u = c.reshape(Bn, s.NS, n, n).float() / s.norm['c_scale']
-        cf = s.cond_fields(ctx['z'], ctx.get('U'), n)
+        cf = s.cond_fields(ctx['z'], ctx.get('U'), n, ctx.get('dsite'))
         with torch.enable_grad():                       # dE/du, dS/du by autodiff also at inference
             v = s.net(u.detach(), cf, create_graph=False).detach()
         bad = ~torch.isfinite(v).flatten(1).all(1) | (v.flatten(1).abs().amax(1) > 1e4)

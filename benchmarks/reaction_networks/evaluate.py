@@ -18,7 +18,7 @@ from .models import UDE, rebind, set_max_sub, next_dtype, accelerate
 
 def err_channels(n):
     """the state channels of the trajectory error: X and Xp on the phosphorylation cycle (E is constant), all otherwise"""
-    return slice(0, 2 * n * n) if C.SYSTEM == 'phosphorylation_cycle' else slice(None)
+    return slice(0, 2 * n * n) if C.is_pc() else slice(None)
 
 
 def lngamma_curve(model, x):
@@ -44,6 +44,30 @@ def lngamma_metrics(model, norm, ood_max):
                 rmse_ood=float(np.sqrt(np.mean((lo - to) ** 2))), slope_id=slope, x_id=[xi[0], xi[-1]], x_ood=[xo[0], xo[-1]],
                 curve_x=np.linspace(0.02, 2.6, 60).tolist(), curve_model=lngamma_curve(model, np.linspace(0.02, 2.6, 60)).tolist(),
                 table=dict(x=xt.tolist(), model=lngamma_curve(model, xt).tolist(), true=TR.lng_np(xt, TR.PHI).tolist()))
+
+
+@torch.no_grad()
+def k_law(model, sd, hg):
+    """the learned symmetric rate constant against the true one on the media of a test set, per hyperedge class and over
+    all hyperedges: Pearson and Spearman r of log k, relative L2 error of k, median log ratio (learned / true)"""
+    from scipy.stats import spearmanr
+    dev = next(iter(model.parameters())).device
+    drive = {k: v.to(dev).to(next_dtype(model)) for k, v in sd['drive'].items()}
+    ctx = model.prepare(drive)
+    k = ctx['k'] if ctx['k'] is not None else model.kinetics(ctx['feats'])
+    typ = torch.as_tensor(hg.meta['typ'])
+    lt = torch.tensor([math.log(TR.PC_K1), 0.5 * math.log(TR.PC_K2 * TR.PC_K2R), math.log(TR.PC_D), math.log(TR.PC_D)],
+                      dtype=torch.float64)[typ] + sd['drive']['logm'].double().cpu()
+    lm = torch.log(k).double().cpu()
+    out = {}
+    for name, mask in (('all', torch.ones_like(typ, dtype=torch.bool)), ('R1', typ == 0), ('R2', typ == 1), ('transport X', typ == 2),
+                       ('transport Xp', typ == 3)):
+        a, b = lm[:, mask].reshape(-1).numpy(), lt[:, mask].reshape(-1).numpy()
+        out[name] = dict(pearson_logk=float(np.corrcoef(a, b)[0, 1]) if a.std() > 0 else 0.0,
+                         spearman_logk=float(spearmanr(a, b).statistic) if a.std() > 0 else 0.0,
+                         relerr_k=float(np.linalg.norm(np.exp(a) - np.exp(b)) / np.linalg.norm(np.exp(b))),
+                         median_logratio=float(np.median(a - b)), std_log_true=float(b.std()))
+    return out
 
 
 def front_speed(Cs, bb, n, a=3.0):
@@ -129,7 +153,7 @@ def eval_set(name, model, sd, n, log, snap, sname):
         q = torch.nan_to_num(R, nan=float('inf')) @ L
         m['moiety_drift'] = dict(all=float((torch.linalg.vector_norm(q - q[:, :1], dim=-1) / torch.linalg.vector_norm(q[:, :1], dim=-1)).max()))
         m['kpp_end_err'] = float(np.nanmedian((TR.kpp_fraction(R[:, -1]) - TR.kpp_fraction(Yc[:, -1])).abs().mean(-1).numpy()))
-    if C.SYSTEM == 'phosphorylation_cycle':  # moieties: E at every site, total X + Xp
+    if C.is_pc():  # moieties: E at every site, total X + Xp
         E = R[..., 2 * V:]; Xt = R[..., :2 * V].sum(-1)
         m['moiety_drift'] = dict(E=float(((E - E[:, :1]).abs() / E[:, :1]).nan_to_num(float('inf')).max()),
                                  X_total=float(((Xt - Xt[:, :1]).abs() / Xt[:, :1]).nan_to_num(float('inf')).max()))
@@ -172,6 +196,8 @@ def eval_set(name, model, sd, n, log, snap, sname):
         at, bt = TR.true_rates(hg, lab, Yc[:, 0])
         ct = TR.model_cycle_affinity((torch.log(at) - torch.log(bt)).double(), V).numpy()
         m['cycle_affinity'] = dict(model_mean=float(ca.mean()), true_mean=float(ct.mean()), mae=float(np.abs(ca - ct).mean()))
+    if C.hetero() and name.startswith('chart'):
+        m['k_law'] = k_law(model, sd, hg)
     idx = list(range(min(4, B)))
     snap[f'R_{sname}'] = R[idx].numpy().astype(np.float32)
     if sname == 'planar_fronts':             # front speed against b across the Maxwell point (a = 3)

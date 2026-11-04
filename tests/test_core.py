@@ -167,6 +167,6 @@ def test_every_ablation_is_one_override():
             if name.startswith('oracle'):
                 assert 'train' in diff
             elif name == 'chart-const-k':                 # no material network, hence no state term either
-                assert diff == {'descriptors', 'state'}
+                assert 'descriptors' in diff and diff <= {'descriptors', 'state'}
             elif name != 'chart':
                 assert len(diff) == 1, (task, name, diff)

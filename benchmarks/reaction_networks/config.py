@@ -5,6 +5,7 @@ read the module-level values (SYSTEM, DT, N_TRAIN, W_TRAIN, DATA, ...).
     schlogl_nonideal          Schloegl model with crowded (non-ideal) activities, 8 x 8 grid (DT 0.05)
     schlogl_nonideal_strong   the same model with the chemostat a over 1.5–4.5 (stronger crowding), 8 x 8 grid (DT 0.05)
     phosphorylation_cycle     chemostat-driven phosphorylation cycle in a potential, 8 x 8 grid (DT 0.05)
+    phosphorylation_heterogeneous   the same network on heterogeneous reaction media, 8 x 8 grid (DT 0.05)
     mapk_cascade              MAPK cascade with three tiers, 4 x 4 grid (DT 0.5)
 
 Protocol (every model, seed 0): training window 100 sampling steps (MAPK: 20 steps, also 10 time units), rollouts of
@@ -17,13 +18,15 @@ import os
 
 from ..common import ROOT
 
-BENCHMARKS = ('schlogl', 'schlogl_nonideal', 'schlogl_nonideal_strong', 'phosphorylation_cycle', 'mapk_cascade')
+BENCHMARKS = ('schlogl', 'schlogl_nonideal', 'schlogl_nonideal_strong', 'phosphorylation_cycle',
+              'phosphorylation_heterogeneous', 'mapk_cascade')
 NONIDEAL = ('schlogl_nonideal', 'schlogl_nonideal_strong')     # the Schloegl models with crowded activities
 SYSTEM = 'schlogl_nonideal'
 DT, N_TRAIN, W_TRAIN = 0.05, 8, 100
 T_TEST, T_STEPS = 200, 20                  # 10T, sampling steps per time unit T
 GRID = dict(schlogl=(0.05, 8, 100), schlogl_nonideal=(0.05, 8, 100), schlogl_nonideal_strong=(0.05, 8, 100),
-            phosphorylation_cycle=(0.05, 8, 100), mapk_cascade=(0.5, 4, 20))      # DT, training grid, training window
+            phosphorylation_cycle=(0.05, 8, 100), phosphorylation_heterogeneous=(0.05, 8, 100),
+            mapk_cascade=(0.5, 4, 20))      # DT, training grid, training window
 STEP = dict(dt_max=DT / 8, theta0=0.5, theta1=0.5, max_sub=4000, t_tol=1e-9)
 MAXSUB_TRAIN, MAXSUB_EVAL = 2000, 4000
 ITERS, LR, BATCH, KMIN, KMAX = 4000, 1e-3, 8, 4, 20
@@ -57,6 +60,12 @@ TEST_SETS = {
         'strong_potential': 'stronger, finer potential U',
         'grid16': '16×16 grid',
     },
+    'phosphorylation_heterogeneous': {
+        'train_conditions': 'unseen media, training conditions (ΔG 1–3)',
+        'strong_drive': 'unseen media, drive ΔG 3–4',
+        'strong_potential': 'unseen media, stronger, finer potential U',
+        'grid16': 'unseen media, 16×16 grid',
+    },
     'mapk_cascade': {
         'train_conditions': 'training conditions (ATP 0.5–2)',
         'high_atp': 'ATP 3–5',
@@ -67,7 +76,9 @@ TEST_SETS = {
 TITLES = dict(schlogl='Schlögl model: bistability and travelling fronts',
               schlogl_nonideal='Schlögl model with non-ideal (crowded) activities',
               schlogl_nonideal_strong='Schlögl model with strong crowding (chemostat a 1.5–4.5)',
-              phosphorylation_cycle='Driven phosphorylation cycle', mapk_cascade='MAPK cascade')
+              phosphorylation_cycle='Driven phosphorylation cycle',
+              phosphorylation_heterogeneous='Driven phosphorylation cycle on heterogeneous reaction media',
+              mapk_cascade='MAPK cascade')
 
 
 def configure(system, data=None, out=None):
@@ -85,6 +96,16 @@ def configure(system, data=None, out=None):
 
 def sets():
     return list(TEST_SETS[SYSTEM])
+
+
+def is_pc():
+    """the phosphorylation network, homogeneous or on heterogeneous media"""
+    return SYSTEM in ('phosphorylation_cycle', 'phosphorylation_heterogeneous')
+
+
+def hetero():
+    """the benchmark has heterogeneous media, seen by the models through local descriptors per hyperedge"""
+    return SYSTEM == 'phosphorylation_heterogeneous'
 
 
 def nonideal():

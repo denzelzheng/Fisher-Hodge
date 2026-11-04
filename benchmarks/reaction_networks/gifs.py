@@ -27,14 +27,17 @@ SCENES = {
     'schlogl_nonideal': ('high_concentration', ['chart', 'fno', 'flux_gnn'], 'X', 'schlogl_nonideal_high_concentration.gif'),
     'schlogl_nonideal_strong': ('high_a', ['chart', 'fno', 'flux_gnn'], 'X', 'schlogl_nonideal_strong_high_a.gif'),
     'phosphorylation_cycle': ('strong_drive', ['chart', 'flux_gnn', 'fno'], 'Xp fraction', 'phosphorylation_cycle_strong_drive.gif'),
+    'phosphorylation_heterogeneous': ('strong_drive', ['chart', 'flux_gnn', 'fno'], 'Xp fraction', 'phosphorylation_heterogeneous_strong_drive.gif'),
     'mapk_cascade': ('low_atp', ['chart', 'flux_gnn', 'fno'], 'state', 'mapk_cascade_low_atp.gif'),
 }
-TRAJ = dict(schlogl=8, schlogl_nonideal=0, schlogl_nonideal_strong=0, phosphorylation_cycle=0, mapk_cascade=0)   # the README trajectories
+TRAJ = dict(schlogl=8, schlogl_nonideal=0, schlogl_nonideal_strong=0, phosphorylation_cycle=0, phosphorylation_heterogeneous=0,
+            mapk_cascade=0)   # the README trajectories
 SUPTITLE = {
     'schlogl': 'Schlögl model, travelling front (a = 3, b = {b:.2f}): concentration of X',
     'schlogl_nonideal': 'Non-ideal Schlögl model, a = {a:.2f}, b = {b:.2f} (outside the training range): concentration of X',
     'schlogl_nonideal_strong': 'Schlögl model with strong crowding, a = {a:.2f}, b = {b:.2f} (training a 1.5–4.5): concentration of X',
     'phosphorylation_cycle': 'Phosphorylation cycle, drive ΔG = {dG:.2f} (training 1–3): phosphorylated fraction Xp / (X + Xp)',
+    'phosphorylation_heterogeneous': 'Phosphorylation cycle on an unseen medium, drive ΔG = {dG:.2f} (training 1–3): phosphorylated fraction Xp / (X + Xp)',
     'mapk_cascade': 'MAPK cascade, ATP = {atp:.2f} (training 0.5–2): 22 species (rows) at 16 sites (columns)',
 }
 
@@ -42,7 +45,7 @@ SUPTITLE = {
 def field(R, n):
     """the plotted scalar field (T, n, n) of states R (T, M)"""
     V = n * n
-    if C.SYSTEM == 'phosphorylation_cycle':
+    if C.is_pc():
         x, xp = R[:, :V], R[:, V:2 * V]
         f = xp / (x + xp)
     elif C.SYSTEM == 'mapk_cascade':                    # every species at every site: (T, 22, 16)
@@ -102,7 +105,7 @@ def make_gif(benchmark, device='cuda', weights_dir=None, out=None, traj=None, st
     path = os.path.join(out or os.path.join(ROOT, 'assets'), fname)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     vmax = float(np.nanpercentile(ref, 99.5)) * 1.05
-    vmin = 0.95 * float(np.nanpercentile(ref, 0.5)) if benchmark == 'phosphorylation_cycle' else 0.0
+    vmin = 0.95 * float(np.nanpercentile(ref, 0.5)) if benchmark.startswith('phosphorylation') else 0.0
     mb = comparison_gif(path, frames, titles, suptitle=SUPTITLE[benchmark].format(**fmt), times=times, fps=12,
                         vmin=vmin, vmax=vmax, extra_titles=errs, panel_in=2.4, dpi=80, time_label=lambda t: f't = {times[t]:.1f}')
     print(f'{path}: {mb:.2f} MB, trajectory {traj}', flush=True)
@@ -124,13 +127,16 @@ TRACK = {
                                     condition='a = {a:.2f}, b = {b:.2f} (training a 1.5–4.5, b 1.0–3.2)'),
     'phosphorylation_cycle': dict(set='strong_drive', traj=0, species='X', label='X', steps=range(0, 201, 4), speed=4,
                                   condition='drive ΔG = {dG:.2f} (training 1–3)'),
+    'phosphorylation_heterogeneous': dict(set='strong_drive', traj=0, species='X', label='X', steps=range(0, 201, 4), speed=4,
+                                          condition='unseen medium, drive ΔG = {dG:.2f} (training 1–3)'),
     'mapk_cascade': dict(set='low_atp', traj=0, species=('Kp', 'Kpp'), label='phosphorylated MAPK (Kp + Kpp)',
                          steps=range(10, 61), speed=1, max_age=8, n_part=300, condition='ATP = {atp:.2f} (training 0.5–2)'),
 }
 TRACK_MODELS = ['chart', 'crnn_mass_action', 'flux_gnn', 'ude']
 TRACK_TITLE = dict(schlogl='Schlögl model', schlogl_nonideal='Non-ideal Schlögl model',
                    schlogl_nonideal_strong='Schlögl model with strong crowding',
-                   phosphorylation_cycle='Phosphorylation cycle', mapk_cascade='MAPK cascade')
+                   phosphorylation_cycle='Phosphorylation cycle', phosphorylation_heterogeneous='Phosphorylation cycle',
+                   mapk_cascade='MAPK cascade')
 
 
 def condition_text(benchmark, lab):
