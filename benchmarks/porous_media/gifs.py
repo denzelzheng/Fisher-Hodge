@@ -5,22 +5,19 @@ Two scenes per variant, one test trajectory each:
                 box with the lowest drive ×8 error (HelmFluid without crowding, GENERIC-FNO with crowding)
   point cloud   the training conditions on a random point cloud of 1024 cells: Reference | Neural Chart | Flux-GNN |
                 UDE closure (FNO-type models cannot run on a point cloud)
-The Neural Chart weights come from checkpoints/.  Baseline weights are not shipped.  HelmFluid needs
-NEURALCHART_HELMFLUID (see THIRD_PARTY.md).  Train them with run.py train,
-which writes runs/<variant>/<model>.pt (the default of --weights).
+Weights: <weights>/<model>.pt (default runs/<variant>/, the output of neuralchart.run); a Neural Chart variant not found there comes from
+checkpoints/.  Baseline weights are not shipped.  HelmFluid needs NEURALCHART_HELMFLUID (see THIRD_PARTY.md).
 """
 import os
 
 import numpy as np
 import torch
 
-from neuralchart import fast
 from neuralchart.fit import rollout
-from benchmarks.common import CHECKPOINTS, ROOT, LABELS, check_gpu
+from benchmarks.common import ROOT, LABELS, check_gpu
 from scripts.gif_tools import comparison_gif
-from .data import N, DT, load, add_norm
-from .models import build, rebind
-from .run import RUN_SETTINGS
+from .data import DT, load, add_norm
+from .models import load_trained
 
 # per variant: (test set, models after the reference, subtitle).  The last drive ×8 panel is the black box with the
 # lowest drive ×8 error in the main table: HelmFluid without crowding, GENERIC-FNO with crowding.
@@ -33,46 +30,14 @@ SCENES = {
 TITLE = dict(porous_media='Porous media', porous_media_crowding='Porous media with crowding')
 
 
-def _weights(variant, model, weights):
-    p = os.path.join(CHECKPOINTS, variant, model + '.pt')
-    if os.path.exists(p):
-        return p
-    return os.path.join(weights or os.path.join(ROOT, 'runs', variant), model + '.pt')
-
-
 @torch.no_grad()
 def scene_rollout(variant, model_name, data, s, j, device, weights=None):
     """the density of trajectory j of set s, (T+1, V), for one model"""
-    meta = data['meta']
     sd = data[s]
     disc = data['discs'][sd['disc']]
     dr = {k: v[j:j + 1] for k, v in sd['drive'].items()}
-    c0 = sd['c'][j:j + 1, 0]
-    T = sd['c'].shape[1] - 1
-    if model_name == 'helmfluid':
-        from .train import helmfluid_model, helmfluid_rollout
-        m = helmfluid_model(device)
-        m.load_state_dict(torch.load(_weights(variant, model_name, weights), map_location=device)); m.eval()
-        R = helmfluid_rollout(m, sd['c'][j:j + 1], dr, meta['norm'], device)
-        return R[0].double().numpy() * disc.g['dens'].cpu().numpy()[None]
-    if model_name == 'generic_fno':
-        from neuralchart.baselines.generic_fno import GenericFNO, rollout as gfno_rollout
-        from .train import grid_cond
-        from .models import NC
-        m = GenericFNO(n_fields=1, n_cond=NC).to(device)
-        m.load_state_dict(torch.load(_weights(variant, model_name, weights), map_location=device)); m.eval()
-        n = int(round(c0.shape[-1] ** 0.5))
-        R = gfno_rollout(m, c0.reshape(1, 1, n, n).float(), T, grid_cond(dr, meta['norm']))
-        return R.reshape(T + 1, -1).double().numpy() * disc.g['dens'].cpu().numpy()[None]
-    g32 = data['discs']['g32']
-    m = build(model_name, meta, g32).to(device)
-    m.load_state_dict(torch.load(_weights(variant, model_name, weights), map_location=device))
-    m.eval()
-    if sd['disc'] != 'g32':
-        m = rebind(model_name, m, meta, disc, device)
-    if model_name in RUN_SETTINGS:
-        fast.accelerate(m, **RUN_SETTINGS[model_name])
-    R, _, _ = rollout(m, dr, c0, T, DT)
+    m = load_trained(variant, model_name, data['meta'], data['discs']['g32'], disc, device, weights)
+    R, _, _ = rollout(m, dr, sd['c'][j:j + 1, 0], sd['c'].shape[1] - 1, DT)
     return (R[0].double() * disc.g['dens'].to(R.device).double()[None]).cpu().numpy()
 
 

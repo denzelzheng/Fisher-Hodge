@@ -13,8 +13,8 @@ every DT = 0.2.
 Protocol (every trained model, seed 0).  Training windows of 50 sampling steps (10 time units).  Rollout loss over
 K in [4, 20] steps from a random start inside the window, batch 8, Adam with learning rate 1e-3 and a cosine
 schedule, 4000 steps or 12 h of wall clock, gradient clip 1.  The continuous-time models use the positive adaptive
-SSP-RK2 of neuralchart.fast with error control (rtol 5e-5) in float32; the substep cap is 2000 per sampling interval
-in training and 4000 in evaluation.  FNO, BSMS-GNN and GENERIC-FNO are one-step maps.
+SSP-RK2 of neuralchart.fast with error control (neuralchart.chart.RTOL) in float32; the substep cap is 2000 per sampling
+interval in training and 4000 in evaluation.  FNO, BSMS-GNN and GENERIC-FNO are one-step maps.
 """
 import math
 import os
@@ -23,7 +23,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 DATA = os.path.join(os.environ.get('NEURALCHART_DATA', os.path.join(ROOT, 'data')), 'brusselator')
 RESULTS = os.path.join(ROOT, 'results', 'brusselator')
 CHECKPOINTS = os.path.join(ROOT, 'checkpoints', 'brusselator')      # the shipped Neural Chart checkpoints
-RUNS = os.path.join(ROOT, 'runs', 'brusselator')                    # outputs of train and evaluate
+RUNS = os.path.join(ROOT, 'runs', 'brusselator')                    # outputs of neuralchart.run
 
 DT, W_TRAIN, T_TEST, N_TRAIN, T_STEPS = 0.2, 50, 200, 32, 20      # T = 20 sampling steps, 10T = 200
 KF, EPS, DIFF = (1.0, 1.0, 1.0, 1.0), 1e-3, (0.4, 3.6)
@@ -36,6 +36,4 @@ REACTIONS = [({'A': 1}, {'X': 1}), ({'X': 2, 'Y': 1}, {'X': 3}), ({'B': 1, 'X': 
 STEP = dict(dt_max=DT / 8, theta0=0.5, theta1=0.5, max_sub=4000, t_tol=1e-9)
 MAXSUB_TRAIN = 2000
 MAXSUB_EVAL = 4000
-RTOL = 5e-5
-ITERS, LR, BATCH, KMIN, KMAX = 4000, 1e-3, 8, 4, 20
-BUDGET_S = 12 * 3600
+BATCH, KMIN, KMAX = 8, 4, 20

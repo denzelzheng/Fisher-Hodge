@@ -1,10 +1,9 @@
 """Static figures of the Brusselator benchmark for the README.
 
-    python -m benchmarks.brusselator.run figures
+    python -m neuralchart.run --task brusselator --cmd figures [--weights DIR]
 writes assets/brusselator_phase_portraits.png (the limit cycle of homogeneous starts in every test set) and
-assets/brusselator_entropy_b_far.png (local entropy production on one trajectory of "b 4.0–4.6").  The Neural Chart
-variants come from checkpoints/brusselator; baseline weights from --weights DIR (default runs/brusselator).  Models
-without weights are left out.
+assets/brusselator_entropy_b_far.png (local entropy production on one trajectory of "b 4.0–4.6").  Weights: DIR/<name>.pt (default
+runs/brusselator); a Neural Chart variant not found there comes from checkpoints/brusselator.  Models without weights are left out.
 """
 import os
 
@@ -14,12 +13,11 @@ import torch
 from benchmarks.common import LABELS
 from neuralchart.diagnostics import ldb_violation
 from neuralchart.fit import rollout
-from .config import CHECKPOINTS, RUNS, DT, N_TRAIN, MAXSUB_EVAL, RTOL
+from .config import DT
 from .data import load_set, train_norm, true_rates, hg_of
 from .evaluate import site_map
-from .models import build, UDE
+from .models import FLOAT32_MODELS, UDE, load_trained
 from .test_sets import TEST_SETS, LABELS as SET_LABELS
-from .training import accelerate, default_fast, set_max_sub
 
 ASSETS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'assets')
 # Okabe-Ito colours (readable with colour-vision deficiency)
@@ -29,29 +27,12 @@ COLORS = {'reference': '#000000', 'chart': '#0072B2', 'chart-given-mu0': '#56B4E
 # the reversible ablation joins both figures when its run is available (append 'chart-reversible')
 PHASE_MODELS = ['chart', 'crnn_mass_action', 'flux_gnn', 'fno', 'ude']
 ENTROPY_MODELS = ['chart', 'chart-given-mu0', 'crnn_mass_action', 'flux_gnn', 'ude']
-FLOAT32 = ('flux_gnn', 'ude', 'fno', 'bsms', 'generic_fno')
 VIOL_COLOR = '#009E73'
-
-
-def trained(name, norm, device, weights=RUNS):
-    """the model in its evaluation configuration, or None without weights"""
-    f = next((os.path.join(d, name + '.pt') for d in (CHECKPOINTS, weights) if os.path.exists(os.path.join(d, name + '.pt'))), None)
-    if f is None and name not in ('oracle', 'persistence'):
-        return None
-    model = build(name, N_TRAIN, norm).to(device)
-    if f is not None:
-        model.load_state_dict(torch.load(f, map_location=device))
-    model.eval()
-    set_max_sub(model, MAXSUB_EVAL)
-    if name in FLOAT32:
-        model = model.float()
-    accelerate(model, default_fast(name, dict(control='sample_err', rtol=RTOL, precision='fp32', graphs=True)))
-    return model
 
 
 def _inputs(name, sd, i):
     c0, dr = sd['c'][i:i + 1, 0], {k: v[i:i + 1] for k, v in sd['drive'].items()}
-    if name in FLOAT32:
+    if name in FLOAT32_MODELS:
         c0, dr = c0.float(), {k: v.float() for k, v in dr.items()}
     return c0, dr
 
@@ -70,7 +51,7 @@ def phase_portraits(device, data_kw, weights, path):
         V = sd['n'] ** 2
         curves[s]['reference'] = sd['c'][i].double().cpu().numpy()
         for m in PHASE_MODELS:
-            model = trained(m, norm, device, weights)
+            model = load_trained(m, norm, device, weights)
             if model is None:
                 print(f'phase portraits: no weights for {m}', flush=True)
                 continue
@@ -125,7 +106,7 @@ def entropy_maps(device, data_kw, weights, path, set_name='b_far', t=100):
     at, bt = true_rates(hg, lab, c)
     panels = [('Reference', site_map(hg, ((at - bt) * torch.log(at / bt))[0]).numpy(), None, None)]
     for m in ENTROPY_MODELS:
-        model = trained(m, norm, device, weights)
+        model = load_trained(m, norm, device, weights)
         if model is None:
             print(f'entropy maps: no weights for {m}', flush=True)
             continue
@@ -171,7 +152,7 @@ def entropy_maps(device, data_kw, weights, path, set_name='b_far', t=100):
     plt.close(fig)
 
 
-def make_figures(device='cuda', data=None, weights=RUNS):
+def make_figures(device='cuda', data=None, weights=None):
     dkw = {} if data is None else dict(data=data)
     os.makedirs(ASSETS, exist_ok=True)
     out = []

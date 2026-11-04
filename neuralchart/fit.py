@@ -12,10 +12,11 @@ with kappa_r >= 0 the factor by which class r has to change.  This is a non-nega
 convex, so its optimum is global (fit_linear).  The optimum is mapped back to theta by least squares on log kappa.
 
 Rollout refinement (train).  Every parameter is then refined on multi-step rollouts: K in [kmin, kmax] steps from a
-random start inside the training window, batch 8, Adam with a cosine schedule, gradient clip 1.
+random start inside the data, batch 8, Adam with a cosine schedule, gradient clip 1.
 """
 import itertools
 import math
+import os
 import time
 import numpy as np
 import scipy.linalg
@@ -168,11 +169,16 @@ def nnls_kappa(G, h, fixed):
     return kap, free
 
 
+FLOOR = 1e-3            # the lowest rate constant of a class in the closed-form step, relative to the largest class factor
+
+
 @torch.no_grad()
-def fit_linear(model, data, dt, rule='simpson', floor=1e-6, batch=16, log=print):
+def fit_linear(model, data, dt, rule='simpson', floor=FLOOR, batch=16, log=print):
     """set the linear parameters of model to the non-negative least-squares optimum on data (a training set dict
-    with c (B, T+1, M) and drive, or a dict holding it under 'train').  dt: sampling interval.  Returns diagnostics:
-    the relative residual of the derivative fit before (kappa = 1) and after, and the fitted factors."""
+    with c (B, T+1, M) and drive, or a dict holding it under 'train').  dt: sampling interval.  The log rate of no class starts below
+    log(floor * largest fitted factor): the optimum may have a factor at zero, and a class whose rate is that small has no gradient.
+    The standard potentials stay free, so a one-way channel can still be near zero.  Returns diagnostics: the relative residual of
+    the derivative fit before (kappa = 1) and after, and the fitted factors."""
     t0 = time.time()
     tr = data['train'] if 'train' in data else data
     A = assemble(model, tr, dt, rule, batch)
@@ -181,21 +187,26 @@ def fit_linear(model, data, dt, rule='simpson', floor=1e-6, batch=16, log=print)
     kap, free = nnls_kappa(G, h, A['fixed'])
     res = lambda k: (yy - 2 * k @ h + k @ G @ k) / yy
     # back to theta: log kappa_r = U_r delta (classes not seen by the data keep their value)
-    tgt = np.log(np.maximum(kap, floor))
+    zero = 1e-6                                    # the logarithm of a factor at zero in the targets below
+    tgt = np.log(np.maximum(kap, zero))
     delta, *_ = np.linalg.lstsq(U[free], tgt[free], rcond=1e-10)
     proj_err = float(np.abs(U[free] @ delta - tgt[free]).max()) if free.any() else 0.0
-    if proj_err > 1e-8:
+    nc = model.kinetics.core.numel()
+    core = model.kinetics.core.detach().cpu().numpy().astype(np.float64)
+    low = np.log(floor * kap[free].max()) - core if free.any() else np.full(nc, -np.inf)
+    if proj_err > 1e-8 or (delta[:nc] < low).any():
         # the classes are coupled (fewer independent directions in theta than classes, e.g. a given standard
         # affinity): weight the projection by the curvature of the residual, G_rr kappa_r^2, so that classes the data
         # barely see do not dominate, then minimise the residual itself over theta
-        w = np.sqrt(np.diag(G)[free] * np.maximum(kap[free], floor) ** 2) + 1e-300
+        w = np.sqrt(np.diag(G)[free] * np.maximum(kap[free], zero) ** 2) + 1e-300
         delta, *_ = np.linalg.lstsq(w[:, None] * U[free], w * tgt[free], rcond=1e-10)
 
         def f(dl):
             k = np.where(free, np.exp(U @ dl), 1.0)
             g = (2 * (G @ k) - 2 * h) / yy
             return res(k), U.T @ (np.where(free, k, 0.0) * g)
-        delta = scipy.optimize.minimize(f, delta, jac=True, method='L-BFGS-B', options=dict(maxiter=2000, ftol=1e-15, gtol=1e-12)).x
+        bounds = [(x, None) for x in low] + [(None, None)] * (U.shape[1] - nc)
+        delta = scipy.optimize.minimize(f, delta, jac=True, method='L-BFGS-B', bounds=bounds, options=dict(maxiter=2000, ftol=1e-15, gtol=1e-12)).x
         proj_err = float(np.abs(U[free] @ delta - tgt[free]).max())
     k_eff = np.where(free, np.exp(U @ delta), 1.0)
     off = 0
@@ -205,8 +216,8 @@ def fit_linear(model, data, dt, rule='simpson', floor=1e-6, batch=16, log=print)
         off += n
     info = dict(n_classes=int(R), n_free=int(free.sum()), n_params=int(U.shape[1]), rank=int(np.linalg.matrix_rank(U[free])),
                 residual_init=float(res(np.ones(R))), residual_nnls=float(res(kap)), residual_theta=float(res(k_eff)),
-                n_floored=int((kap[free] < floor).sum()), projection_err=proj_err, kappa=kap.tolist(), time_s=time.time() - t0)
-    log(f'fit_linear: {R} classes ({info["n_free"]} seen, {info["n_floored"]} at the floor), {U.shape[1]} parameters, '
+                n_floored=int((kap[free] < zero).sum()), n_at_floor=int((delta[:nc] <= low + 1e-9).sum()), floor=float(floor * kap[free].max()) if free.any() else 0.0, projection_err=proj_err, kappa=kap.tolist(), time_s=time.time() - t0)
+    log(f'fit_linear: {R} classes ({info["n_free"]} seen, {info["n_floored"]} factors at zero, {info["n_at_floor"]} log rates at the floor), {U.shape[1]} parameters, '
         f'rank {info["rank"]}; relative derivative residual {info["residual_init"]:.3e} -> {info["residual_nnls"]:.3e} '
         f'(NNLS) -> {info["residual_theta"]:.3e} (theta, projection error {proj_err:.1e}); {info["time_s"]:.1f}s')
     return info
@@ -217,55 +228,79 @@ def take(drive, idx):
     return {k: v[idx] for k, v in drive.items()}
 
 
-def train(model, tr, iters, seed, dt, batch=8, lr=1e-3, kmin=4, kmax=8, log=print, callback=None, window=None, elapsed0=0.0):
-    """rollout training.  elapsed0: time already spent by the closed-form step, counted in the training time.  If tr has 'obs' (B, T+1, k) and 'obs_w' (k, H), the observables obs = J @ obs_w.T (linear
-    functionals of the net fluxes, e.g. the turnover of a reservoir) add their relative error to the loss with weight 1.
-    callback(it, loss) is called after every step (loss: float, nan for a skipped step).  window: the number of sampling
-    steps of every training trajectory a rollout may use (default: all of tr['c'])."""
-    obs, Wo = tr.get('obs'), tr.get('obs_w')
+def _save_ckpt(path, state):
+    tmp = path + '.tmp'
+    torch.save(state, tmp)
+    os.replace(tmp, path)                          # a killed job leaves the previous complete checkpoint
+
+
+def train(model, tr, iters, seed, dt, batch=8, lr=1e-3, kmin=4, kmax=20, log=print, budget_s=12 * 3600.0, eta_min=1e-5, ckpt=None,
+          resume=False, ckpt_every=100, window=None):
+    """rollout training, the one trainer of every model: K in [kmin, kmax] steps from a random start, batch `batch`, relative L2 loss,
+    Adam with a cosine learning rate on p = max(step / iters, elapsed / budget), gradient clip 1.  tr = dict(c (B, T + 1, M), drive).  ckpt:
+    a checkpoint every ckpt_every steps; resume=True continues exactly from it."""
     rng = np.random.default_rng(10_000 + seed)
-    C = tr['c']; ntr = C.shape[0]
-    window = C.shape[1] - 1 if window is None else window
-    opt = torch.optim.Adam(model.parameters(), lr=lr)
-    sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, iters, eta_min=1e-5)
-    hist, subs, nskip = [], [], 0
-    t0 = time.time() - elapsed0
+    Cs = tr['c']; ntr = Cs.shape[0]
+    window = Cs.shape[1] - 1 if window is None else window
+    params = [p for p in model.parameters() if p.requires_grad]
+    opt = torch.optim.Adam(params, lr=lr)
+    hist, subs, smax, nskip = [], [], [], 0
+    t0 = time.time()
+    it, p, trunc = 0, 0.0, False
+    st0 = getattr(getattr(model, '_fast', None), 'stepper', None)
+    if resume:
+        ck = torch.load(ckpt, map_location=params[0].device, weights_only=False)
+        model.load_state_dict(ck['model']); opt.load_state_dict(ck['opt'])
+        rng.bit_generator.state = ck['rng']
+        it, hist, subs, smax, nskip = ck['it'], ck['hist'], ck['subs'], ck['smax'], ck['nskip']
+        t0 = time.time() - ck['elapsed']
+        if st0 is not None:
+            st0.cap_hits = ck.get('cap_hits', 0)
+        log(f'resumed from {ckpt}: step {it}, elapsed {ck["elapsed"]:.0f}s')
     model.train()
-    for it in range(iters):
-        idx = torch.tensor(rng.choice(ntr, min(batch, ntr), replace=False), device=C.device)
-        K = int(rng.integers(kmin, kmax + 1))
-        st = torch.tensor(rng.integers(0, window - K + 1, size=len(idx)), device=C.device)
+    while it < iters:
+        p = max(it / iters, (time.time() - t0) / budget_s)
+        if p >= 1.0:
+            trunc = True
+            break
+        for g in opt.param_groups:
+            g['lr'] = eta_min + (lr - eta_min) * 0.5 * (1 + math.cos(math.pi * p))
+        idx = torch.tensor(rng.choice(ntr, min(batch, ntr), replace=False), device=Cs.device)
+        K = int(rng.integers(kmin, min(kmax, window) + 1))
+        st = torch.tensor(rng.integers(0, window - K + 1, size=len(idx)), device=Cs.device)
         ctx = model.prepare(take(tr['drive'], idx))
-        c = C[idx, st]
-        loss = 0.0; ns = 0
+        c = Cs[idx, st]
+        loss = 0.0; ns = 0.0; nmax = 0
         for k in range(1, K + 1):
             c, n = model.advance(c, ctx, dt)
             ns = ns + (n.float().mean() if torch.is_tensor(n) else n)
-            y = C[idx, st + k]
+            nmax = max(nmax, int(n.max()) if torch.is_tensor(n) else int(n))
+            y = Cs[idx, st + k]
             loss = loss + (((c - y) ** 2).sum(-1) / (y ** 2).sum(-1)).mean()
-            if obs is not None:
-                a, b = model.rates(c, ctx)
-                yo = obs[idx, st + k]
-                loss = loss + ((((a - b) @ Wo.T - yo) ** 2).sum(-1) / (yo ** 2).sum(-1)).mean()
         loss = loss / K
-        subs.append(ns / K)
+        subs.append(float(ns) / K); smax.append(nmax)
         if not torch.isfinite(loss):
-            nskip += 1; opt.zero_grad(set_to_none=True); sched.step()
-            if callback is not None:
-                callback(it, float('nan'))
-            continue
+            nskip += 1; opt.zero_grad(set_to_none=True); it += 1; continue
         opt.zero_grad(set_to_none=True); loss.backward()
-        gn = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-        opt.step(); sched.step()
+        gn = torch.nn.utils.clip_grad_norm_(params, 1.0)
+        opt.step()
         hist.append(float(loss.detach()))
-        if callback is not None:
-            callback(it, hist[-1])
         if it % 100 == 0 or it == iters - 1:
-            log(f'it {it:5d} loss {np.mean(hist[-100:]):.4e} gnorm {float(gn):.2e} K {K} '
-                f'substeps/DT {float(np.mean([float(x) for x in subs[-100:]])):.1f} skipped {nskip} t {time.time() - t0:.0f}s')
-    return dict(train_time_s=time.time() - t0, final_train_loss=float(np.mean(hist[-100:])) if hist else None, train_nskip=nskip,
-                train_substeps_per_DT=float(np.mean([float(x) for x in subs])) if subs else None,
-                loss_curve=[float(np.mean(hist[i:i + 100])) for i in range(0, len(hist), 100)])
+            from . import fast
+            log(f'it {it:5d} loss {np.mean(hist[-100:]):.4e} gnorm {float(gn):.2e} K {K} substeps/DT {np.mean(subs[-100:]):.1f} '
+                f'(max {max(smax[-100:])}) lr {opt.param_groups[0]["lr"]:.2e} p {p:.3f} skipped {nskip} t {time.time() - t0:.0f}s'
+                + fast.cap_report(model))
+        it += 1
+        if ckpt is not None and it % ckpt_every == 0:
+            _save_ckpt(ckpt, dict(model=model.state_dict(), opt=opt.state_dict(), rng=rng.bit_generator.state, it=it, hist=hist, subs=subs,
+                                  smax=smax, nskip=nskip, elapsed=time.time() - t0, cap_hits=st0.cap_hits if st0 is not None else 0))
+    el = time.time() - t0
+    log(f'training ended: {it} steps, {el:.0f}s, truncated by the budget: {trunc}')
+    if ckpt is not None and os.path.exists(ckpt):
+        os.remove(ckpt)
+    return dict(train_time_s=el, final_train_loss=float(np.mean(hist[-100:])) if hist else None, train_nskip=nskip,
+                train_substeps_per_DT=float(np.mean(subs)) if subs else None, train_substeps_max=int(max(smax)) if smax else None,
+                train_steps_done=it, truncated=trunc, budget_s=budget_s)
 
 
 @torch.no_grad()
@@ -309,22 +344,3 @@ def chart_summary(model, tr, every=5, batch=16):
     return dict(max_abs_grad_G_species=lg.tolist(), max_abs_grad_G=float(lg.max()), max_abs_g=gm,
                 params_G=sum(p.numel() for p in fe.excess_parameters()),
                 params_g=sum(p.numel() for p in kin.net.parameters()) if kin.net is not None else 0)
-
-
-def fit_chart(model, tr, dt, iters, seed=0, log=print, trainer=None, after_linear=None, **train_kw):
-    """the fit of the Neural Chart: NNLS on omega at the zero-initialised model (g = 0 and G = 0, so log a and log b are
-    linear in log omega and the standard potentials), then the rollout refinement of every parameter.
-    trainer(model, tr, iters, seed, dt, log=log, **train_kw) (default: train); returns the info dict."""
-    cfg = model.config
-    info = {}
-    if not cfg.train:                                    # oracle: nothing is fitted
-        return info
-    if cfg.init == 'nnls':
-        assert model.linear_parameters(), 'no linear parameters for the closed-form step'
-        info['linear_fit'] = fit_linear(model, dict(train=tr), dt, log=log)
-        if after_linear is not None:
-            after_linear(model)
-    if iters > 0:
-        info.update((trainer or train)(model, tr, iters, seed, dt, log=log, **train_kw))
-        info['summary'] = chart_summary(model, tr)
-    return info

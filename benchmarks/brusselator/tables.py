@@ -1,6 +1,6 @@
 """Tables of the Brusselator benchmark from the result files results/brusselator/runs/<model>.json.
 
-    python -m benchmarks.brusselator.run tables [--runs DIR]
+    python -m neuralchart.run --task brusselator --cmd tables [--runs DIR]
 reads DIR/<model>.json (default results/brusselator/runs) and writes
 results/brusselator/{main, physics, ablations, oscillation_patterns, entropy_readout, training, excess}.{md, csv}.
 """
@@ -12,10 +12,10 @@ from neuralchart.chart import ABLATIONS
 from .config import RESULTS
 from .test_sets import TEST_SETS, LABELS as SET_LABELS
 
-MODELS = ['chart', 'chart-given-mu0', 'chart-const-k', 'chart-no-excess', 'chart-zero-init', 'chart-reversible', 'flux_gnn', 'crnn_mass_action',
-          'crnn_features', 'ude', 'bsms', 'fno', 'generic_fno', 'persistence']
+MODELS = ['chart', 'chart-given-mu0', 'chart-learned-chem-mu0', 'chart-const-k', 'chart-no-excess', 'chart-zero-init', 'chart-reversible', 'flux_gnn',
+          'crnn_mass_action', 'crnn_features', 'ude', 'bsms', 'fno', 'generic_fno', 'persistence']
 MAIN = ['chart', 'chart-given-mu0', 'flux_gnn', 'crnn_mass_action', 'crnn_features', 'ude', 'bsms', 'fno', 'generic_fno', 'persistence']
-ABLATION_MODELS = ['chart', 'chart-given-mu0', 'chart-const-k', 'chart-no-excess', 'chart-zero-init', 'chart-reversible', 'flux_gnn']
+ABLATION_MODELS = ['chart', 'chart-given-mu0', 'chart-learned-chem-mu0', 'chart-const-k', 'chart-no-excess', 'chart-zero-init', 'chart-reversible', 'flux_gnn']
 
 
 def _set(r, s):

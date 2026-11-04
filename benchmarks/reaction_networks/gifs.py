@@ -1,8 +1,8 @@
 """README animations of the reaction-network benchmarks: reference, Neural Chart and two baselines on one test
 trajectory, rolled out from the shipped or trained weights.
 
-    python -m benchmarks.schlogl.run gifs [--weights DIR] [--device cuda]
-    python -m benchmarks.schlogl.run gifs --track       # the tracer animation (make_track_gif)
+    python -m neuralchart.run --task schlogl --cmd gifs [--weights DIR] [--device cuda]
+    python -m neuralchart.run --task schlogl --cmd gifs --track       # the tracer animation (make_track_gif)
 
 Weights: <weights_dir>/<model>.pt (default runs/<benchmark>/, the output of `train`); a Neural Chart variant not found
 there is taken from checkpoints/<benchmark>/.  The GIF is written to assets/.
@@ -13,13 +13,13 @@ import os
 import numpy as np
 import torch
 
-from neuralchart import chart, fast
+from neuralchart import NeuralChart, VARIANTS, fast
 from neuralchart.fit import rollout
 from ..common import ROOT, CHECKPOINTS, LABELS
 from . import config as C
 from . import truth as TR
 from .data import load_set, train_norm
-from .models import FLOAT_MODELS, build, set_max_sub, accelerate
+from .models import FLOAT_MODELS, build_baseline, set_max_sub, accelerate
 
 # benchmark -> (test set, models after the reference, field, file name)
 SCENES = {
@@ -61,13 +61,16 @@ def field(R, n):
 
 
 def load_model(name, norm, device, weights_dir):
-    model = build(name, C.N_TRAIN, norm).to(device)
+    """a Neural Chart from <weights_dir>/<name>.pt or checkpoints/<benchmark>/; a baseline from <weights_dir>/<name>.pt"""
+    if name in VARIANTS:
+        w = os.path.join(weights_dir or C.OUT, f'{name}.pt')
+        if not os.path.exists(w):
+            w = os.path.join(CHECKPOINTS, C.SYSTEM, f'{name}.pt')
+        return NeuralChart.load(w, map_location=device).to(device).accelerate()
+    model = build_baseline(name, C.N_TRAIN, norm).to(device)
     if name in FLOAT_MODELS:
         model = model.float()
-    w = os.path.join(weights_dir or C.OUT, f'{name}.pt')
-    if not os.path.exists(w) and chart.is_chart(C.SYSTEM, name):
-        w = os.path.join(CHECKPOINTS, C.SYSTEM, f'{name}.pt')
-    model.load_state_dict(torch.load(w, map_location=device))
+    model.load_state_dict(torch.load(os.path.join(weights_dir or C.OUT, f'{name}.pt'), map_location=device))
     model.eval()
     set_max_sub(model, C.MAXSUB_EVAL)
     accelerate(model, name)
@@ -200,7 +203,7 @@ def make_track_gif(benchmark, device='cuda', weights_dir=None, out=None, traj=No
     drive = {k: v[traj:traj + 1] for k, v in sd['drive'].items()}
     panels = [('Reference', track_panel(None, None, sd['c'][traj].double().cpu()[idx], drive, hg, sc['species']))]
     for m in models:
-        if not chart.is_chart(C.SYSTEM, m) and not os.path.exists(os.path.join(weights_dir or C.OUT, f'{m}.pt')):
+        if m not in VARIANTS and not os.path.exists(os.path.join(weights_dir or C.OUT, f'{m}.pt')):
             print(f'{benchmark}: no weights for {m}, panel left out', flush=True)
             continue
         model = load_model(m, norm, device, weights_dir)

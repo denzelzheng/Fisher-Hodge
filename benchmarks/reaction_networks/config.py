@@ -13,7 +13,7 @@ read the module-level values (SYSTEM, DT, N_TRAIN, W_TRAIN, DATA, ...).
 Protocol (every model, seed 0): training window 100 sampling steps (MAPK: 20 steps, also 10 time units), rollouts of
 K in [4, 20] steps, batch 8, Adam lr 1e-3 with a cosine schedule on p = max(step / 4000, elapsed / 12 h), gradient
 clip 1.  Test rollouts run for 10T = 200 sampling steps.  Integration: neuralchart.fast, sample_err, float32 in training
-and evaluation, rtol 1e-4 (chosen with the `calibrate` command: the oracle's 10T error is at the integrator floor);
+and evaluation, the rtol of neuralchart.chart;
 substep cap 2000 per sampling interval in training and 4000 in evaluation.
 """
 import os

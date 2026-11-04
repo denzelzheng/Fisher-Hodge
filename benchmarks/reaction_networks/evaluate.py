@@ -1,19 +1,13 @@
-"""Evaluation on the test sets: the 10T error, negative values, local detailed balance and sigma against the
-reference force, thermodynamic readouts, and the extra readouts of each benchmark (front speed, ln gamma, Kpp
-fraction, moiety drift)."""
+"""Readouts of the reaction-network benchmarks: the error channels, ln gamma, the learned laws, front speed, Maxwell point."""
 import math
 import time
 
 import numpy as np
 import torch
 
-from neuralchart import fast
-from neuralchart.diagnostics import ldb_violation, LDB_RULE, relerr_traj
-from neuralchart.fit import rollout
 from . import config as C
 from . import truth as TR
-from .data import load_set
-from .models import UDE, rebind, set_max_sub, next_dtype, accelerate
+from .models import next_dtype
 
 
 def err_channels(n):
@@ -154,115 +148,3 @@ def maxwell_equal_area(model, a=3.0, blo=1.5, bhi=2.5):
         else:
             bhi = bm
     return 0.5 * (blo + bhi)
-
-
-@torch.no_grad()
-def eval_set(name, model, sd, n, log, snap, sname):
-    Y = sd['c']
-    B = Y.shape[0]
-    hg = TR.hg_of(n)
-    V = hg.V
-    dev = Y.device
-    t0 = time.time()
-    st = getattr(getattr(model, '_fast', None), 'stepper', None)
-    cap0 = st.cap_hits if st is not None else 0
-    R, ns, _ = rollout(model, sd['drive'], Y[:, 0], Y.shape[1] - 1, C.DT)
-    R = R.double().cpu()
-    Yc = Y.double().cpu()
-    ch = err_channels(n)
-    e = relerr_traj(R[..., ch], Yc[..., ch]).numpy()
-    fin = torch.isfinite(R.reshape(B, -1)).all(1)
-    lab = {k: v.double().cpu() for k, v in sd['drive'].items()}
-    m = dict(err_T=float(np.median(e[:, C.T_STEPS])), err_10T=float(np.median(e[:, -1])), err_10T_mean=float(np.mean(e[:, -1])),
-             err_10T_per_traj=e[:, -1].tolist(), err_curve=np.median(e, 0)[::10].tolist(),
-             n_blown=int((~fin).sum()), n_neg_traj=int((torch.nan_to_num(R, nan=0.0) < 0).reshape(B, -1).any(1).sum()),
-             neg_cell_frac=float((torch.nan_to_num(R, nan=0.0) < 0).double().mean()), min_value=float(np.nanmin(R.numpy())),
-             infer_time_s=time.time() - t0, substeps_per_DT=float(ns),
-             capped_DT=(st.cap_hits - cap0) if st is not None else None)
-    if C.SYSTEM == 'mapk_cascade':          # moieties (L basis of the hypergraph), Kpp fraction at the end
-        L = hg.on('cpu', torch.float64)['L']
-        q = torch.nan_to_num(R, nan=float('inf')) @ L
-        m['moiety_drift'] = dict(all=float((torch.linalg.vector_norm(q - q[:, :1], dim=-1) / torch.linalg.vector_norm(q[:, :1], dim=-1)).max()))
-        m['kpp_end_err'] = float(np.nanmedian((TR.kpp_fraction(R[:, -1]) - TR.kpp_fraction(Yc[:, -1])).abs().mean(-1).numpy()))
-    if C.is_pc():  # moieties: E at every site, total X + Xp
-        E = R[..., 2 * V:]; Xt = R[..., :2 * V].sum(-1)
-        m['moiety_drift'] = dict(E=float(((E - E[:, :1]).abs() / E[:, :1]).nan_to_num(float('inf')).max()),
-                                 X_total=float(((Xt - Xt[:, :1]).abs() / Xt[:, :1]).nan_to_num(float('inf')).max()))
-    has_flux = hasattr(model, 'flux')
-    if has_flux:
-        # local detailed balance against the reference force of the condition, with the model's own flux
-        nv = nval = nsn = ns_ = 0
-        for t in range(0, R.shape[1], 10):
-            c = R[:, t]
-            ok_c = torch.isfinite(c).all(1) & (c > 0).all(1)
-            a, b = model.rates(c.to(dev).to(next_dtype(model)).clamp_min(1e-30), sd['drive'])
-            a, b = a.double().cpu(), b.double().cpu()
-            J, Sab = a - b, a + b
-            at, bt = TR.true_rates(hg, lab, c.clamp_min(1e-300))
-            f = torch.log(at) - torch.log(bt)
-            f = torch.where(ok_c[:, None], f, torch.full_like(f, float('nan')))
-            ok = torch.isfinite(f) & torch.isfinite(J)
-            val = ok & (J.abs() > 1e-9 * J.abs().nan_to_num(0).amax(-1, keepdim=True).clamp_min(1e-30))
-            nv += int((ldb_violation(J, f, gross=None if isinstance(model, UDE) else Sab) & val).sum()); nval += int(val.sum())
-            sig = torch.where(ok, J * f, torch.zeros_like(J)).sum(-1)
-            good = ok_c & torch.isfinite(sig)
-            nsn += int((sig[good] < 0).sum()); ns_ += int(good.sum())
-        m['phys'] = dict(ldb_violation_frac=nv / max(nval, 1), sigma_neg_frac=nsn / max(ns_, 1), ldb_rule=LDB_RULE)
-    if has_flux and not isinstance(model, UDE):
-        # entropy production from the model's own one-way rates on the reference states
-        sgm, sgt = [], []
-        for t in range(0, Yc.shape[1], 5):
-            c = Yc[:, t]
-            a, b = model.rates(c.to(dev).to(next_dtype(model)), sd['drive'])
-            a, b = a.double().cpu(), b.double().cpu()
-            sgm.append(((a - b) * (torch.log(a) - torch.log(b))).sum(-1))
-            at, bt = TR.true_rates(hg, lab, c)
-            sgt.append(((at - bt) * (torch.log(at) - torch.log(bt))).sum(-1))
-        sgm, sgt = torch.stack(sgm, 1), torch.stack(sgt, 1)
-        se = (torch.linalg.vector_norm(sgm - sgt, dim=1) / torch.linalg.vector_norm(sgt, dim=1)).numpy()
-        m['sigma'] = dict(relerr=float(np.nanmedian(se)), ratio=float(np.median((sgm.mean(1) / sgt.mean(1)).numpy())))
-        a, b = model.rates(Yc[:, 0].to(dev).to(next_dtype(model)), sd['drive'])
-        la = (torch.log(a) - torch.log(b)).double().cpu()
-        ca = TR.model_cycle_affinity(la, V).numpy()
-        at, bt = TR.true_rates(hg, lab, Yc[:, 0])
-        ct = TR.model_cycle_affinity((torch.log(at) - torch.log(bt)).double(), V).numpy()
-        m['cycle_affinity'] = dict(model_mean=float(ca.mean()), true_mean=float(ct.mean()), mae=float(np.abs(ca - ct).mean()))
-    if name.startswith('chart'):
-        if C.is_pc() or C.SYSTEM == 'mapk_cascade':
-            m['k_law'] = k_law(model, sd, hg)
-        m['excess_law'] = excess_law(model, sd)
-    idx = list(range(min(4, B)))
-    snap[f'R_{sname}'] = R[idx].numpy().astype(np.float32)
-    if sname == 'planar_fronts':             # front speed against b across the Maxwell point (a = 3)
-        bb = lab['logab'][:, 1].exp().numpy()
-        vm, vt = front_speed(R.numpy(), bb, n), front_speed(Yc.numpy(), bb, n)
-        ok = np.isfinite(vm) & (np.abs(vt) > 1e-3)
-        m['front'] = dict(b=bb.tolist(), v_model=vm.tolist(), v_true=vt.tolist(), b_star_model=zero_cross(vm, bb),
-                          b_star_true=zero_cross(vt, bb),
-                          speed_relerr_median=float(np.median(np.abs(vm[ok] - vt[ok]) / np.abs(vt[ok]))) if ok.any() else None)
-    log(f'[{sname}] T {m["err_T"]:.4g} 10T {m["err_10T"]:.4g} | blown {m["n_blown"]} negative trajectories {m["n_neg_traj"]}'
-        + (f' | LDB violations {m["phys"]["ldb_violation_frac"]:.3g} sigma<0 {m["phys"]["sigma_neg_frac"]:.3g}' if 'phys' in m else '')
-        + f' | substeps/DT {m["substeps_per_DT"]:.1f} capped {m["capped_DT"]} {m["infer_time_s"]:.0f}s')
-    return m
-
-
-def evaluate(name, model, norm, device, log, sets=None):
-    """every test set (or the given ones); models trained on the training grid are rebound to the 16 x 16 grid"""
-    res, snap = {}, {}
-    for s in sets or C.sets():
-        sd = load_set(s, device)
-        n = sd['n']
-        m_ = rebind(name, model, n, norm, device) if n != C.N_TRAIN else model
-        if m_ is model and name == 'ude':
-            accelerate(m_, name)                 # the fast path's operators belong to the current grid
-        else:
-            fast.copy_config(model, m_)
-        if hasattr(m_, 'eval'):
-            m_.eval()
-        set_max_sub(m_, C.MAXSUB_EVAL)
-        if next_dtype(model) == torch.float32:
-            sd['c'] = sd['c'].float(); sd['drive'] = {k: v.float() for k, v in sd['drive'].items()}
-        res[s] = eval_set(name, m_, sd, n, log, snap, s)
-        if n != C.N_TRAIN and name in ('ude', 'bsms'):
-            model.set_n(C.N_TRAIN)
-    return res, snap

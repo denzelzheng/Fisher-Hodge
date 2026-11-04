@@ -20,7 +20,7 @@ Model inputs.  A discretisation is any point set with Voronoi cells.  The state 
 volume.  The material enters only through 12 edge descriptors computed on the pore map (porosity and connected-pair
 fractions at two window sizes, mixed into the edge frame), never through coordinates.
 
-    python -m benchmarks.porous_media.run generate --variant porous_media
+    python -m neuralchart.run --task porous_media --cmd generate
 """
 import json
 import math
@@ -30,7 +30,7 @@ import time
 import numpy as np
 import torch
 
-from .test_sets import CONDITIONS, GENERATED, DISC_OF, SET_NAME
+from .test_sets import CONDITIONS, GENERATED, SET_NAME
 
 N, NF = 32, 128                          # training grid, fine (reference) grid
 D = 0.02
@@ -515,24 +515,26 @@ class Disc:
         return s._hg
 
 
-def load_raw(variant, data_dir=None):
-    """the stored sets of a variant: <data directory of the variant>/<set>.pt"""
+def load_raw(variant, data_dir=None, sets=None, meta=None):
+    """the stored sets of a variant (default: all): <data directory of the variant>/<set>.pt"""
     dd = data_dir_of(variant, data_dir)
-    data = dict(meta=torch.load(os.path.join(dd, 'meta.pt')))
+    data = dict(meta=meta if meta is not None else torch.load(os.path.join(dd, 'meta.pt')))
     for f in sorted(os.listdir(dd)):
-        if f.endswith('.pt') and f != 'meta.pt':
+        if f.endswith('.pt') and f != 'meta.pt' and (sets is None or f[:-3] in sets):
             data[f[:-3]] = torch.load(os.path.join(dd, f))
     return data
 
 
-def load(variant, device='cpu', sets=None, data_dir=None):
-    """dict(set -> dict(c (B, T+1, V), drive, disc, J_end, med, pool), meta, discs); sets not generated are skipped"""
+def load(variant, device='cpu', sets=None, data_dir=None, meta=None, discs=None):
+    """dict(set -> dict(c (B, T+1, V), drive, disc, J_end, med, pool), meta, discs); sets not generated are skipped.  meta, discs: reuse
+    what an earlier call returned.  drive holds the keys of the Neural Chart (U, T, force, edge) and of the baselines."""
     from .test_sets import TEST_SETS
-    data = load_raw(variant, data_dir)
+    sets = sets or ['train', 'relax'] + list(TEST_SETS)
+    data = load_raw(variant, data_dir, sets, meta)
     meta = data['meta']
-    discs = {}
+    discs = {} if discs is None else discs
     res = dict(meta=meta, discs=discs)
-    for s in [k for k in (sets or ['train', 'relax'] + list(TEST_SETS)) if k in data]:
+    for s in [k for k in sets if k in data]:
         d = data[s]
         dn = d['disc']
         if dn not in discs:
@@ -543,6 +545,7 @@ def load(variant, device='cpu', sets=None, data_dir=None):
         drive = dict(U=gauss_eval(Up, G.g['pts']).float(), psin=gauss_eval(Pp, G.g['pts']).float(), line=face_drive(Pp, G.g).float(),
                      T=d['T'].to(device), amp=d['amp'].to(device), Ppar=Pp, ein=G.ein[d['pool']][med], ndesc=G.ndesc[d['pool']][med],
                      pmed=torch.as_tensor(meta['pools'][d['pool']]['pmed'], dtype=torch.float32, device=device)[med])
+        drive.update(force=drive['amp'][:, None] * drive['line'], edge=drive['ein'])
         res[s] = dict(c=d['rho'].to(device), drive=drive, disc=dn, J_end=d.get('J_end'), med=d['med'], pool=d['pool'])
     return res
 

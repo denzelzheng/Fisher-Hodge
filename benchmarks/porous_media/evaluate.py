@@ -10,18 +10,13 @@ Physics (sampled every 10 steps of the 10T rollout):
 The edge statistics need the model's own edge flux.  For models without one they are reported as N/A.
 """
 import math
-import time
 
 import numpy as np
 import torch
 
-from neuralchart import fast
 from neuralchart.chart import NeuralChart
 from neuralchart.diagnostics import ldb_violation, relerr_traj
-from neuralchart.fit import rollout
 from .data import D, DT, RHO_S
-from .models import rebind
-from .test_sets import TEST_SETS
 
 PHYS_EVERY = 10
 K_SETS = ('training_conditions', 'low_porosity', 'grid64', 'point_cloud')     # sets of the learned-law table
@@ -65,7 +60,7 @@ def k_metrics(model, sd, disc):
     med = sd['med'].numpy()
     first = np.unique(med, return_index=True)[1]
     idx = torch.as_tensor(first, device=sd['c'].device)
-    drive = {k: v[idx] for k, v in sd['drive'].items() if torch.is_tensor(v) and v.shape[0] == len(med)}
+    drive = {k: v[idx] for k, v in sd['drive'].items()}
     feats = model.featurizer(drive)
     gh = torch.exp(model.kinetics.core.double()[model.kinetics.typ] - math.log(D))[None].expand(feats['edge_sym'].shape[:2]).cpu().numpy().ravel()
     gt = disc.mtrue[sd['pool']][torch.as_tensor(med[first])].double().cpu().numpy().ravel()
@@ -86,12 +81,12 @@ def k_metrics_state(model, sd, disc, crowd, every=20):
     divided by (1 + rhobar_e / RHO_S) under crowding, with rhobar_e the mean density of the two cells on the same reference
     state."""
     kin = model.kinetics
-    feats = model.featurizer(sd['drive'])
-    x = feats['edge_sym']
+    x = model.featurizer(sd['drive'])['edge_sym']
+    E = disc.g['edges'].to(x.device)
     gt0 = disc.mtrue[sd['pool']][sd['med'].to(disc.mtrue[sd['pool']].device)].double().to(x.device)
     C = sd['c'][:, ::every].double().to(x.device)                             # (N, S, n)
-    rho = C * feats['invV'].double()[None, None]
-    rbar = 0.5 * (rho[..., feats['tail']] + rho[..., feats['head']])          # (N, S, H)
+    rho = C * torch.exp(-disc.g['logV']).to(C)[None, None]
+    rbar = 0.5 * (rho[..., E[:, 0]] + rho[..., E[:, 1]])                      # (N, S, H)
     core = kin.core.double()[kin.typ] - math.log(D)
     lh = core[None, None].expand_as(rbar).clone()
     if kin.rho_dependent:
@@ -99,7 +94,7 @@ def k_metrics_state(model, sd, disc, crowd, every=20):
             lh[:, t] = lh[:, t] + kin.state_term(x.double(), C[:, t])
     gt = gt0[:, None] / (1 + rbar / RHO_S) if crowd else gt0[:, None].expand_as(rbar)
     gh, gt = torch.exp(lh).cpu().numpy().ravel(), gt.cpu().numpy().ravel()
-    eps = (0.5 * (feats['ein'][..., 0] + 1)).double()[:, None].expand_as(rbar).cpu().numpy().ravel()
+    eps = (0.5 * (sd['drive']['ein'][..., 0] + 1)).double()[:, None].expand_as(rbar).cpu().numpy().ravel()
     rw = rbar.cpu().numpy().ravel()                                         # flux scale: J_e ~ k_e rhobar_e
     lh, lt = np.log(gh), np.log(gt)
     out = dict(pearson_logk=pearson(lh, lt), spearman_logk=pearson(rankdata(lh), rankdata(lt)), pearson_k=pearson(gh, gt),
@@ -182,92 +177,34 @@ def oracle_drive(data):
     """the true edge mobility as an input of every set (for the oracles)"""
     for s, sd in data.items():
         if isinstance(sd, dict) and 'drive' in sd:
-            disc = data['discs'][sd['disc']]
-            sd['drive']['mtrue'] = disc.mtrue[sd['pool']][sd['med'].to(sd['c'].device)]
+            sd['drive']['mtrue'] = true_edge_input(sd, data['discs'][sd['disc']])
+
+
+def true_edge_input(sd, disc):
+    """the true edge mobility of the trajectories of a set, (B, H)"""
+    return disc.mtrue[sd['pool']][sd['med'].to(sd['c'].device)]
 
 
 @torch.no_grad()
-def eval_model(name, model, data, log, device, sets=TEST_SETS, chunk=64, snap=None, state_k=False):
-    """roll the model out on every test set (in chunks of `chunk` trajectories) and return the metrics per set.
-    The model is rebuilt on the 64 x 64 grid and the point cloud with the same parameters.  snap (a dict) receives the
-    first four final states of every set.  state_k: the learned-law comparison at the reference states (Neural Charts;
-    the reported values come from law_metrics, which runs on the CPU)."""
-    snap = {} if snap is None else snap
-    res = {}
-    meta = data['meta']
-    for s in [k for k in sets if k in data]:
-        sd = data[s]; Y = sd['c']
-        disc = data['discs'][sd['disc']]
-        m_ = rebind(name, model, meta, disc, device) if sd['disc'] != 'g32' else model
-        if m_ is not None and m_ is not model:               # a rebuilt model: same dtype as the trained one
-            pd = {p.dtype for p in model.parameters()}
-            if len(pd) == 1:
-                m_ = m_.to(pd.pop())
-        if m_ is not None:
-            fast.copy_config(model, m_)
-        if m_ is None:
-            res[s] = None
-            log(f'[{s}] N/A on {sd["disc"]}')
-            continue
-        t0 = time.time()
-        Rs, Js, nsubs = [], [], []
-        acc = PhysAcc()
-        own = hasattr(m_, 'flux')
-        for i in range(0, Y.shape[0], chunk):
-            dr = {k: v[i:i + chunk] for k, v in sd['drive'].items()}
-            R, ns, _ = rollout(m_, dr, Y[i:i + chunk, 0], Y.shape[1] - 1, DT)
-            Rs.append(R.cpu()); nsubs.append(ns)
-            ctx = m_.prepare(dr) if own else None
-            two = own and hasattr(m_, 'rates') and not getattr(m_, 'free_flux', False)    # forward / backward rates a, b
-            phys_metrics_rollout(R, dr, disc, (lambda c: m_.flux(c, ctx)) if own else None, acc,
-                                 rates_fn=(lambda c: m_.rates(c, ctx)) if two else None)
-            if i == 0 and s in ('drive_x8', 'temperature_x0.25', 'training_conditions'):
-                j = 0; t = 100
-                Jm = m_.flux(R[:, t], ctx)[j] if own else disc.minnorm_flux((R[:, t + 1] - R[:, t]) / DT)[j]
-                snap[f'sig_{s}'] = local_sigma(R[j, t], Jm, {k: v[j] for k, v in dr.items() if torch.is_tensor(v)}, disc).cpu().numpy().astype(np.float32)
-                snap[f'rho_{s}_t100'] = R[j, t].cpu().numpy().astype(np.float32)
-            if hasattr(m_, 'flux') and sd['J_end'] is not None:
-                Js.append(m_.flux(R[:, -1], dr).cpu() if torch.isfinite(R[:, -1]).all() and R[:, -1].min() > 0 else torch.full((R.shape[0], disc.H), float('nan')))
-        R = torch.cat(Rs)
-        m = rollout_metrics(R, Y.cpu(), disc.g['dens'])
-        m['infer_time_s'] = time.time() - t0; m['substeps_per_DT'] = float(np.mean(nsubs))
-        m['phys'] = dict(acc.result(), flux='own' if own else 'min-norm')
-        if Js:
-            m.update(flux_metrics(torch.cat(Js), sd['J_end']))
-        if isinstance(m_, NeuralChart) and m_.config.kappa == 'learned':
-            km, kd = k_metrics(m_, sd, disc)
-            m['k'] = km
-            if state_k and s in K_SETS:
-                m['k_state'], kd = k_metrics_state(m_, sd, disc, bool(meta.get('crowd')))
-                snap.update({f'k_{s}_{k}': v for k, v in kd.items()})
-        snap[f'R_{s}'] = R[:4, -1].numpy().astype(np.float32)
-        res[s] = m
-        log(f'[{s}] T {m["err_T"]:.4g} 10T {m["err_10T"]:.4g} blown {m["n_blown"]} neg {m["n_neg_traj"]} mass {m["mass_drift_max"]:.1e}'
-            + (f' | J {m["J_relerr"]:.3g}' if 'J_relerr' in m else '')
-            + (f' | k r(log) {m["k"]["pearson_logk"]:.3f} rho_s {m["k"]["spearman_logk"]:.3f} r(k) {m["k"]["pearson_k"]:.3f} relerr {m["k"]["relerr_k"]:.3f}' if 'k' in m else '')
-            + f' | LDB viol {m["phys"]["ldb_violation_frac"]:.3g} sigma<0 {m["phys"]["sigma_neg_frac"]:.3g}'
-            + f' | sub {m["substeps_per_DT"]:.1f} t {m["infer_time_s"]:.0f}s')
-    return res
-
-
-
-
-@torch.no_grad()
-def law_metrics(variant, model_name, checkpoint, data_dir=None):
-    """the learned mobility of a Neural Chart against the true mobility at the reference states (the learned-law
-    table), on the CPU: {set: metrics}"""
-    from .data import load, add_norm
-    from .models import build
-    data = load(variant, 'cpu', sets=['train'] + list(K_SETS), data_dir=data_dir)
-    meta = add_norm(data['meta'], data)
-    base = build(model_name, meta, data['discs']['g32'])
-    base.load_state_dict(torch.load(checkpoint, map_location='cpu'))
-    base.eval()
-    out = {}
-    for s in K_SETS:
-        if s not in data:
-            continue
-        disc = data['discs'][data[s]['disc']]
-        m_ = rebind(model_name, base, meta, disc, 'cpu') if data[s]['disc'] != 'g32' else base
-        out[s], _ = k_metrics_state(m_, data[s], disc, bool(meta.get('crowd')))
-    return out
+def set_metrics(name, model, sd, R, Yc, m, disc, crowd):
+    """the readouts of one test set, added to the dict m: R, Yc (B, T + 1, V) float64 on the CPU.  Errors on the densities, mass, the
+    physics of the model's own flux (the minimum-norm flux of the step change for a model without one), the flux against the reference and
+    the learned law of a Neural Chart with a state-dependent mobility"""
+    m.update(rollout_metrics(R, Yc, disc.g['dens']))
+    if name == 'persistence':
+        return
+    dr = sd['drive']
+    Rd = R.to(sd['c'].device, dtype=sd['c'].dtype)
+    own = hasattr(model, 'flux')
+    two = own and not getattr(model, 'free_flux', False)     # forward / backward rates a, b
+    ctx = model.prepare(dr) if own else None
+    acc = phys_metrics_rollout(Rd, dr, disc, (lambda c: model.flux(c, ctx)) if own and not two else None, rates_fn=(lambda c: model.rates(c, ctx)) if two else None)
+    m['phys'] = dict(acc.result(), flux='own' if own else 'min-norm')
+    if own and sd['J_end'] is not None:
+        last = Rd[:, -1]
+        J = model.flux(last, dr) if torch.isfinite(last).all() and last.min() > 0 else torch.full((last.shape[0], disc.H), float('nan'))
+        m.update(flux_metrics(J, sd['J_end']))
+    if isinstance(model, NeuralChart) and model.kinetics.net is not None:
+        m['k'], _ = k_metrics(model, sd, disc)
+        if sd['name'] in K_SETS:
+            m['k_state'], _ = k_metrics_state(model, sd, disc, crowd)

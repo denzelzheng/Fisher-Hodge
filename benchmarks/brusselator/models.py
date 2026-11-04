@@ -1,12 +1,4 @@
-"""Models of the Brusselator benchmark: the Neural Chart and its ablations, the oracle, and the baselines.
-
-Neural Chart.  mu = log c + mu0 for X and Y; the drive is the chemostat force of (a, b, d, e); log k is a table over the
-six hyperedge types (R1-R4, transport of X and Y), log omega_c; there are no material descriptors and no state term.
-The chemostats also enter k through their symmetric mass-action factor.  The standard potentials mu0 of X, Y and of
-the chemostats are learned together with k (they enter log a and log b linearly, so the closed-form step fits them
-with k).  The variant chart-given-mu0 takes them from thermochemical data and fixes them; then the force f of every
-hyperedge is the true force and only k is learned.  Its gauge of mu0 is the minimum-norm solution of
-<nu+ - nu-, mu0> = log(k_r / eps); any other gauge is absorbed by k.
+"""Models of the Brusselator benchmark other than the Neural Chart (neuralchart.NeuralChart): the oracle and the baselines.
 
 Baselines (all see the same data):
   crnn_mass_action  CRNN with a log rate table over the hyperedge types and the chemostats as mass-action factors
@@ -18,21 +10,21 @@ Baselines (all see the same data):
 """
 import contextlib
 import math
+import os
 
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as Fn
 
-from neuralchart import fast
-from neuralchart.chart import NeuralChart, is_chart, chart_config
+from neuralchart import NeuralChart, VARIANTS, fast
+from neuralchart.chart import RTOL
 from neuralchart.model import MLP, Context, featurizer
 from neuralchart.baselines import FluxGNN, CRNN
 from neuralchart.graphs import grid_edge_list
-from .config import STEP, KF, EPS, DIFF, H_GRID, N_TRAIN
+from .config import CHECKPOINTS, DT, STEP, KF, EPS, DIFF, H_GRID, MAXSUB_EVAL, N_TRAIN, RUNS
 from .data import hg_of
 
-TASK = 'brusselator'
 GRAPH_BUFFERS = ('p_h', 'p_m', 'p_v', 'm_h', 'm_m', 'm_v')
 
 
@@ -60,18 +52,7 @@ def chem_featurizer(hg):
     return feat
 
 
-# ------------------------------------------------------------------------------------------ the Neural Chart
-def chart_model(n, cls=NeuralChart, excess='none', material=False):
-    """the Neural Chart class on the n x n grid (standard potentials still free, log k = 0)"""
-    hg = hg_of(n)
-    with default_dtype(torch.float64):
-        m = cls.from_parts(hg, harmonic=False, featurizer=chem_featurizer(hg), step=dict(STEP), learn_mu0=True, learn_chem_mu0=True,
-                           excess=excess == 'learned', material=material)
-    m = m.double()
-    m.step = dict(STEP)
-    return m
-
-
+# ------------------------------------------------------------------------------------------ the oracle and the known constants
 @torch.no_grad()
 def set_true(m):
     """the reference in the Neural Chart class (exact for every a, b): reaction r has forward constant k_r and reverse
@@ -95,30 +76,32 @@ def true_log_k():
     return [0.5 * math.log(k * EPS) for k in KF] + [math.log(d / H_GRID ** 2) for d in DIFF]
 
 
-@torch.no_grad()
-def give_mu0(m):
-    """the given standard potentials: set to the reference values and frozen; log k starts at 0 and the closed-form
-    step solves for k alone (a convex NNLS problem)"""
-    set_true(m)
-    m.kinetics.core.zero_()
-    m.free_energy.mu0.requires_grad_(False); m.drive.chem_mu0.requires_grad_(False)
-    m.linear_parameters = lambda: [m.kinetics.core]
+def oracle(n):
+    """the true rates in the chart class on the n x n grid, for the integration floor and the tests"""
+    m = set_true(NeuralChart(hg_of(n), excess=False, material=False))
+    m.dt.fill_(DT)
     return m
 
 
-def build_chart(cfg, n=N_TRAIN, norm=None):
-    """the Neural Chart of a ChartConfig: log k = log omega over the six hyperedge types"""
-    assert cfg.task == TASK and cfg.kappa in ('learned', 'constant', 'true')
-    m = chart_model(n, excess=cfg.excess, material=cfg.kappa == 'learned')
-    if cfg.kappa == 'true':
-        set_true(m)                                 # oracle: the true k and mu0
-    elif cfg.mu0 == 'given':
-        give_mu0(m)
-    if cfg.drive == 'off':
-        m.knobs['drive_scale'] = 0.0                # A = 0: detailed balance (the reversible ablation)
-    m.drive.s_A.requires_grad_(False)               # no external force field (s_A multiplies nothing)
-    m.config = cfg
-    return m
+_REF = {}
+
+
+def _reference():
+    """the reference model on a small grid: the standard potentials in one gauge"""
+    if not _REF:
+        m = set_true(NeuralChart(hg_of(4), excess=False, material=False))
+        _REF.update(mu0=m.free_energy.mu0.detach().cpu().tolist(), chem_mu0=m.drive.chem_mu0.detach().cpu().tolist())
+    return _REF
+
+
+def known_chem_mu0():
+    """the standard free energies of the chemostats A, B, D, E, known physical data"""
+    return _reference()['chem_mu0']
+
+
+def known_mu0():
+    """the standard potentials of X and Y (oracle-type information)"""
+    return _reference()['mu0']
 
 
 # ------------------------------------------------------------------------------------------ baselines
@@ -401,9 +384,7 @@ FLOAT32_MODELS = ('fno', 'bsms', 'flux_gnn', 'ude', 'generic_fno')      # traine
 
 
 def build(name, n, norm):
-    """a model by name: a Neural Chart (neuralchart.chart.CONFIGS['brusselator']) or a baseline"""
-    if is_chart(TASK, name):
-        return build_chart(chart_config(TASK, name), n, norm)
+    """a baseline by name"""
     if name in ('crnn_mass_action', 'crnn_features'):
         return make_crnn(n, norm, name == 'crnn_mass_action')
     if name == 'flux_gnn':
@@ -418,7 +399,7 @@ def build(name, n, norm):
         return GenericFNOMap(norm)
     if name == 'persistence':
         return Persistence()
-    raise ValueError(name)
+    raise ValueError(f'unknown model {name!r}')
 
 
 def next_dtype(model):
@@ -426,15 +407,37 @@ def next_dtype(model):
     return p.dtype if p is not None and not p.is_complex() else torch.float64
 
 
+def set_max_sub(model, k):
+    STEP['max_sub'] = k
+    for mod in model.modules() if hasattr(model, 'modules') else []:
+        st = getattr(mod, 'step', None)
+        if isinstance(st, dict) and 'max_sub' in st:
+            st['max_sub'] = k
+
+
+def accelerate(model, name):
+    """the integrator of every model with positive rates; the UDE closure integrates with error control only"""
+    if fast.supports(model):
+        fast.restore(model)
+        kw = dict(control='err_only', compact=True) if name == 'ude' else dict(control='sample_err')
+        fast.accelerate(model, rtol=RTOL, precision='fp32', graphs=True, **kw)
+    return model
+
+
 def rebind(name, model, n, norm, device):
     """the same trained parameters on another grid (no retraining)"""
     if name in ('fno', 'generic_fno', 'persistence'):
         return model
-    if name in ('ude', 'bsms'):
-        kw = dict(model._fast.kw) if getattr(model, '_fast', None) is not None else None
-        model.set_n(n)
-        if kw is not None:                 # rebound in place: the fast operators belong to the old grid
-            fast.restore(model); fast.accelerate(model, **kw)
+    if name == 'bsms':
+        return model if model.n == n else model.set_n(n)
+    if name == 'ude':
+        if model.hg is not hg_of(n):
+            kw = dict(model._fast.kw) if getattr(model, '_fast', None) is not None else None
+            model.set_n(n)
+            if kw is not None:             # rebound in place: the fast operators belong to the old grid
+                fast.restore(model); fast.accelerate(model, **kw)
+        return model
+    if model.hg is hg_of(n):
         return model
     new = build(name, n, norm).to(device).to(next_dtype(model))
     gb = lambda k: k.split('.')[-1] in GRAPH_BUFFERS     # exact buffer names ('chem_mu0' contains 'm_m')
@@ -442,3 +445,22 @@ def rebind(name, model, n, norm, device):
     missing, unexpected = new.load_state_dict(sd, strict=False)
     assert not unexpected and all(gb(k) for k in missing), (missing, unexpected)
     return new.eval()
+
+
+def load_trained(name, norm, device, weights=None):
+    """a trained model in its evaluation configuration on the training grid, None without weights: a Neural Chart from <weights>/<name>.pt
+    or checkpoints/brusselator/<name>.pt, a baseline from <weights>/<name>.pt (weights default: runs/brusselator)"""
+    dirs = [weights or RUNS] + ([CHECKPOINTS] if name in VARIANTS else [])
+    f = next((p for p in (os.path.join(d, name + '.pt') for d in dirs) if os.path.exists(p)), None)
+    if name in VARIANTS:
+        return None if f is None else NeuralChart.load(f, map_location=device).to(device).accelerate()
+    if f is None and name not in ('oracle', 'persistence'):
+        return None
+    model = (oracle(N_TRAIN) if name == 'oracle' else build(name, N_TRAIN, norm)).to(device)
+    if f is not None:
+        model.load_state_dict(torch.load(f, map_location=device))
+    model.eval()
+    set_max_sub(model, MAXSUB_EVAL)
+    if name in ('flux_gnn', 'ude'):
+        model = model.float()
+    return accelerate(model, name)

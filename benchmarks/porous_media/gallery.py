@@ -15,7 +15,8 @@ flagged.
   medium_and_law.png   an unseen medium: the pore map, the true mobility, and the learned mobility of the Neural Chart
                        on the 32 x 32 grid and on the point cloud (same parameters, no retraining).
 
-    python -m benchmarks.porous_media.run gallery
+    python -m neuralchart.run --task porous_media --cmd gifs --track     # the animations
+    python -m neuralchart.run --task porous_media --cmd figures          # medium_and_law.png
 """
 import io
 import math
@@ -24,15 +25,15 @@ import os
 import numpy as np
 import torch
 
-from neuralchart import fast
+from neuralchart import NeuralChart
 from neuralchart.diagnostics import ldb_violation
 from neuralchart.fit import rollout
 from benchmarks.common import CHECKPOINTS, ROOT, RESULTS, LABELS, check_gpu
 from .data import (NF, DT, D, T_TEST, POR_TRAIN, POR_LOW, RASTER, make_pool, fine_inputs, fine_edge_mobility,
                    truth_mobility_raw, M_FLOOR, ref_flux, escape_max, projector, load, add_norm)
-from .models import build, rebind
+from .models import load_trained
 from .evaluate import phys_force, local_sigma, oracle_drive
-from .test_sets import CONDITIONS, LABEL
+from .test_sets import CONDITIONS
 
 MAGENTA = '#d81b60'                 # physics violation (the colour of negative values in the other animations)
 TRACER = '#56b4e9'                  # tracers in cells without a violation (Okabe-Ito sky blue)
@@ -47,9 +48,6 @@ SCENE_TITLE = dict(training_conditions='training conditions', drive_x8='drive ×
                    point_cloud='point cloud of 1024 cells (no retraining)')
 # the three animations shown in the README (assets/); the others go to results/porous_media/gallery/
 README_PICKS = ('porous_media_track_drive_x8', 'porous_media_entropy_drive_x8', 'porous_media_track_point_cloud')
-RUN_SETTINGS = {'chart': dict(control='sample_err', rtol=0.3, precision='fp32'),
-                'flux_gnn': dict(control='sample_err', rtol=0.3, precision='fp32'),
-                'ude': dict(control='err_only', rtol=1e-3, precision='fp32')}
 
 
 # ------------------------------------------------------------------------------------------ fluxes on a discretisation
@@ -121,11 +119,6 @@ def reference_scene(variant, key, j, disc, meta, device, frames):
     return torch.stack(R).numpy(), torch.stack(J).numpy()
 
 
-def _weights(variant, model, weights):
-    p = os.path.join(CHECKPOINTS, variant, model + '.pt')
-    return p if os.path.exists(p) else os.path.join(weights or os.path.join(ROOT, 'runs', variant), model + '.pt')
-
-
 @torch.no_grad()
 def model_scene(variant, name, data, key, j, device, frames, weights=None):
     """roll out model `name` on trajectory j of set `key`; returns the states, the edge fluxes, the cells flagged
@@ -133,12 +126,7 @@ def model_scene(variant, name, data, key, j, device, frames, weights=None):
     meta = data['meta']
     sd = data[key]
     disc = data['discs'][sd['disc']]
-    m = build(name, meta, data['discs']['g32']).to(device)
-    m.load_state_dict(torch.load(_weights(variant, name, weights), map_location=device))
-    m.eval()
-    if sd['disc'] != 'g32':
-        m = rebind(name, m, meta, disc, device)
-    fast.accelerate(m, **RUN_SETTINGS[name])
+    m = load_trained(variant, name, meta, data['discs']['g32'], disc, device, weights)
     dr = {k: v[j:j + 1] for k, v in sd['drive'].items()}
     R, _, _ = rollout(m, dr, sd['c'][j:j + 1, 0], T_TEST, DT)
     ctx = m.prepare(dr)
@@ -402,11 +390,9 @@ def medium_and_law(path=None, data_dir=None, j=0):
     variant = 'porous_media'
     path = path or os.path.join(ROOT, 'assets', 'medium_and_law.png')
     data = load(variant, 'cpu', sets=['train', 'training_conditions', 'point_cloud'], data_dir=data_dir)
-    meta = add_norm(data['meta'], data)
+    meta = data['meta']
     oracle_drive(data)
-    base = build('chart', meta, data['discs']['g32'])
-    base.load_state_dict(torch.load(os.path.join(CHECKPOINTS, variant, 'chart.pt'), map_location='cpu'))
-    base.eval()
+    base = NeuralChart.load(os.path.join(CHECKPOINTS, variant, 'chart.pt'))
     med = int(data['training_conditions']['med'][j])
     pore = meta['pools']['test']['pore'][med].numpy()
     Mpix = meta['Mpix']['test'][med].double().mean(0).numpy()            # mean of the x and y pixel mobilities
@@ -414,7 +400,7 @@ def medium_and_law(path=None, data_dir=None, j=0):
     rows = []
     for key, lab in (('training_conditions', '32×32 grid'), ('point_cloud', 'point cloud')):
         sd = data[key]; disc = data['discs'][sd['disc']]
-        m = base if sd['disc'] == 'g32' else rebind('chart', base, meta, disc, 'cpu')
+        m = base.on(disc.hg())
         feats = m.featurizer({k: v[j:j + 1] for k, v in sd['drive'].items()})
         c1 = torch.exp(disc.g['logV'].double())[None]                  # the state of uniform density 1
         kap = m.kinetics.core.double()[m.kinetics.typ] - math.log(D) + m.kinetics.state_term(feats['edge_sym'].double(), c1)[0]

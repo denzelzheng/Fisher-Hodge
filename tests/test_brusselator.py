@@ -7,12 +7,12 @@ import numpy as np
 import pytest
 import torch
 
-from neuralchart.chart import CONFIGS, chart_config, fit_chart
+from neuralchart import NeuralChart
 from neuralchart.fit import fit_linear, rollout
 from neuralchart.diagnostics import relerr_traj
 from benchmarks.brusselator import config as C
-from benchmarks.brusselator.data import hg_of, true_rates, TruthNP, make_traj, load_set
-from benchmarks.brusselator.models import build_chart, true_log_k
+from benchmarks.brusselator.data import conditions, hg_of, true_rates, TruthNP, make_traj, load_set
+from benchmarks.brusselator.models import known_chem_mu0, known_mu0, oracle, true_log_k
 
 N = 4          # a small grid for the unit tests (same spacing h)
 
@@ -26,19 +26,16 @@ def _conditions(B, seed=1):
     g = torch.Generator().manual_seed(seed)
     a = 0.8 + 1.4 * torch.rand(B, generator=g, dtype=torch.float64)
     b = 2.0 + 2.5 * torch.rand(B, generator=g, dtype=torch.float64)
-    return dict(logab=torch.stack([a.log(), b.log()], 1))
+    return conditions(torch.stack([a.log(), b.log()], 1))
 
 
-def test_ablations_are_one_override():
-    base = CONFIGS['brusselator']['chart']
-    for name, cfg in CONFIGS['brusselator'].items():
-        diff = [k for k in base.__dataclass_fields__ if getattr(cfg, k) != getattr(base, k)]
-        assert len(diff) <= (4 if name == 'oracle' else 1), (name, diff)        # the oracle: given mu0, ideal activities, true k, not trained
+def _chart(n=N, **kw):
+    return NeuralChart(hg_of(n), chemostats=known_chem_mu0(), **kw)
 
 
 @torch.no_grad()
 def test_oracle_equals_reference_rates():
-    m = build_chart(chart_config('brusselator', 'oracle'), n=N)
+    m = oracle(N)
     c, dr = _states(5, N), _conditions(5)
     a, b = m.rates(c, dr)
     at, bt = true_rates(hg_of(N), dr['logab'], c)
@@ -49,7 +46,7 @@ def test_oracle_equals_reference_rates():
 def test_sigma_nonnegative_for_any_parameters():
     """the Neural Chart (learned standard potentials): for random k and mu0 every hyperedge flux runs along the
     model's own force log(a / b), so sigma >= 0"""
-    m = build_chart(chart_config('brusselator', 'chart'), n=N)
+    m = _chart()
     g = torch.Generator().manual_seed(3)
     for p in m.linear_parameters():
         p.data.copy_(torch.randn(p.shape, generator=g, dtype=torch.float64))
@@ -62,7 +59,7 @@ def test_sigma_nonnegative_for_any_parameters():
 def test_given_mu0_fixes_the_force():
     """with the given standard potentials the force log(a / b) is the reference force for every k, so local detailed
     balance against the true force and sigma >= 0 hold for any parameter value"""
-    m = build_chart(chart_config('brusselator', 'chart-given-mu0'), n=N)
+    m = _chart(mu0=known_mu0())
     m.kinetics.core.copy_(torch.randn(m.kinetics.core.shape, generator=torch.Generator().manual_seed(2), dtype=torch.float64))
     c, dr = _states(5, N), _conditions(5)
     a, b = m.rates(c, dr)
@@ -75,7 +72,7 @@ def test_given_mu0_fixes_the_force():
 
 @torch.no_grad()
 def test_reversible_ablation_dissipates_free_energy():
-    m = build_chart(chart_config('brusselator', 'chart-reversible'), n=N)
+    m = _chart(reversible=True)
     out = m.readouts(_states(4, N), _conditions(4))
     assert float(out['A'].abs().max()) == 0.0
     assert bool((out['dFdt'] <= 1e-10 * out['sigma']).all())
@@ -94,8 +91,8 @@ def test_nnls_recovers_the_rate_constants():
         ts = np.arange(41) * dt
         sol = solve_ivp(TruthNP(N, a, b).rhs, (0, ts[-1]), c0, method='DOP853', t_eval=ts, rtol=1e-12, atol=1e-14)
         cs.append(sol.y.T); labs.append([math.log(a), math.log(b)])
-    tr = dict(c=torch.as_tensor(np.stack(cs)), drive=dict(logab=torch.tensor(labs, dtype=torch.float64)))
-    m = build_chart(chart_config('brusselator', 'chart-given-mu0'), n=N)
+    tr = dict(c=torch.as_tensor(np.stack(cs)), drive=conditions(torch.tensor(labs, dtype=torch.float64)))
+    m = _chart(mu0=known_mu0())
     fit_linear(m, dict(train=tr), dt, log=lambda *a: None)
     err = np.abs(m.kinetics.core.detach().numpy() - np.array(true_log_k()))
     assert err.max() < 1e-4, err
@@ -122,8 +119,8 @@ def test_generator_reproduces_stored_data():
 def test_shipped_checkpoint(name, tol):
     """the shipped Neural Charts on four test trajectories over 40 sampling steps, with the reference integrator in
     float64; with given potentials the learned log k is the true one"""
-    m = build_chart(chart_config('brusselator', name), n=C.N_TRAIN)
-    m.load_state_dict(torch.load(os.path.join(C.CHECKPOINTS, name + '.pt'), map_location='cpu'))
+    m = NeuralChart.load(os.path.join(C.CHECKPOINTS, name + '.pt'))
+    m.step = dict(m.step, dt_max=C.DT / 8)
     if name == 'chart-given-mu0':
         assert np.abs(m.kinetics.core.numpy() - np.array(true_log_k())).max() < 1e-3
     sd = load_set('training')

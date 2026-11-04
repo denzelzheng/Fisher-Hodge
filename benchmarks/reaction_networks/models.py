@@ -1,11 +1,7 @@
-"""Models of the reaction-network benchmarks: the Neural Chart of each network and the baselines.
+"""Models of the reaction-network benchmarks other than the Neural Chart (neuralchart.NeuralChart): the oracle and the baselines.
 
-Neural Chart (neuralchart.model).  The drive is the chemostat force, and the chemostats also enter k through their
-mass-action factor.  The standard potentials mu0 of the species and the chemostats are learned together with k: they enter log a and log b
-linearly, so the closed-form step fits them with omega.  The variant chart-given-mu0 takes them from the reference model
-instead (the information an oracle would have) and learns k only.
-
-Baselines (inputs: the hyperedge type and the z-scored conditions; the phosphorylation cycle adds the potential):
+Baselines (inputs: the hyperedge type and the z-scored conditions; the phosphorylation networks add the potential and, on heterogeneous
+media, the local descriptors):
   crnn_mass_action  CRNN with the chemostats as exact mass-action factors and a log rate table per hyperedge type
   crnn_features     CRNN whose forward / backward rate constants are an MLP of the hyperedge and condition features
   flux_gnn          Flux-GNN (neuralchart.baselines.FluxGNN)
@@ -22,8 +18,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as Fn
 
-from neuralchart import fast
-from neuralchart import chart
+from neuralchart import NeuralChart, fast
 from neuralchart.model import FreeEnergy, MLP, Mobility, Context, featurizer as base_featurizer
 from neuralchart.fit import set_to_rates
 from neuralchart.graphs import grid_edge_list
@@ -43,7 +38,7 @@ def default_dtype(dt):
 
 # ------------------------------------------------------------------------------------------ the Neural Chart
 class TrueActivity(FreeEnergy):
-    """mu = log x + mu0 + ln gamma(x) with the reference model's crowding ln gamma (oracle only)"""
+    """the oracle of the crowded models: mu = log x + mu0 + the excess potential of the generator"""
     local_excess = True
 
     @property
@@ -60,40 +55,6 @@ class TrueActivity(FreeEnergy):
         return super().value(c, ctx) + G
 
 
-def chem_featurizer(hg):
-    """drive = dict(logab (B, k) log concentrations of the first k chemostats; the others are at 1) -> features with
-    chem_logc and the hyperedge type as the only mobility feature"""
-    base, nC = base_featurizer(hg), len(hg.meta['chemostats'])
-
-    def feat(F):
-        lab = F['logab']
-        if lab.shape[1] < nC:
-            lab = torch.cat([lab, torch.zeros(lab.shape[0], nC - lab.shape[1], dtype=lab.dtype, device=lab.device)], -1)
-        return base(dict(chem_logc=lab))
-    feat.n_edge_sym = base.n_edge_sym
-    return feat
-
-
-DESCRIPTORS = ('m', 's', 'n')                   # the 3 local descriptors per hyperedge of the heterogeneous media
-
-
-def pc_featurizer(hg, descriptors=False):
-    """phosphorylation cycle: drive dict(U (B, V), dG (B,)) -> potential U on X and Xp (0 on E), chemostats ATP, ADP at
-    log c = +-dG / 2 (ATP ADP = 1); mobility features: the hyperedge type and, when they exist, the local descriptors"""
-    base = base_featurizer(hg, DESCRIPTORS if descriptors else ())
-
-    def feat(F):
-        U, dG = F['U'], F['dG'].reshape(-1)
-        d = dict(U=torch.cat([U, U, torch.zeros_like(U)], 1), chem_logc=torch.stack([0.5 * dG, -0.5 * dG], 1))
-        if descriptors:
-            d['edge'] = F['edge']
-        if 'logm' in F:                                  # read only by the oracle (TrueMediumMobility)
-            d['logm'] = F['logm']
-        return base(d)
-    feat.n_edge_sym = base.n_edge_sym
-    return feat
-
-
 class TrueMediumMobility(Mobility):
     """the oracle with a true k that is not a class constant: the true factor of the medium, or the saturation factor"""
     @property
@@ -108,30 +69,10 @@ class TrueMediumMobility(Mobility):
         return TR.pc_state_logk(s.hg, c)
 
 
-def _base(hg, cls, excess, material, featurizer, known=None):
-    with default_dtype(torch.float64):
-        m = cls.from_parts(hg, harmonic=False, step=dict(C.STEP), learn_mu0=True, learn_chem_mu0=True, featurizer=featurizer,
-                           excess=excess == 'learned', material=material, chem_mu0_known=known)
-    m = m.double()
-    m.step = dict(C.STEP)
-    return m
-
-
-def base_model(n, excess='none', material=False, known=None):
-    """the Neural Chart on the n x n grid of the benchmark; the inputs (featurizer) are all that differs"""
-    hg = TR.hg_of(n)
-    feat = (TR.mapk_featurizer(hg, False) if C.SYSTEM == 'mapk_cascade' else pc_featurizer(hg, C.hetero()) if C.is_pc()
-            else chem_featurizer(hg))
-    return _base(hg, chart.NeuralChart, excess, material, feat, known)
-
-
 def _pc_ref_state(hg):
     g = torch.Generator().manual_seed(3)
     c = 0.3 + torch.rand(1, hg.M, generator=g, dtype=torch.float64)
-    drive = dict(U=0.5 * torch.randn(1, hg.V, generator=g, dtype=torch.float64), dG=torch.tensor([1.7], dtype=torch.float64))
-    if C.hetero():                                       # the class constants are set at descriptors 0, without a medium
-        drive.update(edge=torch.zeros(1, hg.H, n_desc(), dtype=torch.float64))
-    return c, drive
+    return c, TR.conditions(dict(U=0.5 * torch.randn(1, hg.V, generator=g, dtype=torch.float64), dG=torch.tensor([1.7], dtype=torch.float64)))
 
 
 @torch.no_grad()
@@ -142,16 +83,16 @@ def set_true_mass_action(model, kf, kb, D, logab=None):
     c = torch.rand(1, hg.M, generator=g, dtype=torch.float64) + 0.5
     logab = torch.tensor([[0.3, -0.2]], dtype=torch.float64) if logab is None else logab
     a, b = TR.mass_action_rates(hg, logab, c, kf, kb, D)
-    return set_to_rates(model, c, dict(logab=logab), a[0], b[0])
+    return set_to_rates(model, c, dict(chem_logc=logab), a[0], b[0])
 
 
 @torch.no_grad()
 def set_true(m):
-    """the reference model's constants in the class (exact for every condition; the activity part is set separately)"""
+    """the reference model's constants in the class (exact for every condition; the excess potential is set separately)"""
     if C.SYSTEM == 'mapk_cascade':
         g = torch.Generator().manual_seed(3)
         c = 0.05 + torch.rand(1, m.hg.M, generator=g, dtype=torch.float64)
-        drive = dict(logc=torch.tensor([[0.4, -0.1, 0.2]], dtype=torch.float64))
+        drive = TR.conditions(dict(logc=torch.tensor([[0.4, -0.1, 0.2]], dtype=torch.float64)))
         a, b = TR.true_rates(m.hg, drive, c)
         err = set_to_rates(m, c, drive, a[0], b[0])
     elif C.is_pc():
@@ -164,48 +105,40 @@ def set_true(m):
     return m
 
 
-_TRUE_LOGK, _CHEM_MU0 = {}, {}
+_REF = {}
 
 
-def known_chem_mu0():
-    """the standard free energies of the chemostats, from the reference model: (C, v) of Drive, every chemostat known"""
-    if C.SYSTEM not in _CHEM_MU0:
-        _CHEM_MU0[C.SYSTEM] = set_true(base_model(4)).drive.chem_mu0.detach().cpu().numpy()
-    v = _CHEM_MU0[C.SYSTEM]
-    return np.eye(len(v)), v
+def _reference():
+    """the reference model on a small grid: log k per class and the standard potentials, in one gauge"""
+    if C.SYSTEM not in _REF:
+        m = set_true(NeuralChart(TR.hg_of(4), excess=False, material=False))
+        _REF[C.SYSTEM] = dict(log_k=m.kinetics.core.detach().cpu().tolist(), mu0=m.free_energy.mu0.detach().cpu().numpy(),
+                              chem_mu0=m.drive.chem_mu0.detach().cpu().numpy())
+    return _REF[C.SYSTEM]
 
 
 def true_log_k():
-    """log k per hyperedge type of the reference model, in the gauge of the given standard potentials"""
-    if C.SYSTEM not in _TRUE_LOGK:
-        m = set_true(base_model(4))
-        _TRUE_LOGK[C.SYSTEM] = m.kinetics.core.detach().cpu().tolist()
-    return _TRUE_LOGK[C.SYSTEM]
+    return _reference()['log_k']
 
 
-def build_chart(cfg, n=None, norm=None):
-    """the Neural Chart of a ChartConfig; mu0 learned (with omega) or given (the reference values, frozen)"""
-    n = C.N_TRAIN if n is None else n
-    assert cfg.task in chart.REACTION_TASKS and cfg.kappa in ('learned', 'constant', 'true')
-    if cfg.task != C.SYSTEM:
-        C.configure(cfg.task)
-    known = known_chem_mu0() if cfg.chem_mu0 == 'known' and cfg.kappa != 'true' and cfg.mu0 != 'given' else None
-    m = base_model(n, 'learned' if cfg.excess == 'learned' else 'none', cfg.kappa == 'learned', known)
-    if cfg.kappa == 'true' or cfg.mu0 == 'given':
-        set_true(m)
-    if cfg.kappa != 'true' and cfg.mu0 == 'given':
-        with torch.no_grad():
-            m.kinetics.core.zero_()
-        m.free_energy.mu0.requires_grad_(False); m.drive.chem_mu0.requires_grad_(False)
-        m.linear_parameters = lambda: [m.kinetics.core]
-    if cfg.excess == 'true':
+def known_chem_mu0():
+    """the standard free energies of the chemostats, known physical data"""
+    return _reference()['chem_mu0'].tolist()
+
+
+def known_mu0():
+    """the standard potentials of the internal species (oracle-type information)"""
+    return _reference()['mu0'].tolist()
+
+
+def oracle(n):
+    """the true rates in the chart class, for the integration floor and the tests"""
+    m = set_true(NeuralChart(TR.hg_of(n), excess=False, material=False))
+    if C.nonideal() or C.interacting():
         m.free_energy.__class__ = TrueActivity
-    if cfg.kappa == 'true' and (C.hetero() or C.saturating()):
+    if C.hetero() or C.saturating():
         m.kinetics.__class__ = TrueMediumMobility
-    if cfg.drive == 'off':
-        m.knobs['drive_scale'] = 0.0
-    m.drive.s_A.requires_grad_(False)                   # no external force field (s_A multiplies nothing)
-    m.config = cfg
+    m.dt.fill_(C.DT)
     return m
 
 
@@ -269,17 +202,14 @@ def bb_featurizer(hg, norm):
 
 
 def mass_action_featurizer(hg):
-    """CRNN (mass action) inputs: the chemostats as exact mass-action factors and the hyperedge type; on the
-    phosphorylation cycle also the oriented potential difference"""
-    if C.SYSTEM == 'mapk_cascade':
-        return TR.mapk_featurizer(hg, False)
-    if not C.is_pc():
-        return chem_featurizer(hg)
+    """CRNN (mass action) inputs: the chemostats as exact mass-action factors and the hyperedge type; on the phosphorylation networks
+    also the oriented potential difference"""
     base = base_featurizer(hg)
+    if not C.is_pc():
+        return base
 
     def feat(F):
-        dG = F['dG'].reshape(-1)
-        f = base(dict(chem_logc=torch.stack([0.5 * dG, -0.5 * dG], 1)))
+        f = base({k: F[k] for k in ('chem_logc',)})
         f['dU'], _ = edge_potential(hg, F)
         return f
     feat.n_edge_sym = base.n_edge_sym
@@ -609,12 +539,6 @@ def build_baseline(name, n, norm):
     raise ValueError(name)
 
 
-def build(name, n, norm):
-    if chart.is_chart(C.SYSTEM, name):
-        return build_chart(chart.chart_config(C.SYSTEM, name), n, norm)
-    return build_baseline(name, n, norm)
-
-
 GRAPH_BUFFERS = ('p_h', 'p_m', 'p_v', 'm_h', 'm_m', 'm_v')
 
 
@@ -625,11 +549,13 @@ def next_dtype(model):
 
 def rebind(name, model, n, norm, device):
     """the same trained parameters on another grid (no retraining)"""
+    if name == 'oracle':
+        return oracle(n).to(device)
     if name in ('fno', 'persistence', 'generic_fno'):
         return model
     if name in ('ude', 'bsms'):
         return model.set_n(n)
-    new = build(name, n, norm).to(device).to(next_dtype(model))
+    new = build_baseline(name, n, norm).to(device).to(next_dtype(model))
     gb = lambda k: k.split('.')[-1] in GRAPH_BUFFERS
     missing, unexpected = new.load_state_dict({k: v for k, v in model.state_dict().items() if not gb(k)}, strict=False)
     assert not unexpected and all(gb(k) for k in missing), (missing, unexpected)

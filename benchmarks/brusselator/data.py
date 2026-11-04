@@ -1,6 +1,6 @@
 """Reference data of the Brusselator: hypergraph, true rates, generation and loading.
 
-    python -m benchmarks.brusselator.run generate            # every set, written to $NEURALCHART_DATA/brusselator
+    python -m neuralchart.run --task brusselator --cmd generate     # every set, written to $NEURALCHART_DATA/brusselator
 """
 import math
 import os
@@ -157,10 +157,17 @@ def describe(d):
     return ' | '.join(out) + f' | max c {C.max():.2f} min c {C.min():.2e}'
 
 
+def conditions(logab):
+    """the conditions of trajectories at the chemostats logab (B, 2) = (log a, log b): logab for the baselines, chem_logc (B, 4) with
+    d = e = 1 for the Neural Chart"""
+    return dict(logab=logab, chem_logc=torch.cat([logab, torch.zeros(logab.shape[0], len(CHEM) - logab.shape[1], dtype=logab.dtype, device=logab.device)], -1))
+
+
 def load_set(name, device='cpu', data=DATA):
     d = torch.load(os.path.join(data, f'{name}.pt'))
     d['c'] = d['c'].to(device)
-    d['drive'] = dict(logab=d['logab'].to(device))
+    d['drive'] = conditions(d['logab'].to(device))
+    d['name'] = name
     return d
 
 

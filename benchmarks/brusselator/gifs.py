@@ -1,10 +1,9 @@
 """Comparison animations of the Brusselator for the README.
 
-    python -m benchmarks.brusselator.run gifs [--weights DIR]
-    python -m benchmarks.brusselator.run gifs --track [--weights DIR]     # the tracer animation (make_track_gif)
-The Neural Chart comes from checkpoints/brusselator.  Baseline weights are not shipped: train them with
-`run train --model <name>` (written to runs/brusselator) or pass --weights DIR with DIR/<name>.pt.  Panels without
-weights are left out.
+    python -m neuralchart.run --task brusselator --cmd gifs [--weights DIR]
+    python -m neuralchart.run --task brusselator --cmd gifs --track [--weights DIR]     # the tracer animation (make_track_gif)
+Weights: DIR/<name>.pt (default runs/brusselator); a Neural Chart variant not found there comes from checkpoints/brusselator.  Baseline
+weights are not shipped.  Panels without weights are left out.
 """
 import os
 
@@ -13,10 +12,9 @@ import torch
 
 from benchmarks.common import LABELS
 from neuralchart.fit import rollout
-from .config import CHECKPOINTS, RUNS, DT, N_TRAIN, MAXSUB_EVAL, RTOL
-from .data import load_set, train_norm
-from .models import build
-from .training import accelerate, default_fast, set_max_sub
+from .config import DT
+from .data import conditions, load_set, train_norm
+from .models import FLOAT32_MODELS, load_trained
 
 ASSETS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'assets')
 # (file, test set, trajectory, models after the reference, what the scene shows, sampling steps shown).  Trajectory 30
@@ -32,36 +30,21 @@ SCENES = [
 TRAINING_RANGE = 'training a 0.9–1.1, b 2.3–3.0'
 
 
-def weights_of(name, weights=RUNS):
-    for d in (CHECKPOINTS, weights):
-        f = os.path.join(d, name + '.pt')
-        if os.path.exists(f):
-            return f
-    return None
-
-
 @torch.no_grad()
-def model_rollout(name, sd, i, norm, device, weights=RUNS, with_model=False):
+def model_rollout(name, sd, i, norm, device, weights=None, with_model=False):
     """rollout of trajectory i in the evaluation configuration of the model; None without weights.  with_model: also
     return the model"""
-    f = weights_of(name, weights)
-    if f is None and name not in ('oracle', 'persistence'):
+    model = load_trained(name, norm, device, weights)
+    if model is None:
         return None
-    model = build(name, N_TRAIN, norm).to(device)
-    if f is not None:
-        model.load_state_dict(torch.load(f, map_location=device))
-    model.eval()
-    set_max_sub(model, MAXSUB_EVAL)
     c0, dr = sd['c'][i:i + 1, 0], {k: v[i:i + 1] for k, v in sd['drive'].items()}
-    if name in ('flux_gnn', 'ude', 'fno', 'bsms', 'generic_fno'):
-        model = model.float()
+    if name in FLOAT32_MODELS:
         c0, dr = c0.float(), {k: v.float() for k, v in dr.items()}
-    accelerate(model, default_fast(name, dict(control='sample_err', rtol=RTOL, precision='fp32', graphs=True)))
     R, _, _ = rollout(model, dr, c0, sd['c'].shape[1] - 1, DT)
     return (R[0].double().cpu().numpy(), model) if with_model else R[0].double().cpu().numpy()
 
 
-def make_gifs(device='cuda', data=None, weights=RUNS, scenes=SCENES, panel_in=2.8, max_mb=1.7):
+def make_gifs(device='cuda', data=None, weights=None, scenes=SCENES, panel_in=2.8, max_mb=1.7):
     """one GIF per scene: X on the grid at the chosen sampling steps, with the relative error of the full state
     (X and Y) against the reference in every panel"""
     from scripts.gif_tools import comparison_gif
@@ -118,7 +101,7 @@ def track_panel(model, states, logab, hg, species):
     if model is None:
         return hypergraph_track(hg, species, c, at - bt, f, at + bt)
     dev = next(iter(model.parameters())).device
-    cm, dr = c.to(dev).to(next_dtype(model)), dict(logab=lab.to(dev).to(next_dtype(model)))
+    cm, dr = c.to(dev).to(next_dtype(model)), conditions(lab.to(dev).to(next_dtype(model)))
     if isinstance(model, UDE):
         return hypergraph_track(hg, species, c, model.flux(cm, dr).double().cpu(), f, None)
     a, b = model.rates(cm, dr)
@@ -126,7 +109,7 @@ def track_panel(model, states, logab, hg, species):
     return hypergraph_track(hg, species, c, a - b, f, a + b)
 
 
-def make_track_gif(device='cuda', data=None, weights=RUNS, scene=TRACK):
+def make_track_gif(device='cuda', data=None, weights=None, scene=TRACK):
     """the tracer animation of the scene; panels without weights are left out.  Returns the path, the size in MB and
     the fraction of flagged cells over the clip per panel."""
     from scripts.gif_tools import grid_disc

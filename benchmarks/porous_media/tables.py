@@ -1,5 +1,5 @@
 """Result tables of the porous-media benchmark, written from results/<variant>/runs/<model>.json (or from a directory
-of <model>.json files that run.py train writes, runs/<variant>/).
+of <model>.json files that neuralchart.run writes, runs/<variant>/).
 
 main       relative L2 error of the density at 10T per test set, negative-density trajectories, parameters
 physics    local-detailed-balance violations, samples with sigma < 0, negative cell values
@@ -12,7 +12,7 @@ import json
 import os
 
 from neuralchart.chart import ABLATIONS
-from benchmarks.common import LABELS, OWN_FLUX, RESULTS, excess_table, load_runs, write_table, fmt, param_cell
+from benchmarks.common import LABELS, OWN_FLUX, RESULTS, excess_table, load_runs, write_table, param_cell
 from .test_sets import COLUMNS, LABEL
 
 MODELS = {
@@ -26,7 +26,9 @@ LAW_SETS = [('training_conditions', 'unseen media, 32×32 grid'), ('low_porosity
 
 
 def _set(r, s):
-    return (r.get('sets') or {}).get(s)
+    """the metrics of set s; None where the model cannot run"""
+    v = (r.get('sets') or {}).get(s)
+    return None if v is None or v.get('not_applicable') else v
 
 
 def main_rows(runs, models, key='err_10T'):

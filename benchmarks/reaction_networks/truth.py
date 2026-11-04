@@ -69,6 +69,19 @@ TOTALS = dict(KKK=1.0, KK=1.0, K=1.0, E2=0.2, P2=0.3, P3=0.3)
 INPUT_SITES = [0, 1, 4, 5]                       # the 2 x 2 corner
 
 
+def conditions(drive):
+    """the chemostat levels of Conditions from the conditions of a benchmark"""
+    d = dict(drive)
+    if 'logc' in d:
+        d['chem_logc'] = d['logc']
+    elif 'logab' in d:
+        d['chem_logc'] = d['logab']
+    elif 'dG' in d:
+        dG = d['dG'].reshape(-1)
+        d['chem_logc'] = torch.stack([0.5 * dG, -0.5 * dG], 1)
+    return d
+
+
 def phi_of():
     return PHI if C.nonideal() else 0.0
 

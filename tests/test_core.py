@@ -1,13 +1,11 @@
 """Unit tests of the library (CPU, a few seconds): hypergraph algebra, the structure of the master equation, the
 integrators, the closed-form fit and the configurations."""
-import dataclasses
 
 import numpy as np
 import pytest
 import torch
 
-from neuralchart import CONFIGS, Hypergraph, MasterEquation, fast
-from neuralchart.chart import ChartConfig
+from neuralchart import Hypergraph, MasterEquation, fast
 from neuralchart.diagnostics import ldb_violation
 from neuralchart.fit import fit_linear, rollout
 from neuralchart.integrators import positive_ssp_rk2
@@ -101,7 +99,7 @@ def test_conservation_and_positivity():
 
 def test_excess_starts_at_zero_and_grows_without_bound():
     hg = network()
-    m = MasterEquation.from_parts(hg, harmonic=False)
+    m = MasterEquation.from_parts(hg)
     c = state(hg, 2)
     assert float(m.free_energy.correction(c, None).abs().max()) == 0
     fe = model(hg, excess=True).free_energy
@@ -157,12 +155,5 @@ def test_ldb_rule_ignores_rounding():
 
 
 def test_every_ablation_is_one_override():
-    for task, cfgs in CONFIGS.items():
-        base = dataclasses.asdict(cfgs['chart'])
-        for name, cfg in cfgs.items():
-            assert isinstance(cfg, ChartConfig) and cfg.task == task
-            diff = {k for k, v in dataclasses.asdict(cfg).items() if v != base[k]}
-            if name.startswith('oracle'):
-                assert 'train' in diff
-            elif name != 'chart':
-                assert len(diff) == 1, (task, name, diff)
+    from neuralchart.chart import VARIANTS
+    assert all(len(v) <= 1 for v in VARIANTS.values()) and VARIANTS['chart'] == {}

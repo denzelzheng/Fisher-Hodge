@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 import torch
 
-from neuralchart.chart import chart_config
+from neuralchart import NeuralChart, VARIANTS
 from neuralchart.fit import train, rollout
 from benchmarks.common import CHECKPOINTS, RESULTS
 from benchmarks.porous_media import data as PD
@@ -30,10 +30,19 @@ def drive_on(pool, disc, T=1.0, amp=1.0):
     B = len(pool['med'])
     Up, Pp = torch.as_tensor(pool['Upar']), torch.as_tensor(pool['Ppar'])
     med = torch.as_tensor(pool['med'])
+    line = PD.face_drive(Pp, disc.g).float()
     return dict(U=PD.gauss_eval(Up, disc.g['pts']).float(), psin=PD.gauss_eval(Pp, disc.g['pts']).float(),
-                line=PD.face_drive(Pp, disc.g).float(), T=torch.full((B,), T), amp=torch.full((B,), amp), Ppar=Pp,
-                ein=disc.ein['p'][med], ndesc=disc.ndesc['p'][med], pmed=torch.as_tensor(pool['pmed'], dtype=torch.float32)[med],
+                line=line, force=amp * line, T=torch.full((B,), T), amp=torch.full((B,), amp), Ppar=Pp,
+                ein=disc.ein['p'][med], edge=disc.ein['p'][med], ndesc=disc.ndesc['p'][med], pmed=torch.as_tensor(pool['pmed'], dtype=torch.float32)[med],
                 mtrue=disc.mtrue['p'][med])
+
+
+def chart_on(disc, name='chart'):
+    """a Neural Chart variant on a discretisation, with the integrator of a fitted one"""
+    m = NeuralChart(disc.hg(), descriptors=12, **VARIANTS[name])
+    m.dt.fill_(PD.DT)
+    m.accelerate()
+    return m
 
 
 def fine_disc():
@@ -70,20 +79,14 @@ def _fine_inputs(pool, Mpix, T, amp):
     U, dpsi, r0 = PD.fine_inputs(pool, 'cpu')
     Me = PD.fine_edge_mobility(Mpix)[torch.as_tensor(pool['med'])]
     B = U.shape[0]
-    F = dict(U=U.reshape(B, -1), T=torch.full((B,), T, dtype=torch.float64), amp=torch.full((B,), amp, dtype=torch.float64),
-             line=dpsi.reshape(B, -1), ein=torch.zeros(B, PD.NF ** 2 * 2, 12, dtype=torch.float64),
-             pmed=torch.zeros(B, dtype=torch.float64), mtrue=Me.reshape(B, -1))
+    F = dict(U=U.reshape(B, -1), T=torch.full((B,), T, dtype=torch.float64), force=amp * dpsi.reshape(B, -1), mtrue=Me.reshape(B, -1))
     return U, dpsi, r0, Me, F
 
 
 def test_reference_operator_is_in_the_model_class(tiny):
     """on the 128 x 128 reference grid the master equation with the true face mobilities is the reference operator"""
     pool, chi, Mpix, _, _ = tiny
-    torch.set_default_dtype(torch.float64)
-    try:
-        m = PM.build_chart(chart_config('porous_media', 'oracle-no-crowding'), dict(crowd=False, RHO_S=PD.RHO_S), fine_disc()).double()
-    finally:
-        torch.set_default_dtype(torch.float32)
+    m = PM.oracle(fine_disc().hg())
     T, amp = 2.0, 3.0
     U, dpsi, r0, Me, F = _fine_inputs(pool, Mpix, T, amp)
     ref, _ = PD.ref_flux(r0, PD.D * PD.NF ** 2 * T * Me, U / T, amp * dpsi / T, crowd=False)
@@ -94,13 +97,8 @@ def test_reference_operator_is_in_the_model_class(tiny):
 def test_crowding_oracle_matches_reference(tiny):
     """with crowding the oracle (true mobility times 1 / (1 + rhobar / rho_s), no parameters) is the reference operator"""
     pool, chi, Mpix, _, _ = tiny
-    meta = dict(crowd=True, RHO_S=PD.RHO_S)
-    torch.set_default_dtype(torch.float64)
-    try:
-        m = PM.build_chart(chart_config('porous_media', 'oracle'), meta, fine_disc()).double()
-        m0 = PM.build_chart(chart_config('porous_media', 'oracle-no-crowding'), meta, fine_disc()).double()
-    finally:
-        torch.set_default_dtype(torch.float32)
+    hg = fine_disc().hg()
+    m, m0 = PM.oracle(hg, PD.RHO_S), PM.oracle(hg)
     assert m.kinetics.rho_dependent and not m0.kinetics.rho_dependent
     T, amp = 2.0, 3.0
     U, dpsi, _, Me, F = _fine_inputs(pool, Mpix, T, amp)
@@ -138,7 +136,8 @@ def test_models_train_and_transfer(tiny, name):
     meta = dict(meta, norm=dict(U=(0.0, 1.0), psi=(0.0, 1.0), line=0.1))
     torch.manual_seed(0)
     g32 = discs['g32']
-    m = PM.build(name, meta, g32)
+    chart = name in VARIANTS
+    m = chart_on(g32, name) if chart else PM.build(name, meta, g32)
     dr = drive_on(pool, g32)
     B = dr['U'].shape[0]
     c0 = PD.projector(g32.g)(PD.fine_inputs(pool, 'cpu')[2]).float()
@@ -147,13 +146,15 @@ def test_models_train_and_transfer(tiny, name):
     assert info['train_nskip'] == 0
     R = rollout(m, dr, c0, 2, PD.DT)[0]
     assert torch.isfinite(R).all()
-    m2 = PM.rebind(name, m, meta, discs['cloud'], 'cpu')
+    m2 = m.on(discs['cloud'].hg()) if chart else PM.rebind(name, m, meta, discs['cloud'], 'cpu')
     if name == 'fno':
         assert m2 is None
         return
     p1 = {k: v for k, v in m.state_dict().items() if not any(b in k for b in PM.GRAPH_BUFFERS)}
     p2 = m2.state_dict()
     assert all(torch.equal(v, p2[k]) for k, v in p1.items())
+    if chart:
+        m2.accelerate()
     d2 = drive_on(pool, discs['cloud'])
     c2 = PD.projector(discs['cloud'].g)(PD.fine_inputs(pool, 'cpu')[2]).float()
     R2 = rollout(m2, d2, c2, 1, PD.DT)[0]
@@ -168,16 +169,13 @@ def test_chart_physics_for_random_parameters(tiny, disc_name):
     pool, _, _, meta, discs = tiny
     disc = discs[disc_name]
     torch.manual_seed(1)
-    torch.set_default_dtype(torch.float64)
-    try:
-        m = PM.build('chart', dict(meta, norm=None), disc).double()
-    finally:
-        torch.set_default_dtype(torch.float32)
+    m = NeuralChart(disc.hg(), descriptors=12)
     with torch.no_grad():
         for n, p in m.named_parameters():
             if n not in ('drive.s_A', 'free_energy.l3.weight', 'free_energy.l3.bias'):    # the drive scale is physics; G tested below
                 p.add_(0.5 * torch.randn_like(p))
         dr = {k: (v.double() if torch.is_tensor(v) and v.is_floating_point() else v) for k, v in drive_on(pool, disc, T=3.0, amp=6.0).items()}
+        dr['force'] = dr['amp'][:, None] * dr['line']
         c = torch.exp(torch.randn(dr['U'].shape[0], disc.V, dtype=torch.float64))
         a, b = m.rates(c, dr)
         f = PE.phys_force(c, dr, disc)
@@ -199,7 +197,7 @@ def test_chart_rollout_stays_positive(tiny):
     """a short rollout of the untrained Neural Chart under drive: positive densities, no LDB violation"""
     pool, _, _, meta, discs = tiny
     disc = discs['g32']
-    m = PM.build('chart', dict(meta, norm=None), disc)
+    m = chart_on(disc)
     dr = drive_on(pool, disc, T=2.0, amp=4.0)
     c0 = PD.projector(disc.g)(PD.fine_inputs(pool, 'cpu')[2]).float()
     R = rollout(m, dr, c0, 1, PD.DT)[0]
@@ -224,11 +222,9 @@ DATA = PD.data_dir_of('porous_media')
 def test_shipped_chart_reproduces_the_reported_error():
     """the shipped Neural Chart on the first 4 trajectories of 'drive ×4' (CPU, plain integrator): the median error is
     close to the reported one (the reported value uses all 64 trajectories and the fast integrator)"""
-    data = PD.load('porous_media', 'cpu', sets=['train', 'drive_x4'])
-    meta = PD.add_norm(data['meta'], data)
-    m = PM.build('chart', meta, data['discs']['g32'])
-    m.load_state_dict(torch.load(os.path.join(CHECKPOINTS, 'porous_media', 'chart.pt'), map_location='cpu'))
-    m.eval()
+    data = PD.load('porous_media', 'cpu', sets=['drive_x4'])
+    m = NeuralChart.load(os.path.join(CHECKPOINTS, 'porous_media', 'chart.pt'))
+    m.step = dict(m.step, dt_max=PD.DT / 8)
     sd = data['drive_x4']
     dr = {k: v[:4] for k, v in sd['drive'].items()}
     R = rollout(m, dr, sd['c'][:4, 0], sd['c'].shape[1] - 1, PD.DT)[0]

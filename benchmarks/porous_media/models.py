@@ -1,33 +1,37 @@
-"""Models of the porous-media benchmark: the Neural Chart and the baselines on any discretisation.
+"""Models of the porous-media benchmark other than the Neural Chart (neuralchart.NeuralChart): the oracle and the baselines on any
+discretisation.
 
-Neural Chart       neuralchart.MasterEquation with the mesh geometry and the 12 local descriptors as inputs
-UDE closure        the same edges and descriptors with a free antisymmetric edge flux
+UDE closure        the same edges and descriptors as the Neural Chart with a free antisymmetric edge flux
 Flux-GNN           neuralchart.baselines.FluxGNN with the black-box inputs below
 FNO                residual next-step map on n x n grids
 BSMS-GNN           neuralchart.baselines.bsms_gnn on the cells of any discretisation
+GENERIC-FNO        neuralchart.baselines.generic_fno as a next-step map on n x n grids
+HelmFluid          neuralchart.baselines.helmfluid as a next-step map on the 32 x 32 grid
 Persistence        u(t) = u(0)
-GENERIC-FNO and HelmFluid have their own training loops (benchmarks/porous_media/train.py).
+BSMS-GNN, GENERIC-FNO and HelmFluid have their own training loops (benchmarks/porous_media/fitters.py).
 Black-box node inputs (node_cond): U and amp * psi (z-scored with training-set scalars), T, amp, 6 local descriptors.
 """
-import math
 import os
 
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as Fn
 
+from neuralchart import NeuralChart, VARIANTS, fast
+from neuralchart.chart import RTOL
 from neuralchart.model import Mobility, MLP, Context
 from neuralchart.baselines import FluxGNN
 from neuralchart.baselines.bsms_gnn import MeshGraphNets, BSMSGNN, bistride_hierarchy, hierarchy_tensors
-from .data import D, DT, N, KREF, line_integrals, edge_inputs
+from benchmarks.common import CHECKPOINTS, ROOT
+from .data import D, DT, N, KREF
 
 STEP = dict(dt_max=DT / 8, theta0=0.9, theta1=1.0, max_sub=20000, t_tol=1e-9)
+HELM_T_IN, HELM_T_OUT = 10, 10
 
 
-# ------------------------------------------------------------------------------------------ the Neural Chart
+# ------------------------------------------------------------------------------------------ the oracle
 class TrueMobility(Mobility):
-    """the oracles: k = D T w_e M_e, the true edge mobility; crowding: times the true crowding factor 1 / (1 + rhobar_e / rho_s)"""
+    """k = D T w_e M_e, the true edge mobility (conditions['mtrue']); crowding: times the true crowding factor 1 / (1 + rhobar_e / rho_s)"""
     def __init__(s, n_edge_feats, hg, rho_s=None):
         super().__init__(n_edge_feats, hg, material=False)
         s.rho_s = rho_s
@@ -38,45 +42,22 @@ class TrueMobility(Mobility):
 
     def base(s, feats):
         dt = feats['edge_sym'].dtype
-        return D * s.w.to(dt)[None] * feats['T'].to(dt)[:, None] * feats['mtrue'].to(dt)
+        return D * s.w.to(dt)[None] * feats['T'].to(dt)[:, None] * feats['raw']['mtrue'].to(dt)
 
     def state_term(s, x, c):
         return -torch.log1p(torch.exp(s.log_cbar(c)[..., 0]) / s.rho_s)
 
 
-def chart_featurizer(disc):
-    """the inputs of the Neural Chart on a discretisation: potential U / T - log(V_i / Vbar), the drive line integrals and the
-    hyperedge features: the class one-hot (one class) and the 12 local descriptors"""
-    logV, E = disc.g['logV'], disc.g['edges']
-
-    def feat(F):
-        U = F['U']; B = U.shape[0]
-        T = F['T'].to(U.dtype)
-        x = torch.cat([torch.ones(B, disc.H, 1, dtype=U.dtype, device=U.device), F['ein'].to(U.dtype)], -1)
-        f = dict(U=U - T[:, None] * logV.to(U.device, U.dtype)[None], T=T, line=F['amp'][:, None] * F['line'], chem_logc=None, chem_mu0=None,
-                 edge_sym=x, edge_ori=torch.zeros(B, disc.H, dtype=U.dtype, device=U.device),
-                 node={}, ein=F['ein'], pmed=F['pmed'], raw=F, tail=E[:, 0].to(U.device), head=E[:, 1].to(U.device),
-                 invV=torch.exp(-logV).to(U.device, U.dtype))
-        if 'mtrue' in F:
-            f['mtrue'] = F['mtrue']
-        return f
-    feat.n_edge_sym = 13
-    return feat
-
-
-def build_chart(cfg, meta=None, disc=None):
-    """the Neural Chart of a ChartConfig on porous media.  With crowding in the data, the oracle uses the true crowding factor."""
-    from neuralchart.chart import NeuralChart
-    assert cfg.task == 'porous_media'
-    m = NeuralChart.from_parts(disc.hg(), harmonic=False, featurizer=chart_featurizer(disc), step=dict(STEP), learn_mu0=True,
-                               excess=cfg.excess == 'learned', material=cfg.kappa == 'learned')
-    if cfg.kappa in ('true', 'true_material'):
-        crowd = cfg.kappa == 'true' and bool(meta is not None and meta.get('crowd'))
-        m.kinetics = TrueMobility(m.featurizer.n_edge_sym, disc.hg(), rho_s=meta['RHO_S'] if crowd else None)
-    if cfg.drive == 'off':
-        m.knobs['drive_scale'] = 0.0
-    m.drive.s_A.requires_grad_(False)              # the drive is known physics: A = amp int F.dl / T exactly
-    m.config = cfg
+def oracle(hg, rho_s=None):
+    """the true rates in the chart class on a discretisation, for the integration floor and the tests; needs 'mtrue' in the conditions"""
+    old = torch.get_default_dtype()
+    torch.set_default_dtype(torch.float64)
+    try:
+        m = NeuralChart(hg, excess=False, material=False)
+        m.kinetics = TrueMobility(m.featurizer.n_edge_sym, hg, rho_s=rho_s)
+    finally:
+        torch.set_default_dtype(old)
+    m.dt.fill_(DT)
     return m
 
 
@@ -90,6 +71,13 @@ def node_cond(F, norm):
 
 
 NC = 10
+
+
+def grid_cond(drive, norm):
+    """the condition channels on an n x n grid, (B, NC, n, n)"""
+    c = node_cond(drive, norm)
+    n = int(round(c.shape[1] ** 0.5))
+    return c.transpose(1, 2).reshape(c.shape[0], NC, n, n).float()
 
 
 class SpectralConv2d(nn.Module):
@@ -167,6 +155,8 @@ class BSMSOp(nn.Module):
         s.disc = None
 
     def set_disc(s, disc, device=None):
+        if s.disc is disc:
+            return s
         g = disc.g
         E = g['edges']
         s._snd = torch.cat([E[:, 0], E[:, 1]]).long()
@@ -303,6 +293,60 @@ class FluxGNNEdges(FluxGNN):
         return _ckpt(lambda c_: FluxGNN.rates(s, c_, ctx), c)
 
 
+class GenericFNOMap(nn.Module):
+    """GENERIC-FNO (neuralchart.baselines.generic_fno) as a next-step map with the condition fields as input channels"""
+    name = 'generic_fno'
+
+    def __init__(s, norm):
+        super().__init__()
+        from neuralchart.baselines.generic_fno import GenericFNO
+        s.norm = norm
+        s.net = GenericFNO(n_fields=1, n_cond=NC)
+
+    def prepare(s, drive):
+        return Context(cond=grid_cond(drive, s.norm))
+
+    def context(s, drive):
+        return drive if isinstance(drive, Context) else s.prepare(drive)
+
+    def advance(s, c, drive, Dt, **kw):
+        ctx = s.context(drive)
+        n = ctx['cond'].shape[-1]
+        v = s.net(c.reshape(-1, 1, n, n).float().detach(), ctx['cond'], create_graph=False)
+        bad = ~torch.isfinite(v).flatten(1).all(1) | (v.flatten(1).abs().amax(1) > 1e4)
+        return torch.where(bad[:, None, None, None], torch.full_like(v, float('nan')), v).reshape(c.shape).to(c.dtype), 1
+
+
+class HelmFluidMap(nn.Module):
+    """HelmFluid_2D_corr_potential (neuralchart.baselines.helmfluid, the settings of its scripts/Navier_Stokes_HelmFluid.sh, NC condition
+    channels) as an autoregressive map on the 32 x 32 grid: the context of a rollout holds the last T_in frames, padded with rho_0"""
+    name = 'helmfluid'
+
+    def __init__(s, norm):
+        super().__init__()
+        from types import SimpleNamespace
+        from neuralchart.baselines.helmfluid import conditioned_helmfluid
+        s.norm = norm
+        s.net = conditioned_helmfluid(SimpleNamespace(groups=4, dataset_name='NS', in_dim=HELM_T_IN + NC, out_dim=1, d_model=64, padding='0,0'), NC)
+
+    def prepare(s, drive):
+        return Context(cond=grid_cond(drive, s.norm).permute(0, 2, 3, 1), hist=None)
+
+    def context(s, drive):
+        return drive if isinstance(drive, Context) else s.prepare(drive)
+
+    def advance(s, c, drive, Dt, **kw):
+        ctx = s.context(drive)
+        h = ctx['hist']
+        if h is None:
+            h = c.reshape(-1, N, N, 1).float().repeat(1, 1, 1, HELM_T_IN)
+        im, _, _ = s.net(torch.cat([h, ctx['cond']], -1))
+        bad = ~torch.isfinite(im).flatten(1).all(1) | (im.flatten(1).abs().amax(1) > 1e4)
+        im = torch.where(bad[:, None, None, None], torch.full_like(im, float('nan')), im)
+        ctx['hist'] = torch.cat([h[..., 1:], im], -1)
+        return im[..., 0].reshape(c.shape).to(c.dtype), 1
+
+
 class Persistence(nn.Module):
     """u(t) = u(0)"""
     name = 'persistence'
@@ -317,12 +361,24 @@ class Persistence(nn.Module):
         return c, 1
 
 
+class NotOnThisMesh(nn.Module):
+    """stands in for a model that cannot run on a discretisation (FNO-type models on the point cloud, HelmFluid off the training grid):
+    NaN everywhere; the task marks the set as not applicable"""
+    name = 'not_on_this_mesh'
+
+    def prepare(s, drive):
+        return Context()
+
+    def context(s, drive):
+        return drive if isinstance(drive, Context) else s.prepare(drive)
+
+    def advance(s, c, drive, Dt, **kw):
+        return torch.full_like(c, float('nan')), 1
+
+
 def build(model, meta, disc):
-    """a model by key: a Neural Chart (neuralchart.chart.CONFIGS['porous_media']) or a baseline"""
-    from neuralchart import chart
+    """a baseline by key"""
     norm = meta['norm']
-    if chart.is_chart('porous_media', model):
-        return build_chart(chart.chart_config('porous_media', model), meta, disc)
     if model == 'fno':
         return FNOOp(norm)
     if model == 'bsms':
@@ -333,6 +389,10 @@ def build(model, meta, disc):
         return Persistence()
     if model == 'flux_gnn':
         return FluxGNNEdges(disc.hg(), 1 + NC, 4, graph_featurizer(norm, disc), hidden=64, layers=3, scale=KREF, step=dict(STEP))
+    if model == 'generic_fno':
+        return GenericFNOMap(norm)
+    if model == 'helmfluid':
+        return HelmFluidMap(norm)
     raise ValueError(f'unknown model {model!r}')
 
 
@@ -342,15 +402,47 @@ GRAPH_BUFFERS = ('p_h', 'p_m', 'p_v', 'm_h', 'm_m', 'm_v')
 def rebind(model_name, model, meta, disc, device):
     """the same trained model on another discretisation (no retraining): rebuild the graph-dependent parts, keep the
     parameters.  Returns None when the model cannot run there."""
-    if model_name == 'fno':
+    if model_name in ('fno', 'generic_fno'):
         return model if disc.g['kind'] == 'grid' else None
+    if model_name == 'helmfluid':
+        return model if disc.name == 'g32' else None
     if model_name == 'persistence':
         return model
     if model_name == 'bsms':
         return model.set_disc(disc)
-    cfg = getattr(model, 'config', None)
-    new = (build_chart(cfg, meta, disc) if cfg is not None else build(model_name, meta, disc)).to(device)
-    gb = lambda k: any(b in k for b in GRAPH_BUFFERS)
+    if model.hg is disc.hg():
+        return model
+    new = build(model_name, meta, disc).to(device)
+    gb = lambda k: k.split('.')[-1] in GRAPH_BUFFERS
     missing, unexpected = new.load_state_dict({k: v for k, v in model.state_dict().items() if not gb(k)}, strict=False)
     assert not unexpected and all(gb(k) for k in missing), (missing, unexpected)
     return new.eval()
+
+
+def accelerate(model, name):
+    """the integrator of the models with their own rates; the UDE closure integrates with error control only"""
+    if fast.supports(model):
+        fast.restore(model)
+        fast.accelerate(model, control='err_only' if name == 'ude' else 'sample_err', rtol=RTOL, precision='fp32')
+    return model
+
+
+def load_weights(model, name, path, device):
+    """a state dict of a baseline; GENERIC-FNO and HelmFluid weights may hold the bare network"""
+    sd = torch.load(path, map_location=device)
+    if name in ('generic_fno', 'helmfluid') and not any(k.startswith('net.') for k in sd):
+        sd = {f'net.{k}': v for k, v in sd.items()}
+    model.load_state_dict(sd)
+    return model
+
+
+def load_trained(variant, name, meta, g32, disc, device, weights=None):
+    """a trained model in its evaluation configuration on the discretisation disc: a Neural Chart from <weights>/<name>.pt or
+    checkpoints/<variant>/<name>.pt, a baseline from <weights>/<name>.pt (weights default: runs/<variant>)"""
+    f = os.path.join(weights or os.path.join(ROOT, 'runs', variant), name + '.pt')
+    if name in VARIANTS:
+        if not os.path.exists(f):
+            f = os.path.join(CHECKPOINTS, variant, name + '.pt')
+        return NeuralChart.load(f, map_location=device).to(device).on(disc.hg()).accelerate()
+    m = load_weights(build(name, meta, g32).to(device), name, f, device).eval()
+    return accelerate(rebind(name, m, meta, disc, device), name)

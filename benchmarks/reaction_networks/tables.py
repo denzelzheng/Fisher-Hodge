@@ -7,7 +7,7 @@ from ..common import RESULTS, LABELS, OWN_FLUX, excess_table, fmt, write_table
 from . import config as C
 
 MAIN = ['chart', 'chart-given-mu0', 'flux_gnn', 'crnn_mass_action', 'crnn_features', 'ude', 'fno', 'bsms', 'generic_fno', 'persistence']
-ABLATIONS = ['chart', 'chart-given-mu0', 'chart-const-k', 'chart-no-excess', 'chart-zero-init', 'chart-reversible', 'flux_gnn']
+ABLATIONS = ['chart', 'chart-given-mu0', 'chart-learned-chem-mu0', 'chart-const-k', 'chart-no-excess', 'chart-zero-init', 'chart-reversible', 'flux_gnn']
 
 
 def _cols():
@@ -156,10 +156,8 @@ def make_tables(runs=None):
     if C.SYSTEM == 'mapk_cascade':
         mapk_table(R, MAIN + ABLATIONS[2:-1], os.path.join(out, 'conservation_and_output'))
     if C.is_pc() or C.SYSTEM == 'mapk_cascade':
-        k_law_table(R, ['chart', 'chart-given-mu0', 'chart-const-k'], os.path.join(out, 'law'))
-    excess_law_table_on = True
-    if excess_law_table_on:
-        excess_law_table(R, ['chart', 'chart-given-mu0', 'chart-const-k'], os.path.join(out, 'excess_law'))
+        k_law_table(R, ['chart', 'chart-given-mu0', 'chart-learned-chem-mu0', 'chart-const-k'], os.path.join(out, 'law'))
+    excess_law_table(R, ['chart', 'chart-given-mu0', 'chart-learned-chem-mu0'], os.path.join(out, 'excess_law'))
     if C.SYSTEM == 'schlogl':
         front_table(R, MAIN + ABLATIONS[2:-1], os.path.join(out, 'fronts'))
     print(open(os.path.join(out, 'main.md')).read())

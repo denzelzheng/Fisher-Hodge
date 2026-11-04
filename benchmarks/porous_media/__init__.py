@@ -1,1 +1,1 @@
-"""Driven transport through porous media, with and without crowding (run.py has the commands)."""
+"""Driven transport through porous media, with and without crowding (the commands: neuralchart.run)."""

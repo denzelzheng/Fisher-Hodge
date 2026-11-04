@@ -10,7 +10,7 @@ import math
 import os
 
 from benchmarks.common import RESULTS, fmt
-from scripts._dispatch import BENCHMARKS
+from neuralchart.run import TASKS
 
 
 def summary(name, models=None):
@@ -35,5 +35,5 @@ def summary(name, models=None):
 
 if __name__ == '__main__':
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument('--benchmark', required=True, choices=BENCHMARKS)
+    p.add_argument('--benchmark', required=True, choices=list(TASKS))
     print(summary(p.parse_args().benchmark))

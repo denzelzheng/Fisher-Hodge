@@ -17,6 +17,8 @@ transport, chemostatted species as a drive) and Hypergraph.from_graph (transport
 On the periodic n x n grid the edge order is that of grid_edge_list: first the n^2 horizontal edges
 (a, b) -> (a, b + 1), then the n^2 vertical edges (a, b) -> (a + 1, b).
 """
+import re
+
 import numpy as np
 import scipy.linalg
 import scipy.sparse as sp
@@ -48,6 +50,32 @@ def _triplets(N):
     N = sp.coo_matrix(N)
     keep = N.data != 0
     return N.row[keep].astype(np.int64), N.col[keep].astype(np.int64), N.data[keep].astype(np.float64)
+
+
+def _rational_null(A, tol=1e-9):
+    """a basis of the null space of A by elimination (the free columns get unit vectors), rational for a rational A; (n, k)"""
+    A = np.array(A, np.float64)
+    m, n = A.shape
+    pivots, row = [], 0
+    for col in range(n):
+        if row >= m:
+            break
+        p = row + int(np.argmax(np.abs(A[row:, col])))
+        if abs(A[p, col]) < tol:
+            continue
+        A[[row, p]] = A[[p, row]]
+        A[row] /= A[row, col]
+        others = np.arange(m) != row
+        A[others] -= A[others, col, None] * A[row]
+        pivots.append(col)
+        row += 1
+    free = [c for c in range(n) if c not in pivots]
+    Z = np.zeros((n, len(free)))
+    for k, c in enumerate(free):
+        Z[c, k] = 1.0
+        for r, pc in enumerate(pivots):
+            Z[pc, k] = -A[r, c]
+    return Z
 
 
 class Hypergraph:
@@ -103,6 +131,21 @@ class Hypergraph:
         if s._L is None:
             s._L = scipy.linalg.null_space(s.S.T)
         return s._L
+
+    def cycle_basis(s):
+        """a basis of ker S (H, z), the cycles of the hypergraph; rational (mostly integer) entries when it is small"""
+        return s.Z if s.H * s.M > 250_000 or s._Z is not None and s._Z.shape[1] == 0 else _rational_null(s.S)
+
+    def conservation_laws(s):
+        """a basis of ker S^T (M, l), the conserved moieties; rational (mostly integer) entries when it is small"""
+        return s.L if s.H * s.M > 250_000 else _rational_null(s.S.T)
+
+    def to_dict(s):
+        return dict(nu_plus=s.Np, nu_minus=s.Nm, n_species=s.n_species, species_names=s.species_names, meta=s.meta)
+
+    @classmethod
+    def from_dict(cls, d):
+        return cls(d['nu_plus'], d['nu_minus'], n_species=d['n_species'], species_names=d['species_names'], meta=d['meta'])
 
     def set_cycle_basis(s, Z):
         Z = scipy.linalg.orth(np.asarray(Z, np.float64))
@@ -272,6 +315,89 @@ class Hypergraph:
             meta['chemostats'] = list(chemostats); meta['chem_S'] = Yc
             meta['chem_Np'], meta['chem_Nm'] = Yp, Ym          # chemostat coefficients on the reactant / product side
         return cls(Np, Nm, n_species=NS, species_names=state, meta=meta, **kw)
+
+    @classmethod
+    def from_strings(cls, reactions, chemostats=(), diffusing=(), edges=None, n_sites=None, grid_n=None, species=None, **kw):
+        """the reaction-transport hypergraph from reactions written as strings, 'A + 2 X <-> 3 X'; species in order of first
+        appearance unless given.  Each reaction is one hyperedge class per site; each diffusing species one transport class."""
+        rx, names = [], list(species or [])
+        for r in reactions:
+            lhs, rhs = re.split(r'<->|<=>|->|=', r)
+            sides = []
+            for side in (lhs, rhs):
+                d = {}
+                for term in side.split('+'):
+                    term = term.strip()
+                    if not term or term == '0':
+                        continue
+                    m = re.fullmatch(r'(\d+)?\s*\*?\s*(\S+)', term)
+                    d[m.group(2)] = d.get(m.group(2), 0) + int(m.group(1) or 1)
+                    if m.group(2) not in names:
+                        names.append(m.group(2))
+                sides.append(d)
+            rx.append(tuple(sides))
+        return cls.reaction_transport(names, rx, edges=edges, n_sites=n_sites, diffusing=diffusing, chemostats=chemostats, grid_n=grid_n, **kw)
+
+    @classmethod
+    def from_stoichiometry(cls, nu_plus, nu_minus=None, S=None, species=None, classes=None, site_volume=None, edge_weight=None, **kw):
+        """one site: nu_plus, nu_minus (H, M), or S (M, H) with the reactants taken as the negative entries.  classes (H,): the
+        hyperedge classes that share log omega (default: one class per hyperedge)."""
+        if S is not None:
+            S = np.asarray(S, np.float64)
+            nu_plus, nu_minus = np.maximum(-S, 0).T, np.maximum(S, 0).T
+        Np = sp.csr_matrix(nu_plus, dtype=np.float64)
+        H, M = Np.shape
+        meta = dict(typ=np.arange(H) if classes is None else np.asarray(classes), site=np.zeros(H, dtype=np.int64))
+        if site_volume is not None:
+            meta['site_volume'] = np.asarray(site_volume, np.float64)
+        if edge_weight is not None:
+            meta['edge_weight'] = np.asarray(edge_weight, np.float64)
+        return cls(Np, nu_minus, n_species=M, species_names=list(species) if species else None, meta=meta, **kw)
+
+    @classmethod
+    def from_grid(cls, n, n_species=1, **kw):
+        """transport on the n x n periodic grid"""
+        h = cls.from_graph(grid_edge_list(n), n * n, n_species=n_species, **kw)
+        h.meta['grid_n'] = n
+        return h
+
+    @classmethod
+    def from_mesh(cls, edges, n_nodes, site_volume=None, edge_weight=None, n_species=1, **kw):
+        """transport on a mesh: cell volumes (relative to their mean) and the geometric edge weights"""
+        h = cls.from_graph(edges, n_nodes, n_species=n_species, **kw)
+        if site_volume is not None:
+            h.meta['site_volume'] = np.asarray(site_volume, np.float64)
+        if edge_weight is not None:
+            h.meta['edge_weight'] = np.tile(np.asarray(edge_weight, np.float64), n_species)
+        return h
+
+    @classmethod
+    def from_points(cls, points, n_species=1, **kw):
+        """transport between the Voronoi cells of a point cloud on the unit torus: edge weight face length / (distance sqrt(V_i V_j))"""
+        from scipy.spatial import Voronoi
+        P = np.asarray(points, np.float64)
+        V = len(P)
+        offs = [(dx, dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1)]
+        tiled = np.concatenate([P + np.array(o) for o in offs])
+        cen = offs.index((0, 0))
+        vor = Voronoi(tiled)
+        area = np.zeros(V)
+        for i in range(V):
+            poly = vor.vertices[vor.regions[vor.point_region[cen * V + i]]]
+            c0 = poly.mean(0)
+            poly = poly[np.argsort(np.arctan2(poly[:, 1] - c0[1], poly[:, 0] - c0[0]))]
+            area[i] = 0.5 * abs(np.dot(poly[:, 0], np.roll(poly[:, 1], -1)) - np.dot(poly[:, 1], np.roll(poly[:, 0], -1)))
+        faces = {}
+        for (p, q), rv in zip(vor.ridge_points, vor.ridge_vertices):
+            if (p // V != cen and q // V != cen) or -1 in rv:
+                continue
+            u, w = (p, q) if p // V == cen else (q, p)
+            key = tuple(sorted((u % V, w % V)))
+            faces[key] = np.linalg.norm(vor.vertices[rv[1]] - vor.vertices[rv[0]]) / np.linalg.norm(tiled[w] - tiled[u])
+        keys = sorted(faces)
+        E = np.array(keys)
+        w = np.array([faces[k] for k in keys]) / np.sqrt(area[E[:, 0]] * area[E[:, 1]])
+        return cls.from_mesh(E, V, site_volume=area * V, edge_weight=w, n_species=n_species, **kw)
 
     @classmethod
     def from_reactions(cls, reactions, species, n_sites=1, chemostats=(), **kw):

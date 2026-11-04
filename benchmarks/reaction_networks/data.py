@@ -212,6 +212,7 @@ def load_set(name, device='cpu'):
             d['drive'].update({k: d[k].double().to(device) for k in ('logm', 'edge', 'dsite')})
     else:
         d['drive'] = dict(logab=d['logab'].double().to(device))
+    d['drive'] = TR.conditions(d['drive'])
     return d
 
 

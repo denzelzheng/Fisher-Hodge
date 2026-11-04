@@ -67,30 +67,24 @@ def logmean(a, b, f=None, eps=1e-6):
 
 
 # ------------------------------------------------------------------------------------------ features
-def featurizer(hg, edge_keys=()):
-    """condition dict -> features.  Keys (all optional, leading batch dimension B):
-      'U'          (B, V) or (B, M)   potential energy
-      'T'          (B,) or scalar     temperature (default 1)
-      'line'       (B, H)             line integral of the external force along every hyperedge (energy)
-      'chem_logc'  (B, n_chem)        log concentrations of the chemostatted species (or (B, n_chem * V))
-      'chem_mu0'   (B, n_chem)        their standard chemical potentials (energy)
-      'edge'       (B, H, F)          local geometric or material features of the hyperedges, for the mobility only
-    The mobility sees only the hyperedge type and 'edge'.  No condition (U, T, force, chemostat) is a network input."""
+def featurizer(hg, n_desc=0):
+    """conditions -> features.  Keys (all optional, leading batch dimension B):
+      'T' (B,) or scalar  'U' (B, V) or (B, M)  'force' (B, H)  'chem_logc' (B, n_chem)  'edge' (B, H, n_desc)
+    (see neuralchart.Conditions; other keys are ignored).  The mobility sees only the hyperedge class and 'edge'."""
     ntyp = int(hg.meta['typ'].max()) + 1
 
     def feat(drive):
-        ref = next(v for v in drive.values() if torch.is_tensor(v) and v.dim() >= 1)
+        ref = next(v for k, v in drive.items() if torch.is_tensor(v) and v.dim() >= 1 and v.is_floating_point())
         B, dev, dt = ref.shape[0], ref.device, ref.dtype
         t = hg.on(dev, dt)
         T = torch.as_tensor(drive.get('T', 1.0), dtype=dt, device=dev)
         T = T.expand(B) if T.dim() == 0 else T.reshape(B)
         cols = [Fn.one_hot(t['typ'], ntyp).to(dt).expand(B, -1, -1)]
-        if 'edge' in drive:
-            cols.append(drive['edge'])
-        return dict(U=drive.get('U', torch.zeros(B, hg.V, dtype=dt, device=dev)), T=T,
-                    line=drive.get('line'), chem_logc=drive.get('chem_logc'), chem_mu0=drive.get('chem_mu0'),
+        if n_desc:
+            cols.append(drive['edge'].to(dt))
+        return dict(U=drive.get('U', torch.zeros(B, hg.V, dtype=dt, device=dev)), T=T, line=drive.get('force'), chem_logc=drive.get('chem_logc'),
                     edge_sym=torch.cat(cols, -1), edge_ori=torch.zeros(B, hg.H, dtype=dt, device=dev), node={}, raw=drive)
-    feat.n_edge_sym = ntyp + len(edge_keys)
+    feat.n_edge_sym = ntyp + n_desc
     return feat
 
 
@@ -166,7 +160,10 @@ class FreeEnergy(nn.Module):
         Um = U if U.shape[1] == s.hg.M else U.repeat(1, s.NS)
         if s.mu0 is not None:
             Um = Um + s.mu0.to(Um.dtype).repeat_interleave(s.V)[None]
-        return Um / feats['T'][:, None]
+        phi = Um / feats['T'][:, None]
+        if s.inv_v is not None:                          # c is the mass of a cell: log c / V
+            phi = phi + torch.log(s.inv_v.to(phi.dtype)).repeat(s.NS)[None]
+        return phi
 
     def correction(s, c, ctx):
         """the excess potential at the state c, (B, M)"""
@@ -335,7 +332,7 @@ class MasterEquation(nn.Module):
         """the parameters that enter log a and log b additively and independently of c: the log-rate core and, when
         they are learned, the standard potentials"""
         out = [s.kinetics.core]
-        out += [p for p in (s.free_energy.mu0, s.drive.chem_mu0, s.drive.chem_mu0_free) if p is not None]
+        out += [p for p in (s.free_energy.mu0, s.drive.chem_mu0, s.drive.chem_mu0_free) if p is not None and p.requires_grad]
         return out
 
     def edit(s, T=None, drive_scale=None):
