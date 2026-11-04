@@ -14,6 +14,8 @@ Phosphorylation cycle (DT 0.05): train (48 x 100 steps), train_conditions (dG 1�
   strong_drive (dG 3–4), strong_potential (amplitude 1.2 and finer: wavenumbers up to 3 instead of 2), grid16.
 Heterogeneous phosphorylation cycle (phosphorylation_heterogeneous; DT 0.05): the sets of the phosphorylation cycle, every
   trajectory on its own random medium (truth.medium_map), so the test sets are on unseen media.
+Interacting and saturating phosphorylation cycles (phosphorylation_interacting, _saturating; DT 0.05): the sets of the
+  phosphorylation cycle and high_concentration (16 x 200, training conditions, X and Xp at the start x 1.5, resp. x 3).
 MAPK cascade (DT 0.5): train (48 x 20 steps), train_conditions (ATP 0.5–2), high_atp (3–5), low_atp (0.15–0.3),
   phosphorylated_start (ATP 0.5–2, most of every tier phosphorylated at t = 0); ADP = Pi = 1; 200 test steps.
 
@@ -36,7 +38,7 @@ GEN = dict(train=(48, 100, 8, 1), train_conditions=(16, 200, 8, 2), high_a_low_b
 GEN_STRONG = dict(train=(48, 100, 8, 21, (1.5, 4.5), (1.0, 3.2)), train_conditions=(16, 200, 8, 22, (1.5, 4.5), (1.0, 3.2)),
                   high_a=(16, 200, 8, 23, (4.6, 5.0), (2.0, 3.5)), grid16=(8, 200, 16, 24, (1.5, 4.5), (1.0, 3.2)))
 GEN_PC = dict(train=(48, 100, 8, 1, 'id'), train_conditions=(16, 200, 8, 2, 'id'), strong_drive=(16, 200, 8, 3, 'drive'),
-              strong_potential=(16, 200, 8, 4, 'potential'), grid16=(8, 200, 16, 5, 'id'))
+              strong_potential=(16, 200, 8, 4, 'potential'), grid16=(8, 200, 16, 5, 'id'), high_concentration=(16, 200, 8, 6, 'conc'))
 # MAPK: (name, count, ATP range, initial state, steps), drawn in this order from one random stream (seed 0)
 GEN_MAPK = [('train', 48, (0.5, 2.0), 'resting', 20), ('train_conditions', 16, (0.5, 2.0), 'resting', 200),
             ('high_atp', 16, (3.0, 5.0), 'resting', 200), ('low_atp', 16, (0.15, 0.3), 'resting', 200),
@@ -110,7 +112,8 @@ def make_set_schlogl(name):
 
 def make_set_pc(name):
     count, nsteps, n, seed, kind = GEN_PC[name]
-    rng = np.random.default_rng(seed + (700 if C.hetero() else 0))
+    rng = np.random.default_rng(seed + dict(phosphorylation_heterogeneous=700, phosphorylation_interacting=800,
+                                            phosphorylation_saturating=900).get(C.SYSTEM, 0))
     out = dict(c=[], U=[], dG=[])
     if C.hetero():
         out.update(logm=[], edge=[], dsite=[])
@@ -120,6 +123,9 @@ def make_set_pc(name):
         dG = rng.uniform(3, 4) if kind == 'drive' else rng.uniform(1, 3)
         X0 = 0.6 * np.exp(smooth_field(rng, n, 2 * s, 0.4)); Xp0 = 0.4 * np.exp(smooth_field(rng, n, 2 * s, 0.4))
         E0 = np.exp(smooth_field(rng, n, 2 * s, 0.4))
+        if kind == 'conc':
+            scale = 1.5 if C.interacting() else 3.0
+            X0, Xp0 = scale * X0, scale * Xp0
         logm = None
         if C.hetero():
             hg = TR.hg_of(n)

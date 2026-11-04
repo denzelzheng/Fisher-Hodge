@@ -28,10 +28,9 @@ from typing import Optional
 from .model import MasterEquation
 from .fit import fit_chart  # noqa: F401  (re-exported)
 
-TASKS = ('porous_media', 'brusselator', 'schlogl', 'schlogl_nonideal', 'schlogl_nonideal_strong', 'phosphorylation_cycle',
-         'phosphorylation_heterogeneous', 'mapk_cascade')
-REACTION_TASKS = ('schlogl', 'schlogl_nonideal', 'schlogl_nonideal_strong', 'phosphorylation_cycle',
-                  'phosphorylation_heterogeneous', 'mapk_cascade')
+REACTION_TASKS = ('schlogl', 'schlogl_nonideal', 'schlogl_nonideal_strong', 'phosphorylation_cycle', 'phosphorylation_heterogeneous',
+                  'phosphorylation_interacting', 'phosphorylation_saturating', 'mapk_cascade')
+TASKS = ('porous_media', 'brusselator') + REACTION_TASKS
 # the module that assembles the Neural Chart of each task (build_chart(cfg, **task inputs))
 BUILDERS = dict(porous_media='benchmarks.porous_media.models', brusselator='benchmarks.brusselator.models',
                 **{t: 'benchmarks.reaction_networks.models' for t in REACTION_TASKS})
@@ -93,6 +92,8 @@ CONFIGS = {
     'schlogl_nonideal_strong': _ablations(ChartConfig(task='schlogl_nonideal_strong'), oracle_excess='true'),
     'phosphorylation_cycle': _ablations(ChartConfig(task='phosphorylation_cycle')),
     'phosphorylation_heterogeneous': _ablations(ChartConfig(task='phosphorylation_heterogeneous')),
+    'phosphorylation_interacting': _ablations(ChartConfig(task='phosphorylation_interacting'), oracle_excess='true'),
+    'phosphorylation_saturating': _ablations(ChartConfig(task='phosphorylation_saturating')),
     'mapk_cascade': _ablations(ChartConfig(task='mapk_cascade')),
 }
 

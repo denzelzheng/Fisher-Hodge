@@ -98,6 +98,17 @@ def k_law_table(R, models, stem):
                               'median log ratio (learned / true)', 'standard deviation of the true log k'], rows)
 
 
+def excess_law_table(R, models, stem):
+    """the learned excess potential against the true one on the test states, per test set and species"""
+    rows = []
+    for m in models:
+        S = (R.get(m) or {}).get('sets', {})
+        for s, lab in _cols():
+            for sp, g in ((S.get(s) or {}).get('excess_law') or {}).items():
+                rows.append([LABELS[m], lab, sp, g['pearson'], g['rmse'], g['slope'], g['std_true']])
+    return write_table(stem, ['Method', 'test set', 'species', 'Pearson r', 'RMSE', 'slope, learned against true', 'standard deviation of the true excess potential'], rows)
+
+
 def mapk_table(R, models, stem):
     cols = _cols()
     rows = []
@@ -144,8 +155,10 @@ def make_tables(runs=None):
         lngamma_curve_table(R, os.path.join(out, 'activity_coefficient_curve'))
     if C.SYSTEM == 'mapk_cascade':
         mapk_table(R, MAIN + ABLATIONS[2:-1], os.path.join(out, 'conservation_and_output'))
-    if C.hetero():
+    if C.hetero() or C.saturating() or C.interacting():
         k_law_table(R, ['chart', 'chart-given-mu0', 'chart-const-k'], os.path.join(out, 'law'))
+    if C.interacting():
+        excess_law_table(R, ['chart', 'chart-given-mu0', 'chart-const-k'], os.path.join(out, 'excess_law'))
     if C.SYSTEM == 'schlogl':
         front_table(R, MAIN + ABLATIONS[2:-1], os.path.join(out, 'fronts'))
     print(open(os.path.join(out, 'main.md')).read())

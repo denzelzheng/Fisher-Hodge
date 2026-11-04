@@ -6,6 +6,8 @@ read the module-level values (SYSTEM, DT, N_TRAIN, W_TRAIN, DATA, ...).
     schlogl_nonideal_strong   the same model with the chemostat a over 1.5–4.5 (stronger crowding), 8 x 8 grid (DT 0.05)
     phosphorylation_cycle     chemostat-driven phosphorylation cycle in a potential, 8 x 8 grid (DT 0.05)
     phosphorylation_heterogeneous   the same network on heterogeneous reaction media, 8 x 8 grid (DT 0.05)
+    phosphorylation_interacting     the same network with a cross-species excess free energy, 8 x 8 grid (DT 0.05)
+    phosphorylation_saturating      the same network with a state-dependent rate constant, 8 x 8 grid (DT 0.05)
     mapk_cascade              MAPK cascade with three tiers, 4 x 4 grid (DT 0.5)
 
 Protocol (every model, seed 0): training window 100 sampling steps (MAPK: 20 steps, also 10 time units), rollouts of
@@ -19,13 +21,14 @@ import os
 from ..common import ROOT
 
 BENCHMARKS = ('schlogl', 'schlogl_nonideal', 'schlogl_nonideal_strong', 'phosphorylation_cycle',
-              'phosphorylation_heterogeneous', 'mapk_cascade')
+              'phosphorylation_heterogeneous', 'phosphorylation_interacting', 'phosphorylation_saturating', 'mapk_cascade')
 NONIDEAL = ('schlogl_nonideal', 'schlogl_nonideal_strong')     # the Schloegl models with crowded activities
 SYSTEM = 'schlogl_nonideal'
 DT, N_TRAIN, W_TRAIN = 0.05, 8, 100
 T_TEST, T_STEPS = 200, 20                  # 10T, sampling steps per time unit T
 GRID = dict(schlogl=(0.05, 8, 100), schlogl_nonideal=(0.05, 8, 100), schlogl_nonideal_strong=(0.05, 8, 100),
             phosphorylation_cycle=(0.05, 8, 100), phosphorylation_heterogeneous=(0.05, 8, 100),
+            phosphorylation_interacting=(0.05, 8, 100), phosphorylation_saturating=(0.05, 8, 100),
             mapk_cascade=(0.5, 4, 20))      # DT, training grid, training window
 STEP = dict(dt_max=DT / 8, theta0=0.5, theta1=0.5, max_sub=4000, t_tol=1e-9)
 MAXSUB_TRAIN, MAXSUB_EVAL = 2000, 4000
@@ -66,6 +69,20 @@ TEST_SETS = {
         'strong_potential': 'unseen media, stronger, finer potential U',
         'grid16': 'unseen media, 16×16 grid',
     },
+    'phosphorylation_interacting': {
+        'train_conditions': 'training conditions (ΔG 1–3)',
+        'strong_drive': 'drive ΔG 3–4',
+        'strong_potential': 'stronger, finer potential U',
+        'high_concentration': 'X and Xp at the start × 1.5',
+        'grid16': '16×16 grid',
+    },
+    'phosphorylation_saturating': {
+        'train_conditions': 'training conditions (ΔG 1–3)',
+        'strong_drive': 'drive ΔG 3–4',
+        'strong_potential': 'stronger, finer potential U',
+        'high_concentration': 'X and Xp at the start × 3',
+        'grid16': '16×16 grid',
+    },
     'mapk_cascade': {
         'train_conditions': 'training conditions (ATP 0.5–2)',
         'high_atp': 'ATP 3–5',
@@ -78,6 +95,8 @@ TITLES = dict(schlogl='Schlögl model: bistability and travelling fronts',
               schlogl_nonideal_strong='Schlögl model with strong crowding (chemostat a 1.5–4.5)',
               phosphorylation_cycle='Driven phosphorylation cycle',
               phosphorylation_heterogeneous='Driven phosphorylation cycle on heterogeneous reaction media',
+              phosphorylation_interacting='Driven phosphorylation cycle with cross-species interactions',
+              phosphorylation_saturating='Driven phosphorylation cycle with a saturating rate constant',
               mapk_cascade='MAPK cascade')
 
 
@@ -99,8 +118,16 @@ def sets():
 
 
 def is_pc():
-    """the phosphorylation network, homogeneous or on heterogeneous media"""
-    return SYSTEM in ('phosphorylation_cycle', 'phosphorylation_heterogeneous')
+    """the phosphorylation network"""
+    return SYSTEM.startswith('phosphorylation')
+
+
+def interacting():
+    return SYSTEM == 'phosphorylation_interacting'
+
+
+def saturating():
+    return SYSTEM == 'phosphorylation_saturating'
 
 
 def hetero():

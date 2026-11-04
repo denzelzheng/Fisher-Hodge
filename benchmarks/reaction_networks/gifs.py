@@ -28,9 +28,12 @@ SCENES = {
     'schlogl_nonideal_strong': ('high_a', ['chart', 'fno', 'flux_gnn'], 'X', 'schlogl_nonideal_strong_high_a.gif'),
     'phosphorylation_cycle': ('strong_drive', ['chart', 'flux_gnn', 'fno'], 'Xp fraction', 'phosphorylation_cycle_strong_drive.gif'),
     'phosphorylation_heterogeneous': ('strong_drive', ['chart', 'flux_gnn', 'fno'], 'Xp fraction', 'phosphorylation_heterogeneous_strong_drive.gif'),
+    'phosphorylation_interacting': ('high_concentration', ['chart', 'flux_gnn', 'fno'], 'Xp fraction', 'phosphorylation_interacting_high_concentration.gif'),
+    'phosphorylation_saturating': ('high_concentration', ['chart', 'flux_gnn', 'fno'], 'Xp fraction', 'phosphorylation_saturating_high_concentration.gif'),
     'mapk_cascade': ('low_atp', ['chart', 'flux_gnn', 'fno'], 'state', 'mapk_cascade_low_atp.gif'),
 }
 TRAJ = dict(schlogl=8, schlogl_nonideal=0, schlogl_nonideal_strong=0, phosphorylation_cycle=0, phosphorylation_heterogeneous=0,
+            phosphorylation_interacting=0, phosphorylation_saturating=0,
             mapk_cascade=0)   # the README trajectories
 SUPTITLE = {
     'schlogl': 'Schlögl model, travelling front (a = 3, b = {b:.2f}): concentration of X',
@@ -38,6 +41,8 @@ SUPTITLE = {
     'schlogl_nonideal_strong': 'Schlögl model with strong crowding, a = {a:.2f}, b = {b:.2f} (training a 1.5–4.5): concentration of X',
     'phosphorylation_cycle': 'Phosphorylation cycle, drive ΔG = {dG:.2f} (training 1–3): phosphorylated fraction Xp / (X + Xp)',
     'phosphorylation_heterogeneous': 'Phosphorylation cycle on an unseen medium, drive ΔG = {dG:.2f} (training 1–3): phosphorylated fraction Xp / (X + Xp)',
+    'phosphorylation_interacting': 'Interacting phosphorylation cycle, X and Xp × 1.5 at the start, ΔG = {dG:.2f}: phosphorylated fraction Xp / (X + Xp)',
+    'phosphorylation_saturating': 'Saturating phosphorylation cycle, X and Xp × 3 at the start, ΔG = {dG:.2f}: phosphorylated fraction Xp / (X + Xp)',
     'mapk_cascade': 'MAPK cascade, ATP = {atp:.2f} (training 0.5–2): 22 species (rows) at 16 sites (columns)',
 }
 
@@ -129,6 +134,10 @@ TRACK = {
                                   condition='drive ΔG = {dG:.2f} (training 1–3)'),
     'phosphorylation_heterogeneous': dict(set='strong_drive', traj=0, species='X', label='X', steps=range(0, 201, 4), speed=4,
                                           condition='unseen medium, drive ΔG = {dG:.2f} (training 1–3)'),
+    'phosphorylation_interacting': dict(set='high_concentration', traj=0, species='X', label='X', steps=range(0, 201, 4), speed=4,
+                                        condition='X and Xp × 1.5 at the start, ΔG = {dG:.2f}'),
+    'phosphorylation_saturating': dict(set='high_concentration', traj=0, species='X', label='X', steps=range(0, 201, 4), speed=4,
+                                       condition='X and Xp × 3 at the start, ΔG = {dG:.2f}'),
     'mapk_cascade': dict(set='low_atp', traj=0, species=('Kp', 'Kpp'), label='phosphorylated MAPK (Kp + Kpp)',
                          steps=range(10, 61), speed=1, max_age=8, n_part=300, condition='ATP = {atp:.2f} (training 0.5–2)'),
 }
@@ -136,6 +145,7 @@ TRACK_MODELS = ['chart', 'crnn_mass_action', 'flux_gnn', 'ude']
 TRACK_TITLE = dict(schlogl='Schlögl model', schlogl_nonideal='Non-ideal Schlögl model',
                    schlogl_nonideal_strong='Schlögl model with strong crowding',
                    phosphorylation_cycle='Phosphorylation cycle', phosphorylation_heterogeneous='Phosphorylation cycle',
+                   phosphorylation_interacting='Interacting phosphorylation cycle', phosphorylation_saturating='Saturating phosphorylation cycle',
                    mapk_cascade='MAPK cascade')
 
 

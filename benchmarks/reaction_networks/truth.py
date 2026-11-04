@@ -21,6 +21,13 @@ by a nonlinear function of H, which does not read the conditions (the thermodyna
 The models never see H or k.  They see 3 descriptors per hyperedge, from the mean and the standard deviation of H in the
 cells (medium_descriptors).
 
+Interacting phosphorylation cycle (phosphorylation_interacting): the same network, every hyperedge mass action in the activity
+y = log c + dG_true, with the regular-solution excess free energy per site G_true = CHI_XXP c_X c_Xp + CHI_XPE c_Xp c_E, one
+attractive and one repulsive cross term: dG_X = CHI_XXP c_Xp, dG_Xp = CHI_XXP c_X + CHI_XPE c_E, dG_E = CHI_XPE c_Xp.
+
+Saturating phosphorylation cycle (phosphorylation_saturating): the same network with the symmetric rate constant of R1 at site v
+multiplied by 1 / (1 + (c_X + c_Xp + c_E) / K_SAT); it does not read the conditions.
+
 MAPK cascade (mapk_cascade): three tiers with the Huang-Ferrell structure on the 4 x 4 grid.  Dual phosphorylation of
 MAPKK and MAPK; every enzymatic step is binding E + S <-> ES followed by catalysis ES (+ ATP) <-> E + P (+ ADP or Pi);
 mass action throughout; ATP, ADP and Pi are chemostats.  The rate constants are dimensionless example values (the
@@ -68,8 +75,30 @@ def phi_of():
 
 def n_channels():
     """state species per site"""
-    return dict(schlogl_nonideal=1, schlogl_nonideal_strong=1, schlogl=1, phosphorylation_cycle=3,
-                phosphorylation_heterogeneous=3, mapk_cascade=22)[C.SYSTEM]
+    return 3 if C.is_pc() else 22 if C.SYSTEM == 'mapk_cascade' else 1
+
+
+CHI_XXP, CHI_XPE, K_SAT = -0.15, 0.15, 2.0
+
+
+def pc_excess(c):
+    """interacting phosphorylation cycle: the true excess potential at the states c (..., 3 V)"""
+    x, xp, e = c.chunk(3, -1)
+    return torch.cat([CHI_XXP * xp, CHI_XXP * x + CHI_XPE * e, CHI_XPE * xp], -1)
+
+
+def pc_excess_G(c):
+    x, xp, e = c.chunk(3, -1)
+    return (CHI_XXP * x * xp + CHI_XPE * xp * e).sum(-1)
+
+
+def pc_state_logk(hg, c):
+    """saturating phosphorylation cycle: the log factor of the true k per hyperedge at the states c (B, 3 V), (B, H)"""
+    typ = torch.as_tensor(hg.meta['typ'], device=c.device)
+    x, xp, e = c.chunk(3, -1)
+    out = torch.zeros(c.shape[0], hg.H, dtype=c.dtype, device=c.device)
+    out[:, typ == 0] = -torch.log1p((x + xp + e) / K_SAT)            # R1 hyperedges are in site order
+    return out
 
 
 # ------------------------------------------------------------------------------------------ Schloegl
@@ -239,10 +268,12 @@ def pc_true_log_k(hg, drive, c):
     lk = lk[None].expand(c.shape[0], -1)
     if drive.get('logm') is not None:
         lk = lk + drive['logm'].double().cpu()
+    if C.saturating():
+        lk = lk + pc_state_logk(hg, c)
     return lk
 
 
-def true_rates(hg, drive, c):
+def true_rates(hg, drive, c, ideal=False):
     """one-way rates of the reference model (mass action in the activity), float64 on the CPU; drive: the condition
     dict (or the (log a, log b) tensor of the Schloegl models)"""
     if C.SYSTEM == 'mapk_cascade':
@@ -250,6 +281,12 @@ def true_rates(hg, drive, c):
     if C.is_pc():
         la, lb = pc_log_constants(hg, drive)
         c = c.double().cpu()
+        if not ideal and C.interacting():
+            y = torch.log(c) + pc_excess(c)
+            return torch.exp(la + hg.dot(y, '+')), torch.exp(lb + hg.dot(y, '-'))
+        if not ideal and C.saturating():
+            dk = pc_state_logk(hg, c)
+            return torch.exp(la + dk) * hg.mass_action(c, '+'), torch.exp(lb + dk) * hg.mass_action(c, '-')
         return torch.exp(la) * hg.mass_action(c, '+'), torch.exp(lb) * hg.mass_action(c, '-')
     logab = drive['logab'] if isinstance(drive, dict) else drive
     kf, kb = true_constants(hg, logab.double().cpu())
@@ -384,9 +421,18 @@ def solve_pc(n, U, dG, c0, nsteps, logm=None):
     Np, Nm = hg.Np.tocsr(), hg.Nm.tocsr()
     S = (hg.Nm - hg.Np).T.tocsr()
 
+    r1 = np.asarray(hg.meta['typ']) == 0
+
     def rhs(t, x):
         L = np.log(np.maximum(x, 1e-300))
-        return S @ (ka * np.exp(Np @ L) - kb * np.exp(Nm @ L))
+        fac = 1.0
+        if C.interacting():
+            L = L + pc_excess(torch.as_tensor(x)).numpy()
+        elif C.saturating():
+            xv, xp, e = np.split(x, 3)
+            fac = np.ones(hg.H)
+            fac[r1] = 1.0 / (1.0 + (xv + xp + e) / K_SAT)
+        return S @ (fac * (ka * np.exp(Np @ L) - kb * np.exp(Nm @ L)))
     ts = np.arange(nsteps + 1) * C.DT
     sol = solve_ivp(rhs, (0, ts[-1]), c0, method='DOP853', t_eval=ts, rtol=1e-10, atol=1e-12)
     assert sol.success and sol.y.min() > 0, sol.message

@@ -3,9 +3,10 @@ import argparse
 import sys
 
 BENCHMARKS = ('porous_media', 'porous_media_crowding', 'brusselator', 'schlogl', 'schlogl_nonideal',
-              'schlogl_nonideal_strong', 'phosphorylation_cycle', 'phosphorylation_heterogeneous', 'mapk_cascade')
+              'schlogl_nonideal_strong', 'phosphorylation_cycle', 'phosphorylation_heterogeneous', 'phosphorylation_interacting',
+              'phosphorylation_saturating', 'mapk_cascade')
 REACTION_NETWORKS = ('schlogl', 'schlogl_nonideal', 'schlogl_nonideal_strong', 'phosphorylation_cycle',
-                     'phosphorylation_heterogeneous', 'mapk_cascade')
+                     'phosphorylation_heterogeneous', 'phosphorylation_interacting', 'phosphorylation_saturating', 'mapk_cascade')
 
 
 def run(command, doc):

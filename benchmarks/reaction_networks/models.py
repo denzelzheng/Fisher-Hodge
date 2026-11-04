@@ -51,9 +51,11 @@ class TrueActivity(FreeEnergy):
         return True
 
     def correction(s, c, ctx):
-        return TR.lng_t(c, TR.PHI)
+        return TR.pc_excess(c) if C.is_pc() else TR.lng_t(c, TR.PHI)
 
     def value(s, c, ctx):
+        if C.is_pc():
+            return super().value(c, ctx) + TR.pc_excess_G(c)
         G = (-c - torch.log1p(-TR.PHI * c) / TR.PHI).sum(-1)               # int_0^x ln gamma
         return super().value(c, ctx) + G
 
@@ -93,9 +95,17 @@ def pc_featurizer(hg, descriptors=False):
 
 
 class TrueMediumMobility(Mobility):
-    """the oracle on heterogeneous media: the class constants times the true factor of the medium"""
+    """the oracle with a true k that is not a class constant: the true factor of the medium, or the saturation factor"""
+    @property
+    def rho_dependent(s):
+        return C.saturating()
+
     def base(s, feats):
-        return super().base(feats) * torch.exp(feats['raw']['logm'].to(feats['edge_sym'].dtype))
+        k = super().base(feats)
+        return k * torch.exp(feats['raw']['logm'].to(k.dtype)) if 'logm' in feats['raw'] else k
+
+    def state_term(s, x, c):
+        return TR.pc_state_logk(s.hg, c)
 
 
 def _base(hg, cls, excess, material, featurizer):
@@ -146,7 +156,7 @@ def set_true(m):
         err = set_to_rates(m, c, drive, a[0], b[0])
     elif C.is_pc():
         c, drive = _pc_ref_state(m.hg)
-        a, b = TR.true_rates(m.hg, drive, c)
+        a, b = TR.true_rates(m.hg, drive, c, ideal=True)
         err = set_to_rates(m, c, drive, a[0], b[0])
     else:
         err = set_true_mass_action(m, TR.KF, TR.KB, TR.DD)
@@ -181,7 +191,7 @@ def build_chart(cfg, n=None, norm=None):
         m.linear_parameters = lambda: [m.kinetics.core]
     if cfg.excess == 'true':
         m.free_energy.__class__ = TrueActivity
-    if cfg.kappa == 'true' and C.hetero():
+    if cfg.kappa == 'true' and (C.hetero() or C.saturating()):
         m.kinetics.__class__ = TrueMediumMobility
     if cfg.drive == 'off':
         m.knobs['drive_scale'] = 0.0
@@ -204,8 +214,7 @@ def cond_z(drive, norm):
 
 
 def n_cond():
-    return dict(schlogl_nonideal=2, schlogl_nonideal_strong=2, schlogl=2, phosphorylation_cycle=1,
-                phosphorylation_heterogeneous=1, mapk_cascade=1)[C.SYSTEM]
+    return 1 if C.is_pc() or C.SYSTEM == 'mapk_cascade' else 2
 
 
 def n_desc():

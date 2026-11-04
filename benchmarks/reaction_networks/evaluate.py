@@ -77,6 +77,26 @@ def k_law(model, sd, hg, every=20):
     return out
 
 
+@torch.no_grad()
+def excess_law(model, sd, every=20):
+    """interacting phosphorylation cycle: the learned excess potential against the true one on the reference test states, per
+    species: Pearson r, RMSE, slope (learned against true), and the standard deviation of the true one"""
+    dev = next(iter(model.parameters())).device
+    dt = next_dtype(model)
+    fe = model.free_energy
+    L, Tt = [], []
+    for t in range(0, sd['c'].shape[1], every):
+        c = sd['c'][:, t].to(dev).to(dt)
+        L.append(fe.correction(c, None).double().cpu()); Tt.append(TR.pc_excess(c.double().cpu()))
+    L, Tt = torch.cat(L).chunk(3, -1), torch.cat(Tt).chunk(3, -1)
+    out = {}
+    for name, a, b in zip(('X', 'Xp', 'E'), L, Tt):
+        a, b = a.reshape(-1).numpy(), b.reshape(-1).numpy()
+        out[name] = dict(pearson=float(np.corrcoef(a, b)[0, 1]) if a.std() > 1e-12 else 0.0, rmse=float(np.sqrt(np.mean((a - b) ** 2))),
+                         slope=float(np.polyfit(b, a, 1)[0]), std_true=float(b.std()))
+    return out
+
+
 def front_speed(Cs, bb, n, a=3.0):
     """the high-state fraction m(t) of a stripe start; slope of m until it leaves [0.1, 0.9], in sites per unit time
     (two interfaces); > 0: the high state invades"""
@@ -205,6 +225,8 @@ def eval_set(name, model, sd, n, log, snap, sname):
         m['cycle_affinity'] = dict(model_mean=float(ca.mean()), true_mean=float(ct.mean()), mae=float(np.abs(ca - ct).mean()))
     if C.is_pc() and name.startswith('chart'):
         m['k_law'] = k_law(model, sd, hg)
+        if C.interacting():
+            m['excess_law'] = excess_law(model, sd)
     idx = list(range(min(4, B)))
     snap[f'R_{sname}'] = R[idx].numpy().astype(np.float32)
     if sname == 'planar_fronts':             # front speed against b across the Maxwell point (a = 3)
