@@ -1,8 +1,8 @@
 Method,quantity,training conditions,"a 3.5–4.0, b 2.0–3.5",16×16 grid
-Neural Chart,hyperedges violating local detailed balance,0.0,0.0,0.0
+Neural Chart,hyperedges violating local detailed balance,0.00042375036018780615,0.0003545729481697779,8.272940865018697e-05
 Neural Chart,samples with σ < 0,0.0,0.0,0.0
 Neural Chart,negative values,0.0,0.0,0.0
-"Neural Chart, given standard potentials (oracle-type information)",hyperedges violating local detailed balance,0.0,0.0,8.221791034959056e-06
+"Neural Chart, given standard potentials (oracle-type information)",hyperedges violating local detailed balance,0.00040047389410802784,0.24494959478157738,0.0001539770655212934
 "Neural Chart, given standard potentials (oracle-type information)",samples with σ < 0,0.0,0.0,0.0
 "Neural Chart, given standard potentials (oracle-type information)",negative values,0.0,0.0,0.0
 No chart (Flux-GNN),hyperedges violating local detailed balance,0.09999302455357142,0.5171595982142857,0.1068754650297619

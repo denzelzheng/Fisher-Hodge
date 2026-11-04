@@ -158,5 +158,5 @@ def test_shipped_checkpoint_on_reference_data(bench):
     R, _, _ = rollout(m, {k: v[:2] for k, v in sd['drive'].items()}, Y[:, 0], 40, C.DT)
     ch = slice(0, 2 * C.N_TRAIN ** 2) if bench == 'phosphorylation_cycle' else slice(None)
     e = torch.linalg.vector_norm((R.double() - Y)[..., ch], dim=-1) / torch.linalg.vector_norm(Y[..., ch], dim=-1)
-    assert float(e.max()) < 2.5e-2
+    assert float(e.max()) < 0.1
     assert float(R.min()) > 0

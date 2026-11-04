@@ -1,0 +1,5 @@
+Method,"largest |∇G|, training states","largest |g_θ|, training states",parameters of G_θ,parameters of g_θ
+Neural Chart,0.18334339505978492,1.1849835639141741,"1,825","7,169"
+"Neural Chart, given standard potentials (oracle-type information)",0.12146794516608275,0.7098386809302146,"1,825","7,169"
+"Neural Chart, constant mobility per class",0.4289718086053388,0.0,"1,825",0
+"Neural Chart, no excess free energy",0.0,1.7983039975083728,0,"7,169"

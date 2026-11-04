@@ -1,13 +1,16 @@
 Method,quantity,training conditions (ATP 0.5–2),ATP 3–5,ATP 0.15–0.3,phosphorylated initial states
-Neural Chart,hyperedges violating local detailed balance,0.002661401098901099,0.0018958905677655678,0.006102621336996337,0.00438558836996337
+Neural Chart,hyperedges violating local detailed balance,0.00814875228937729,0.007562099358974359,0.04845610119047619,0.007483402014652015
 Neural Chart,samples with σ < 0,0.0,0.0,0.0,0.0
 Neural Chart,negative values,0.0,0.0,0.0,0.0
-"Neural Chart, given standard potentials (oracle-type information)",hyperedges violating local detailed balance,0.0,0.0,0.0,0.0
+"Neural Chart, given standard potentials (oracle-type information)",hyperedges violating local detailed balance,0.0010588369963369963,0.0010159111721611722,0.004399896978021978,0.0006653502747252747
 "Neural Chart, given standard potentials (oracle-type information)",samples with σ < 0,0.0,0.0,0.0,0.0
 "Neural Chart, given standard potentials (oracle-type information)",negative values,0.0,0.0,0.0,0.0
-"Neural Chart, ideal activities",hyperedges violating local detailed balance,0.002661401098901099,0.0018958905677655678,0.006102621336996337,0.00438558836996337
-"Neural Chart, ideal activities",samples with σ < 0,0.0,0.0,0.0,0.0
-"Neural Chart, ideal activities",negative values,0.0,0.0,0.0,0.0
+"Neural Chart, constant mobility per class",hyperedges violating local detailed balance,0.009665464743589744,0.009400755494505494,0.07248740842490843,0.009543841575091576
+"Neural Chart, constant mobility per class",samples with σ < 0,0.0,0.0,0.0,0.0
+"Neural Chart, constant mobility per class",negative values,0.0,0.0,0.0,0.0
+"Neural Chart, no excess free energy",hyperedges violating local detailed balance,0.0017599587912087912,0.0015739468864468865,0.022578983516483516,0.002418154761904762
+"Neural Chart, no excess free energy",samples with σ < 0,0.0,0.0,0.0,0.0
+"Neural Chart, no excess free energy",negative values,0.0,0.0,0.0,0.0
 "Neural Chart, no convex initialisation",hyperedges violating local detailed balance,0.019838885073260072,0.0250329097985348,0.03938444368131868,0.020032051282051284
 "Neural Chart, no convex initialisation",samples with σ < 0,0.0,0.0,0.0,0.0
 "Neural Chart, no convex initialisation",negative values,0.0,0.0,0.0,0.0

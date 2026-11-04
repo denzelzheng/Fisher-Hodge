@@ -1,13 +1,19 @@
 Method,quantity,training conditions,temperature ×0.25,temperature ×4,drive ×4,drive ×8,unseen low-porosity media,64×64 grid,point cloud
-Neural Chart,edges violating local detailed balance,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+Neural Chart,edges violating local detailed balance,0.005043698946772709,0.003325150013732239,0.0040311631251883345,0.002941065311577696,0.0019954981988214078,0.002387035178227237,0.006215334353895811,0.005188378216517634
 Neural Chart,samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
 Neural Chart,negative cell values,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
-"Neural Chart, ideal activities",edges violating local detailed balance,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
-"Neural Chart, ideal activities",samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
-"Neural Chart, ideal activities",negative cell values,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
-"Neural Chart, no state input",edges violating local detailed balance,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
-"Neural Chart, no state input",samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
-"Neural Chart, no state input",negative cell values,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+"Neural Chart, constant mobility per class",edges violating local detailed balance,0.009429395313989557,0.0111416628074381,0.005348283094313654,0.012059650886973533,0.009993266866689682,0.011160071396990691,0.010052605779006137,0.009729313413307471
+"Neural Chart, constant mobility per class",samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+"Neural Chart, constant mobility per class",negative cell values,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+"Neural Chart, no excess free energy",edges violating local detailed balance,0.0018145071219022695,0.0017133862983331723,0.002013733717418128,0.0006802619810282492,0.0003722044582077382,0.0009066065120994449,0.0036902694446683017,0.00190648406122689
+"Neural Chart, no excess free energy",samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+"Neural Chart, no excess free energy",negative cell values,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+"Neural Chart, no convex initialisation",edges violating local detailed balance,0.0023243234170338993,0.000973528568027979,0.004203118425474758,0.001162729484576668,0.0007297579896674203,0.000968186786043309,0.0024002343013203864,0.002328910175839458
+"Neural Chart, no convex initialisation",samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+"Neural Chart, no convex initialisation",negative cell values,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+"Neural Chart, reversible (no drive)",edges violating local detailed balance,0.17209185316295433,0.25306027712723356,0.1435613508639043,0.3199222676195808,0.3802748020402598,0.1308171343813267,0.1759599660079122,0.167899607734085
+"Neural Chart, reversible (no drive)",samples with sigma < 0,0.00859375,0.06484375,0.0,0.13984375,0.2484375,0.0109375,0.00859375,0.009375
+"Neural Chart, reversible (no drive)",negative cell values,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
 No chart (Flux-GNN),edges violating local detailed balance,0.028891301594471158,0.21609263979626325,0.1690728633957243,0.04878962497544153,0.06502725507153384,0.05584386699074203,0.07829754806023219,0.30425494253294516
 No chart (Flux-GNN),samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
 No chart (Flux-GNN),negative cell values,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0

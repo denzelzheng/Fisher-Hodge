@@ -1,7 +1,7 @@
 Method,quantity,training conditions,"a 3.15–3.35, b 0.3–1.0","planar fronts, a = 3, b 1.7–2.3",16×16 grid
-Neural Chart,"σ, relative error",1.8840781029691436e-06,1.0380500780961846e-06,1.6230541876387223e-06,1.6524478864017457e-06
+Neural Chart,"σ, relative error",0.00010627770896911613,8.598935307829519e-05,0.00010772089587124098,0.00011617330388608959
 Neural Chart,"cycle affinity, model; reference",2.709; 2.709,3.967; 3.967,2.712; 2.712,2.622; 2.622
-"Neural Chart, given standard potentials (oracle-type information)","σ, relative error",1.0101374321772062e-05,1.0062593996701274e-05,9.989422769632755e-06,9.910850837232749e-06
+"Neural Chart, given standard potentials (oracle-type information)","σ, relative error",1.0724526312235233e-05,7.618762901432283e-06,8.15773576867153e-06,5.797629024377645e-06
 "Neural Chart, given standard potentials (oracle-type information)","cycle affinity, model; reference",2.709; 2.709,3.967; 3.967,2.712; 2.712,2.622; 2.622
 No chart (Flux-GNN),"σ, relative error",0.6181583917033573,0.617541253280518,0.5816761157435936,0.5937669438874327
 No chart (Flux-GNN),"cycle affinity, model; reference",1.075; 2.709,2.550; 3.967,3.239; 2.712,1.750; 2.622
@@ -9,9 +9,11 @@ CRNN (mass action),"σ, relative error",3.20516833308451e-05,3.356071119131531e-
 CRNN (mass action),"cycle affinity, model; reference",2.709; 2.709,3.967; 3.967,2.712; 2.712,2.622; 2.622
 CRNN (condition features),"σ, relative error",0.31489947423879805,0.1348713964974734,0.3181153680702144,0.3847071078926984
 CRNN (condition features),"cycle affinity, model; reference",2.849; 2.709,3.878; 3.967,2.801; 2.712,2.769; 2.622
-"Neural Chart, ideal activities","σ, relative error",2.05964282749499e-06,2.9635465932882847e-06,2.2654795470757465e-06,2.2808161691295087e-06
-"Neural Chart, ideal activities","cycle affinity, model; reference",2.709; 2.709,3.967; 3.967,2.712; 2.712,2.622; 2.622
-"Neural Chart, no convex initialisation","σ, relative error",0.9815543882312396,0.9527200646101817,0.9822192843279204,0.9949718078766122
-"Neural Chart, no convex initialisation","cycle affinity, model; reference",0.812; 2.709,2.070; 3.967,0.815; 2.712,0.725; 2.622
-"Neural Chart, reversible (no drive)","σ, relative error",0.9508287737043701,0.9613720785656512,0.9611652752172042,0.9578501510464107
-"Neural Chart, reversible (no drive)","cycle affinity, model; reference",2.0e-15; 2.709,4.4e-15; 3.967,5.2e-15; 2.712,3.6e-15; 2.622
+"Neural Chart, constant mobility per class","σ, relative error",5.259532927787662e-05,6.124674822905259e-05,5.1299295808913475e-05,5.3133915249104425e-05
+"Neural Chart, constant mobility per class","cycle affinity, model; reference",2.709; 2.709,3.967; 3.967,2.712; 2.712,2.622; 2.622
+"Neural Chart, no excess free energy","σ, relative error",8.225722854867895e-06,4.996686083707685e-06,7.6237825982262335e-06,5.399246599984565e-06
+"Neural Chart, no excess free energy","cycle affinity, model; reference",2.709; 2.709,3.967; 3.967,2.712; 2.712,2.622; 2.622
+"Neural Chart, no convex initialisation","σ, relative error",0.9848091301216417,0.9830400546910333,0.9947399859151146,0.998654673498604
+"Neural Chart, no convex initialisation","cycle affinity, model; reference",0.411; 2.709,1.669; 3.967,0.414; 2.712,0.324; 2.622
+"Neural Chart, reversible (no drive)","σ, relative error",0.939464356167252,0.9223075823323705,0.9460651308376642,0.9162998649000422
+"Neural Chart, reversible (no drive)","cycle affinity, model; reference",-2.2e-16; 2.709,4.2e-15; 3.967,5.7e-15; 2.712,6.7e-15; 2.622

@@ -1,21 +1,21 @@
 Method,quantity,training conditions,"a 3.5–4.0, b 2.0–3.5",16×16 grid
-Neural Chart,hyperedges violating local detailed balance,0.0,0.0,0.0
+Neural Chart,hyperedges violating local detailed balance,0.00042375036018780615,0.0003545729481697779,8.272940865018697e-05
 Neural Chart,samples with σ < 0,0.0,0.0,0.0
 Neural Chart,negative values,0.0,0.0,0.0
-"Neural Chart, given standard potentials (oracle-type information)",hyperedges violating local detailed balance,0.0,0.0,8.221791034959056e-06
+"Neural Chart, given standard potentials (oracle-type information)",hyperedges violating local detailed balance,0.00040047389410802784,0.24494959478157738,0.0001539770655212934
 "Neural Chart, given standard potentials (oracle-type information)",samples with σ < 0,0.0,0.0,0.0
 "Neural Chart, given standard potentials (oracle-type information)",negative values,0.0,0.0,0.0
-"Neural Chart, ideal activities",hyperedges violating local detailed balance,0.03196334428220486,0.35778598322935046,0.00012168254944154114
-"Neural Chart, ideal activities",samples with σ < 0,0.0,0.0,0.0
-"Neural Chart, ideal activities",negative values,0.0,0.0,0.0
-"Neural Chart, ideal-fit initialisation",hyperedges violating local detailed balance,0.0005359230869169807,0.2588417953784732,0.00016102318733897682
-"Neural Chart, ideal-fit initialisation",samples with σ < 0,0.0,0.0,0.0
-"Neural Chart, ideal-fit initialisation",negative values,0.0,0.0,0.0
-"Neural Chart, no convex initialisation",hyperedges violating local detailed balance,0.012586055974827887,0.060577515728756005,0.012112428480795311
-"Neural Chart, no convex initialisation",samples with σ < 0,0.0,0.008928571428571428,0.0
+"Neural Chart, constant mobility per class",hyperedges violating local detailed balance,0.00011591131128810584,0.026034063260340634,3.16490750557815e-05
+"Neural Chart, constant mobility per class",samples with σ < 0,0.0,0.0,0.0
+"Neural Chart, constant mobility per class",negative values,0.0,0.0,0.0
+"Neural Chart, no excess free energy",hyperedges violating local detailed balance,0.00046858297579476063,0.15244765222767862,8.142438388882857e-05
+"Neural Chart, no excess free energy",samples with σ < 0,0.0,0.0,0.0
+"Neural Chart, no excess free energy",negative values,0.0,0.0,0.0
+"Neural Chart, no convex initialisation",hyperedges violating local detailed balance,0.2168036849163314,0.24775526513726964,0.19464401971726192
+"Neural Chart, no convex initialisation",samples with σ < 0,0.0,0.0,0.0
 "Neural Chart, no convex initialisation",negative values,0.0,0.0,0.0
-"Neural Chart, reversible (no drive)",hyperedges violating local detailed balance,0.0747307716816415,0.11190095846645368,0.052765785945141565
-"Neural Chart, reversible (no drive)",samples with σ < 0,0.21428571428571427,0.31845238095238093,0.16071428571428573
+"Neural Chart, reversible (no drive)",hyperedges violating local detailed balance,0.1537705378458082,0.22688524590163933,0.1379521480666238
+"Neural Chart, reversible (no drive)",samples with σ < 0,0.45535714285714285,0.6666666666666666,0.40476190476190477
 "Neural Chart, reversible (no drive)",negative values,0.0,0.0,0.0
 No chart (Flux-GNN),hyperedges violating local detailed balance,0.09999302455357142,0.5171595982142857,0.1068754650297619
 No chart (Flux-GNN),samples with σ < 0,0.0,0.8898809523809523,0.0

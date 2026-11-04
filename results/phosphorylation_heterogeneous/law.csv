@@ -1,0 +1,61 @@
+Method,test set,hyperedges,Pearson r of log k,Spearman r of log k,relative L2 error of k,median log ratio (learned / true),standard deviation of the true log k
+Neural Chart,"unseen media, training conditions (ΔG 1–3)",all,0.8301829991886677,0.7146119681588754,0.5673789915725356,-0.87,1.0006906170075236
+Neural Chart,"unseen media, training conditions (ΔG 1–3)",R1,0.812844834452067,0.8282471232334839,0.5146780826964995,-0.25,0.740733373806049
+Neural Chart,"unseen media, training conditions (ΔG 1–3)",R2,0.53547041979373,0.5312123021992414,0.9366035669091288,-2.75,0.48187539804349333
+Neural Chart,"unseen media, training conditions (ΔG 1–3)",transport X,0.47655672535352456,0.49476512113765087,0.8381493684532098,-1.59,0.5394475605497169
+Neural Chart,"unseen media, training conditions (ΔG 1–3)",transport Xp,0.7110014121051785,0.7150402169271985,0.3198914541219077,+0.21,0.4047569645267711
+Neural Chart,"unseen media, drive ΔG 3–4",all,0.8192508359522337,0.6952393971317365,0.6318861928216628,-1.05,0.9994569999027706
+Neural Chart,"unseen media, drive ΔG 3–4",R1,0.7631004460262282,0.7988584603460557,0.6138388997699527,-0.55,0.7490522371110271
+Neural Chart,"unseen media, drive ΔG 3–4",R2,0.5328497635139621,0.5544039515785849,0.9509637880575776,-3.01,0.4736613367347528
+Neural Chart,"unseen media, drive ΔG 3–4",transport X,0.365542834275334,0.3732084791401074,0.8668207511114543,-1.71,0.5439683265084893
+Neural Chart,"unseen media, drive ΔG 3–4",transport Xp,0.7340240967460486,0.7386198837547815,0.2704868071835947,+0.12,0.4090393045019732
+Neural Chart,"unseen media, stronger, finer potential U",all,0.7975160252185277,0.6594161881976665,0.6198522625880953,-1.07,1.0046191610658672
+Neural Chart,"unseen media, stronger, finer potential U",R1,0.6117734898275149,0.641040872459095,0.586014429505153,-0.44,0.747886966243151
+Neural Chart,"unseen media, stronger, finer potential U",R2,0.29839514997061245,0.3296697741366489,0.9550642321445012,-3.00,0.4977367583952252
+Neural Chart,"unseen media, stronger, finer potential U",transport X,0.2820373973185619,0.35239568676746713,0.8657027459907553,-1.76,0.5418660786838538
+Neural Chart,"unseen media, stronger, finer potential U",transport Xp,0.5576059013370626,0.5723753105172731,0.3341097079888346,+0.10,0.4060833766731079
+Neural Chart,"unseen media, 16×16 grid",all,0.8337708795176049,0.7195495307318068,0.6665365351619729,-0.86,1.007341786235648
+Neural Chart,"unseen media, 16×16 grid",R1,0.8129185398717892,0.8443311596264351,0.6732217741749876,-0.27,0.7478089263093495
+Neural Chart,"unseen media, 16×16 grid",R2,0.5484354397768538,0.5540835585196506,0.9335278202772263,-2.74,0.49851743259352055
+Neural Chart,"unseen media, 16×16 grid",transport X,0.5005841269095537,0.5311002441423336,0.8332889129306253,-1.57,0.5398092243092354
+Neural Chart,"unseen media, 16×16 grid",transport Xp,0.7092552068260813,0.7205054193770968,0.3204717492453401,+0.21,0.4049883422499411
+"Neural Chart, given standard potentials (oracle-type information)","unseen media, training conditions (ΔG 1–3)",all,0.5614249020201253,0.5423263508092454,0.564221704702109,-0.17,1.0006906170075236
+"Neural Chart, given standard potentials (oracle-type information)","unseen media, training conditions (ΔG 1–3)",R1,0.7966143664668623,0.8108722760160233,0.4928506852896633,-0.30,0.740733373806049
+"Neural Chart, given standard potentials (oracle-type information)","unseen media, training conditions (ΔG 1–3)",R2,0.517902921714187,0.5213395522227078,0.7691773434758817,+0.20,0.48187539804349333
+"Neural Chart, given standard potentials (oracle-type information)","unseen media, training conditions (ΔG 1–3)",transport X,0.28035606352346326,0.2824666992230128,0.8748660256206762,-1.78,0.5394475605497169
+"Neural Chart, given standard potentials (oracle-type information)","unseen media, training conditions (ΔG 1–3)",transport Xp,0.6998895316084338,0.7079132515688789,0.3184210707499071,+0.21,0.4047569645267711
+"Neural Chart, given standard potentials (oracle-type information)","unseen media, drive ΔG 3–4",all,0.5551649472083848,0.5250693753535167,0.64364517821574,-0.39,0.9994569999027706
+"Neural Chart, given standard potentials (oracle-type information)","unseen media, drive ΔG 3–4",R1,0.7388697963392059,0.774714571999419,0.6206286500313932,-0.61,0.7490522371110271
+"Neural Chart, given standard potentials (oracle-type information)","unseen media, drive ΔG 3–4",R2,0.5149584145177667,0.5460139811210245,0.566514048448719,-0.07,0.4736613367347528
+"Neural Chart, given standard potentials (oracle-type information)","unseen media, drive ΔG 3–4",transport X,0.12808352105131454,0.10836657006026036,0.8999692280212284,-1.92,0.5439683265084893
+"Neural Chart, given standard potentials (oracle-type information)","unseen media, drive ΔG 3–4",transport Xp,0.7222812473927887,0.7274161217574955,0.26786438946061053,+0.11,0.4090393045019732
+"Neural Chart, given standard potentials (oracle-type information)","unseen media, stronger, finer potential U",all,0.5331479453641305,0.49965169069792587,0.6350534458311591,-0.51,1.0046191610658672
+"Neural Chart, given standard potentials (oracle-type information)","unseen media, stronger, finer potential U",R1,0.5754332983560978,0.6063287995334726,0.5979913257846988,-0.51,0.747886966243151
+"Neural Chart, given standard potentials (oracle-type information)","unseen media, stronger, finer potential U",R2,0.27961467332468254,0.32098023514697493,0.6352868027166177,-0.06,0.4977367583952252
+"Neural Chart, given standard potentials (oracle-type information)","unseen media, stronger, finer potential U",transport X,0.1163536892224678,0.1685101266615885,0.8971760153060195,-1.97,0.5418660786838538
+"Neural Chart, given standard potentials (oracle-type information)","unseen media, stronger, finer potential U",transport Xp,0.5352377304507783,0.551603179327526,0.33735963870243124,+0.10,0.4060833766731079
+"Neural Chart, given standard potentials (oracle-type information)","unseen media, 16×16 grid",all,0.5642724639767077,0.5508185347141571,0.6177521536776809,-0.17,1.007341786235648
+"Neural Chart, given standard potentials (oracle-type information)","unseen media, 16×16 grid",R1,0.7989748576016121,0.8293481232713958,0.5828523260848887,-0.31,0.7478089263093495
+"Neural Chart, given standard potentials (oracle-type information)","unseen media, 16×16 grid",R2,0.5324084465382846,0.5489476217439303,1.0243101523571831,+0.21,0.49851743259352055
+"Neural Chart, given standard potentials (oracle-type information)","unseen media, 16×16 grid",transport X,0.3218920657524932,0.3266587903857889,0.8725254809622841,-1.76,0.5398092243092354
+"Neural Chart, given standard potentials (oracle-type information)","unseen media, 16×16 grid",transport Xp,0.6984397267337743,0.7130975817937889,0.316394261652747,+0.21,0.4049883422499411
+"Neural Chart, constant mobility per class","unseen media, training conditions (ΔG 1–3)",all,0.21743753842409133,0.13485760317767045,0.9239306392539796,-4.73,1.0006906170075236
+"Neural Chart, constant mobility per class","unseen media, training conditions (ΔG 1–3)",R1,0.0,0.0,0.9694503482179008,-3.00,0.740733373806049
+"Neural Chart, constant mobility per class","unseen media, training conditions (ΔG 1–3)",R2,0.0,0.0,0.998811301782526,-6.37,0.48187539804349333
+"Neural Chart, constant mobility per class","unseen media, training conditions (ΔG 1–3)",transport X,0.0,0.0,0.9999992429243613,-13.69,0.5394475605497169
+"Neural Chart, constant mobility per class","unseen media, training conditions (ΔG 1–3)",transport Xp,0.0,0.0,0.5480804370438817,-0.45,0.4047569645267711
+"Neural Chart, constant mobility per class","unseen media, drive ΔG 3–4",all,0.22339373265108128,0.14472203590840776,0.924096685652069,-4.72,0.9994569999027706
+"Neural Chart, constant mobility per class","unseen media, drive ΔG 3–4",R1,0.0,0.0,0.9698990660245929,-2.94,0.7490522371110271
+"Neural Chart, constant mobility per class","unseen media, drive ΔG 3–4",R2,0.0,0.0,0.9988148376306138,-6.36,0.4736613367347528
+"Neural Chart, constant mobility per class","unseen media, drive ΔG 3–4",transport X,0.0,0.0,0.9999992444193018,-13.62,0.5439683265084893
+"Neural Chart, constant mobility per class","unseen media, drive ΔG 3–4",transport Xp,0.0,0.0,0.550506185264434,-0.49,0.4090393045019732
+"Neural Chart, constant mobility per class","unseen media, stronger, finer potential U",all,0.21603757754531164,0.13272294764882783,0.9248508940522402,-4.72,1.0046191610658672
+"Neural Chart, constant mobility per class","unseen media, stronger, finer potential U",R1,0.0,0.0,0.9698797818744377,-2.95,0.747886966243151
+"Neural Chart, constant mobility per class","unseen media, stronger, finer potential U",R2,0.0,0.0,0.9988303585528165,-6.36,0.4977367583952252
+"Neural Chart, constant mobility per class","unseen media, stronger, finer potential U",transport X,0.0,0.0,0.9999992478531574,-13.66,0.5418660786838538
+"Neural Chart, constant mobility per class","unseen media, stronger, finer potential U",transport Xp,0.0,0.0,0.5475960615208327,-0.47,0.4060833766731079
+"Neural Chart, constant mobility per class","unseen media, 16×16 grid",all,0.21973031282971128,0.14155703760913663,0.9233840459430751,-4.72,1.007341786235648
+"Neural Chart, constant mobility per class","unseen media, 16×16 grid",R1,0.0,0.0,0.9696200386633874,-2.95,0.7478089263093495
+"Neural Chart, constant mobility per class","unseen media, 16×16 grid",R2,0.0,0.0,0.998822329214763,-6.32,0.49851743259352055
+"Neural Chart, constant mobility per class","unseen media, 16×16 grid",transport X,0.0,0.0,0.9999992425774938,-13.65,0.5398092243092354
+"Neural Chart, constant mobility per class","unseen media, 16×16 grid",transport Xp,0.0,0.0,0.5486063776725574,-0.48,0.4049883422499411

@@ -5,11 +5,14 @@ Neural Chart,negative values,0.0,0.0,0.0,0.0
 "Neural Chart, given standard potentials (oracle-type information)",hyperedges violating local detailed balance,0.0,0.0,0.0,0.0
 "Neural Chart, given standard potentials (oracle-type information)",samples with σ < 0,0.0,0.0,0.0,0.0
 "Neural Chart, given standard potentials (oracle-type information)",negative values,0.0,0.0,0.0,0.0
-"Neural Chart, ideal activities",hyperedges violating local detailed balance,0.0,0.0,0.0,0.0
-"Neural Chart, ideal activities",samples with σ < 0,0.0,0.0,0.0,0.0
-"Neural Chart, ideal activities",negative values,0.0,0.0,0.0,0.0
-"Neural Chart, no convex initialisation",hyperedges violating local detailed balance,0.1022579294949307,0.026968025152755534,0.019818609338259994,0.12895480390218947
-"Neural Chart, no convex initialisation",samples with σ < 0,0.18154761904761904,0.0,0.0,0.26785714285714285
+"Neural Chart, constant mobility per class",hyperedges violating local detailed balance,0.0,0.0,0.0,0.0
+"Neural Chart, constant mobility per class",samples with σ < 0,0.0,0.0,0.0,0.0
+"Neural Chart, constant mobility per class",negative values,0.0,0.0,0.0,0.0
+"Neural Chart, no excess free energy",hyperedges violating local detailed balance,0.0,0.0,0.0,0.0
+"Neural Chart, no excess free energy",samples with σ < 0,0.0,0.0,0.0,0.0
+"Neural Chart, no excess free energy",negative values,0.0,0.0,0.0,0.0
+"Neural Chart, no convex initialisation",hyperedges violating local detailed balance,0.16305106026785715,0.0025460675463581934,0.35078885532057735,0.18767438616071427
+"Neural Chart, no convex initialisation",samples with σ < 0,0.08035714285714286,0.0,0.0,0.017857142857142856
 "Neural Chart, no convex initialisation",negative values,0.0,0.0,0.0,0.0
 "Neural Chart, reversible (no drive)",hyperedges violating local detailed balance,0.0,0.0,0.0,0.0
 "Neural Chart, reversible (no drive)",samples with σ < 0,0.0,0.0,0.0,0.0

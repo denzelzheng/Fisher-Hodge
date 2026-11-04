@@ -1,8 +1,8 @@
 | Method | what it removes | training conditions | temperature ×0.25 | temperature ×4 | drive ×4 | drive ×8 | unseen low-porosity media | 64×64 grid | point cloud |
 |---|---|---|---|---|---|---|---|---|---|
-| Neural Chart | full model | 0.064 | 0.084 | 0.090 | 0.195 | 0.407 | 0.081 | 0.071 | 0.090 |
-| Neural Chart, ideal activities | the activity correction: ln gamma = 0 | 0.064 | 0.084 | 0.090 | 0.195 | 0.407 | 0.081 | 0.071 | 0.090 |
-| Neural Chart, no state input | the state input s * m(log state) of the mobility | 0.070 | 0.084 | 0.099 | 0.199 | 0.404 | 0.085 | 0.077 | 0.092 |
-| Neural Chart, constant mobility | the material network g_theta: one constant omega for all edges | 1.180 | 1.067 | 0.943 | 1.065 | 1.012 | 0.511 | 1.180 | 1.180 |
-| Neural Chart, learned drive scale | the fixed drive scale: a global scale of the drive is learned | 0.063 | 0.084 | 0.090 | 0.192 | 0.403 | 0.080 | 0.071 | 0.090 |
+| Neural Chart | full model | 0.064 | 0.077 | 0.091 | 0.191 | 0.401 | 0.077 | 0.073 | 0.090 |
+| Neural Chart, constant mobility per class | g_theta: one constant omega per hyperedge class | 1.108 | 1.046 | 0.866 | 1.040 | 1.003 | 0.506 | 1.108 | 1.123 |
+| Neural Chart, no excess free energy | the excess free energy G_theta | 0.068 | 0.083 | 0.092 | 0.201 | 0.413 | 0.080 | 0.075 | 0.093 |
+| Neural Chart, no convex initialisation | the closed-form NNLS start: omega starts at 1 | 0.095 | 0.090 | 0.148 | 0.256 | 0.486 | 0.105 | 0.105 | 0.116 |
+| Neural Chart, reversible (no drive) | the drive: A = 0, so the model is reversible | 0.702 | 0.828 | 0.344 | 0.950 | 0.999 | 0.338 | 0.709 | 0.698 |
 | No chart (Flux-GNN) | the chart: a graph network gives the one-way rates, with no chemical potential, force or symmetric mobility | 0.078 | 0.797 | 2.138 | 1.046 | 1.091 | 0.116 | 0.515 | 0.458 |

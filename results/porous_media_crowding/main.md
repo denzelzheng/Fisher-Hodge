@@ -1,8 +1,10 @@
 | Method | training conditions | temperature ×0.25 | temperature ×4 | drive ×4 | drive ×8 | unseen low-porosity media | 64×64 grid | point cloud | trajectories with a negative density (of 64) | parameters |
 |---|---|---|---|---|---|---|---|---|---|---|
-| Neural Chart | 0.067 | 0.114 | 0.101 | 0.168 | 0.376 | 0.062 | 0.077 | 0.091 | 0 | 5,478 |
-| Neural Chart, ideal activities | 0.067 | 0.114 | 0.101 | 0.168 | 0.376 | 0.062 | 0.077 | 0.091 | 0 | 5,381 |
-| Neural Chart, no state input | 0.241 | 0.318 | 0.144 | 0.412 | 0.601 | 0.127 | 0.254 | 0.250 | 0 | 5,155 |
+| Neural Chart | 0.056 | 0.066 | 0.121 | 0.155 | 0.373 | 0.057 | 0.069 | 0.083 | 0 | 6,340 |
+| Neural Chart, constant mobility per class | 1.030 | 0.929 | 0.828 | 1.002 | 0.996 | 0.420 | 1.029 | 1.038 | 0 | 1,155 |
+| Neural Chart, no excess free energy | 0.058 | 0.070 | 0.123 | 0.163 | 0.389 | 0.059 | 0.071 | 0.084 | 0 | 5,187 |
+| Neural Chart, no convex initialisation | 0.111 | 0.079 | 0.237 | 0.178 | 0.355 | 0.090 | 0.122 | 0.126 | 0 | 6,340 |
+| Neural Chart, reversible (no drive) | 0.608 | 0.651 | 0.319 | 0.912 | 0.954 | 0.195 | 0.614 | 0.601 | 0 | 6,340 |
 | No chart (Flux-GNN) | 0.057 | 0.808 | 2.053 | 0.856 | 1.049 | 0.057 | 0.573 | 0.473 | 0 | 151,234 |
 | UDE closure | 0.066 | 0.679 | 1.916 | 0.601 | 0.917 | 0.075 | 0.756 | 0.485 | 64 | 5,441 |
 | BSMS-GNN | 0.592 | 0.837 | 2.739 | 1.386 | 1.355 | 0.435 | 1.008 | 0.713 | 64 | 1,724,417 |

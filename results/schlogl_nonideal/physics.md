@@ -1,9 +1,9 @@
 | Method | quantity | training conditions | a 3.5–4.0, b 2.0–3.5 | 16×16 grid |
 |---|---|---|---|---|
-| Neural Chart | hyperedges violating local detailed balance | 0 | 0 | 0 |
+| Neural Chart | hyperedges violating local detailed balance | 4.2e-04 | 3.5e-04 | 8.3e-05 |
 | Neural Chart | samples with σ < 0 | 0 | 0 | 0 |
 | Neural Chart | negative values | 0 | 0 | 0 |
-| Neural Chart, given standard potentials (oracle-type information) | hyperedges violating local detailed balance | 0 | 0 | 8.2e-06 |
+| Neural Chart, given standard potentials (oracle-type information) | hyperedges violating local detailed balance | 4.0e-04 | 0.245 | 1.5e-04 |
 | Neural Chart, given standard potentials (oracle-type information) | samples with σ < 0 | 0 | 0 | 0 |
 | Neural Chart, given standard potentials (oracle-type information) | negative values | 0 | 0 | 0 |
 | No chart (Flux-GNN) | hyperedges violating local detailed balance | 0.100 | 0.517 | 0.107 |

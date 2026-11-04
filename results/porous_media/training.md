@@ -1,10 +1,10 @@
 | Method | parameters | training time (min) | final training loss |
 |---|---|---|---|
-| Neural Chart | 5,478 | 47.1 | 1.5e-04 |
-| Neural Chart, ideal activities | 5,381 | 16.2 | 1.5e-04 |
-| Neural Chart, no state input | 5,155 | 23.7 | 1.5e-04 |
-| Neural Chart, constant mobility | 98 | 15.4 | 0.030 |
-| Neural Chart, learned drive scale | 5,479 | 47.9 | 1.5e-04 |
+| Neural Chart | 6,340 | 35.3 | 1.3e-04 |
+| Neural Chart, constant mobility per class | 1,155 | 7.9 | 0.030 |
+| Neural Chart, no excess free energy | 5,187 | 17.7 | 1.4e-04 |
+| Neural Chart, no convex initialisation | 6,340 | 46.8 | 1.6e-04 |
+| Neural Chart, reversible (no drive) | 6,340 | 12.4 | 0.021 |
 | No chart (Flux-GNN) | 151,234 | 639.0 | 4.5e-04 |
 | UDE closure | 5,441 | 11.7 | 2.8e-04 |
 | BSMS-GNN | 1,724,417 | 48.0 | 0.358 |

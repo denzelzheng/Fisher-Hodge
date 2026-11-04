@@ -1,14 +1,20 @@
 | Method | quantity | training conditions | temperature ×0.25 | temperature ×4 | drive ×4 | drive ×8 | unseen low-porosity media | 64×64 grid | point cloud |
 |---|---|---|---|---|---|---|---|---|---|
-| Neural Chart | edges violating local detailed balance | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Neural Chart | edges violating local detailed balance | 5.0e-03 | 3.3e-03 | 4.0e-03 | 2.9e-03 | 2.0e-03 | 2.4e-03 | 6.2e-03 | 5.2e-03 |
 | Neural Chart | samples with sigma < 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | Neural Chart | negative cell values | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| Neural Chart, ideal activities | edges violating local detailed balance | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| Neural Chart, ideal activities | samples with sigma < 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| Neural Chart, ideal activities | negative cell values | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| Neural Chart, no state input | edges violating local detailed balance | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| Neural Chart, no state input | samples with sigma < 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| Neural Chart, no state input | negative cell values | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Neural Chart, constant mobility per class | edges violating local detailed balance | 9.4e-03 | 0.011 | 5.3e-03 | 0.012 | 1.0e-02 | 0.011 | 0.010 | 9.7e-03 |
+| Neural Chart, constant mobility per class | samples with sigma < 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Neural Chart, constant mobility per class | negative cell values | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Neural Chart, no excess free energy | edges violating local detailed balance | 1.8e-03 | 1.7e-03 | 2.0e-03 | 6.8e-04 | 3.7e-04 | 9.1e-04 | 3.7e-03 | 1.9e-03 |
+| Neural Chart, no excess free energy | samples with sigma < 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Neural Chart, no excess free energy | negative cell values | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Neural Chart, no convex initialisation | edges violating local detailed balance | 2.3e-03 | 9.7e-04 | 4.2e-03 | 1.2e-03 | 7.3e-04 | 9.7e-04 | 2.4e-03 | 2.3e-03 |
+| Neural Chart, no convex initialisation | samples with sigma < 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Neural Chart, no convex initialisation | negative cell values | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Neural Chart, reversible (no drive) | edges violating local detailed balance | 0.172 | 0.253 | 0.144 | 0.320 | 0.380 | 0.131 | 0.176 | 0.168 |
+| Neural Chart, reversible (no drive) | samples with sigma < 0 | 8.6e-03 | 0.065 | 0 | 0.140 | 0.248 | 0.011 | 8.6e-03 | 9.4e-03 |
+| Neural Chart, reversible (no drive) | negative cell values | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | No chart (Flux-GNN) | edges violating local detailed balance | 0.029 | 0.216 | 0.169 | 0.049 | 0.065 | 0.056 | 0.078 | 0.304 |
 | No chart (Flux-GNN) | samples with sigma < 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | No chart (Flux-GNN) | negative cell values | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
