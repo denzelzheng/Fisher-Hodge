@@ -263,3 +263,17 @@ class Task:
             return dict(shared_species=c['shared_species'], n_new_cycles=c['n_new_cycles'], spurious_affinity_max=float(sp.max()) if len(sp) else 0.0,
                         force_change=c['force_change'], self_energy_gap=c['self_energy_gap'])
         return {}
+
+    # ---------------------------------------------------------------- tables
+    def tables(s, runs=None):
+        import json
+        from ..common import RESULTS, write_table
+        d = runs or os.path.join(RESULTS, s.name, 'runs')
+        order = ['composed', 'composed-refine-2', 'composed-refine-8', 'composed-refine-32', 'chart', 'flux_gnn-transfer', 'flux_gnn']
+        rs = {m: json.load(open(os.path.join(d, m + '.json'))) for m in order if os.path.exists(os.path.join(d, m + '.json'))}
+        sets = s.sets()
+        rows = []
+        for m, r in rs.items():
+            v = r['sets']
+            rows.append([m] + [v[x]['err_10T'] for x in sets] + [v[x].get('sigma', {}).get('relerr') for x in sets] + [v[sets[0]]['phys']['ldb_violation_frac'], (v[sets[0]].get('new_cycles') or {}).get('mae')])
+        return write_table(os.path.join(RESULTS, s.name, 'main'), ['Model'] + [f'10T {x}' for x in sets] + [f'sigma {x}' for x in sets] + ['LDB violations', 'error of the affinity, new cycles'], rows)
