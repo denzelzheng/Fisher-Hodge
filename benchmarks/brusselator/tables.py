@@ -85,14 +85,14 @@ def oscillation_table(R, models):
 
 
 def entropy_table(R, models):
-    """sigma(t) = sum_h (a_h - b_h) log(a_h / b_h) from the model's own one-way rates on the reference states, against
+    """sigma(t), t > 0, = sum_h (a_h - b_h) log(a_h / b_h) from the model's own one-way rates on the reference states, against
     the true sigma: relative L2 error over time (median over the set) and the ratio of the time means"""
     header = ['Method', 'quantity'] + [SET_LABELS[s] for s in TEST_SETS]
     rows = []
     for m in models:
         if m not in R or not any('sigma' in (_set(R[m], s) or {}) for s in TEST_SETS):
             continue
-        for key, lab in (('relerr', 'relative error of sigma(t)'), ('ratio', 'mean sigma, model / reference')):
+        for key, lab in (('relerr', 'relative error of sigma(t), t > 0'), ('ratio', 'mean sigma, t > 0, model / reference')):
             rows.append([LABELS[m], lab] + [((_set(R[m], s) or {}).get('sigma') or {}).get(key) for s in TEST_SETS])
     return header, rows
 

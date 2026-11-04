@@ -7,7 +7,7 @@ import torch
 from neuralchart import NeuralChart, Trajectories, compose, fast
 from neuralchart.chart import RTOL
 from neuralchart.compose import ComposedChart, compose_graphs, new_cycles
-from neuralchart.diagnostics import LDB_RULE, ldb_violation
+from neuralchart.diagnostics import LDB_RULE, ldb_violation, sigma_error, sigma_times
 from neuralchart.fit import train
 from ..reaction_networks import config as RC
 from ..reaction_networks.data import load_set
@@ -234,7 +234,7 @@ class Task:
             nsn += int((sig[good] < 0).sum()); ns_ += int(good.sum())
         m['phys'] = dict(ldb_violation_frac=nv / max(nval, 1), sigma_neg_frac=nsn / max(ns_, 1), ldb_rule=LDB_RULE)
         sgm, sgt = [], []
-        for t in range(0, Yc.shape[1], 5):
+        for t in sigma_times(Yc.shape[1]):
             c = Yc[:, t]
             a, b = model.rates(c.to(dev).to(dt), sd['drive'])
             a, b = a.double().cpu(), b.double().cpu()
@@ -242,8 +242,8 @@ class Task:
             at, bt = tr.rates(lab, c)
             sgt.append(((at - bt) * (torch.log(at) - torch.log(bt))).sum(-1))
         sgm, sgt = torch.stack(sgm, 1), torch.stack(sgt, 1)
-        se = (torch.linalg.vector_norm(sgm - sgt, dim=1) / torch.linalg.vector_norm(sgt, dim=1)).numpy()
-        m['sigma'] = dict(relerr=float(np.nanmedian(se)), ratio=float(np.median((sgm.mean(1) / sgt.mean(1)).numpy())))
+        se, ratio = sigma_error(sgm, sgt)
+        m['sigma'] = dict(relerr=float(np.nanmedian(se.numpy())), ratio=float(np.median(ratio.numpy())))
         a, b = model.rates(Yc[:, 0].to(dev).to(dt), sd['drive'])
         f = (torch.log(a) - torch.log(b)).double().cpu()
         at, bt = tr.rates(lab, Yc[:, 0])
@@ -276,4 +276,4 @@ class Task:
         for m, r in rs.items():
             v = r['sets']
             rows.append([m] + [v[x]['err_10T'] for x in sets] + [v[x].get('sigma', {}).get('relerr') for x in sets] + [v[sets[0]]['phys']['ldb_violation_frac'], (v[sets[0]].get('new_cycles') or {}).get('mae')])
-        return write_table(os.path.join(RESULTS, s.name, 'main'), ['Model'] + [f'10T {x}' for x in sets] + [f'sigma {x}' for x in sets] + ['LDB violations', 'error of the affinity, new cycles'], rows)
+        return write_table(os.path.join(RESULTS, s.name, 'main'), ['Model'] + [f'10T {x}' for x in sets] + [f'sigma (t > 0) {x}' for x in sets] + ['LDB violations', 'error of the affinity, new cycles'], rows)

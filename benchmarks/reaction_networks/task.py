@@ -7,7 +7,7 @@ import torch
 
 from neuralchart import NeuralChart, fast
 from neuralchart.chart import RTOL
-from neuralchart.diagnostics import LDB_RULE, ldb_violation, relerr_traj
+from neuralchart.diagnostics import LDB_RULE, ldb_violation, relerr_traj, sigma_error, sigma_times
 from neuralchart.fit import rollout, train
 from ..common import check_gpu
 from . import config as C
@@ -101,7 +101,7 @@ class Task:
     # ---------------------------------------------------------------- readouts
     @torch.no_grad()
     def metrics(s, name, model, sd, R, Yc, m):
-        """the physics against the true force of the condition, the entropy production and cycle affinity from the model's own rates on the
+        """the physics against the true force of the condition, the entropy production (t > 0) and cycle affinity from the model's own rates on the
         reference states, and the readouts of each task"""
         from .models import UDE
         B, n = R.shape[0], sd['n']
@@ -139,7 +139,7 @@ class Task:
         m['phys'] = dict(ldb_violation_frac=nv / max(nval, 1), sigma_neg_frac=nsn / max(ns_, 1), ldb_rule=LDB_RULE)
         if not isinstance(model, UDE):
             sgm, sgt = [], []
-            for t in range(0, Yc.shape[1], 5):
+            for t in sigma_times(Yc.shape[1]):
                 c = Yc[:, t]
                 a, b = model.rates(c.to(dev).to(next_dtype(model)), sd['drive'])
                 a, b = a.double().cpu(), b.double().cpu()
@@ -147,8 +147,8 @@ class Task:
                 at, bt = TR.true_rates(hg, lab, c)
                 sgt.append(((at - bt) * (torch.log(at) - torch.log(bt))).sum(-1))
             sgm, sgt = torch.stack(sgm, 1), torch.stack(sgt, 1)
-            se = (torch.linalg.vector_norm(sgm - sgt, dim=1) / torch.linalg.vector_norm(sgt, dim=1)).numpy()
-            m['sigma'] = dict(relerr=float(np.nanmedian(se)), ratio=float(np.median((sgm.mean(1) / sgt.mean(1)).numpy())))
+            se, ratio = sigma_error(sgm, sgt)
+            m['sigma'] = dict(relerr=float(np.nanmedian(se.numpy())), ratio=float(np.median(ratio.numpy())))
             a, b = model.rates(Yc[:, 0].to(dev).to(next_dtype(model)), sd['drive'])
             ca = TR.model_cycle_affinity((torch.log(a) - torch.log(b)).double().cpu(), V).numpy()
             at, bt = TR.true_rates(hg, lab, Yc[:, 0])

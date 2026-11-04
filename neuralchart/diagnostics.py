@@ -7,6 +7,7 @@ J = a - b is a difference, so its rounding error scales with the gross rate a + 
     violation  <=>  J f < -LDB_TOL * scale * |f|,   scale = a + b  for a model with forward / backward rates
                                                      scale = |J|    for a model with a single edge flux (no a, b)
 
+The error of the entropy production is evaluated on t > 0 (sigma_times, sigma_error).
 Entropy production sigma = sum_h J_h f_h, with f the physical force of the test condition.  Negative values of the
 state are counted separately.
 """
@@ -28,3 +29,17 @@ def relerr_traj(R, Y):
     B, T1 = Y.shape[:2]
     e = torch.linalg.vector_norm((R - Y).reshape(B, T1, -1), dim=-1) / torch.linalg.vector_norm(Y.reshape(B, T1, -1), dim=-1)
     return torch.where(torch.isfinite(e), e, torch.full_like(e, float('inf')))
+
+
+SIGMA_EVERY = 5                                      # sampling steps between the states of the entropy production error
+
+
+def sigma_times(n_samples):
+    """the sample indices of the entropy production error: t > 0"""
+    return range(SIGMA_EVERY, n_samples, SIGMA_EVERY)
+
+
+def sigma_error(sgm, sgt):
+    """model and reference entropy production (B, n_times) on sigma_times, t > 0: the relative L2 error over time per trajectory (B,), and
+    the ratio of the time means (B,)"""
+    return torch.linalg.vector_norm(sgm - sgt, dim=1) / torch.linalg.vector_norm(sgt, dim=1), sgm.mean(1) / sgt.mean(1)

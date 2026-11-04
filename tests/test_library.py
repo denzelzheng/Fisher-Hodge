@@ -89,3 +89,11 @@ def test_no_class_starts_below_the_floor():
     info = fit_linear(chart, Trajectories(torch.stack(c, 1), cond, dt=0.05).as_dict(), 0.05, log=lambda *a: None)
     assert np.isclose(info['floor'], FLOOR * max(info['kappa']))
     assert float(chart.kinetics.core.min()) >= np.log(info['floor']) - 1e-9
+
+
+def test_the_entropy_production_error_is_on_positive_times():
+    from neuralchart.diagnostics import sigma_error, sigma_times
+    t = list(sigma_times(21))
+    assert t[0] > 0 and t == [5, 10, 15, 20]
+    e, r = sigma_error(2 * torch.ones(3, 4), torch.ones(3, 4))
+    assert torch.allclose(e, torch.ones(3)) and torch.allclose(r, 2 * torch.ones(3))

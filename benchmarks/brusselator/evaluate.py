@@ -10,7 +10,7 @@ import numpy as np
 import torch
 
 from neuralchart import fast
-from neuralchart.diagnostics import ldb_violation, relerr_traj, LDB_RULE
+from neuralchart.diagnostics import ldb_violation, relerr_traj, sigma_error, sigma_times, LDB_RULE
 from .config import DT
 from .data import hg_of, true_rates
 from .models import UDE, next_dtype
@@ -128,11 +128,11 @@ def set_metrics(model, sd, R, Yc, m):
                      ldb_scale='|J|' if single else 'a + b')
     if single:
         return
-    # entropy production on the reference states (models with their own one-way rates)
-    se, sm_, st_ = [], [], []
+    # entropy production on the reference states, t > 0 (models with their own one-way rates)
+    se, rt = [], []
     for (i, _), ctx in zip(parts, ctxs):
         sgm, sgt = [], []
-        for t in range(0, Yc.shape[1], 5):
+        for t in sigma_times(Yc.shape[1]):
             c = Yc[i:i + chunk, t]
             a, b = model.rates(c.to(dev).to(dtype), ctx)
             a, b = a.double().cpu(), b.double().cpu()
@@ -140,10 +140,10 @@ def set_metrics(model, sd, R, Yc, m):
             at, bt = true_rates(hg, lab[i:i + chunk], c)
             sgt.append(((at - bt) * (torch.log(at) - torch.log(bt))).sum(-1))
         sgm, sgt = torch.stack(sgm, 1), torch.stack(sgt, 1)
-        se.append(torch.linalg.vector_norm(sgm - sgt, dim=1) / torch.linalg.vector_norm(sgt, dim=1))
-        sm_.append(sgm.mean(1)); st_.append(sgt.mean(1))
+        e_, r_ = sigma_error(sgm, sgt)
+        se.append(e_); rt.append(r_)
     se = torch.cat(se).numpy()
-    m['sigma'] = dict(relerr=float(np.nanmedian(se)), ratio=float(np.median((torch.cat(sm_) / torch.cat(st_)).numpy())))
+    m['sigma'] = dict(relerr=float(np.nanmedian(se)), ratio=float(np.median(torch.cat(rt).numpy())))
     # cycle affinities at site 0 (R1 + R4: A -> E, R2 + R3: B -> D), model and truth, mean over the set
     a, b = model.rates(Yc[:, 0].to(dev).to(dtype), model.prepare(sd['drive']))
     la = (torch.log(a) - torch.log(b)).double().cpu()

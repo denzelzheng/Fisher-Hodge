@@ -58,7 +58,7 @@ def readout_table(R, models, stem):
         if m not in R or m not in OWN_FLUX or m == 'ude':
             continue
         S = R[m]['sets']
-        rows.append([LABELS[m], 'σ, relative error'] + [(S[s].get('sigma') or {}).get('relerr') if S.get(s) else None for s, _ in cols])
+        rows.append([LABELS[m], 'σ, relative error (t > 0)'] + [(S[s].get('sigma') or {}).get('relerr') if S.get(s) else None for s, _ in cols])
         rows.append([LABELS[m], 'cycle affinity, model; reference'] +
                     [f'{fmt(S[s]["cycle_affinity"]["model_mean"])}; {fmt(S[s]["cycle_affinity"]["true_mean"])}'
                      if S.get(s) and 'cycle_affinity' in S[s] else 'N/A' for s, _ in cols])
