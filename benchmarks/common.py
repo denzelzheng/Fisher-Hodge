@@ -99,6 +99,19 @@ def write_table(path_stem, header, rows):
     return '\n'.join(md)
 
 
+def activity_table(runs, models, stem):
+    """the learned activity correction of every Neural Chart variant: the gate s_mu and the largest |ln gamma| over the
+    densities of the training data, the largest values over the species"""
+    rows = []
+    for m in models:
+        r = runs.get(m) or {}
+        a = r.get('activity') or (r.get('extra') or {}).get('activity')
+        if a:
+            s = a['s_mu']
+            rows.append([LABELS[m], min(s), max(s), a['max_abs_lngamma_all']])
+    return write_table(stem, ['Method', 'smallest s_μ', 'largest s_μ', 'largest |ln γ|, training range'], rows)
+
+
 def load_runs(benchmark):
     """the result files results/<benchmark>/runs/<model>.json -> {model: dict}"""
     d = os.path.join(RESULTS, benchmark, 'runs')

@@ -5,8 +5,11 @@ Neural Chart,negative values,0.0,0.0,0.0,0.0
 "Neural Chart, given standard potentials (oracle-type information)",hyperedges violating local detailed balance,0.0,0.0,0.0,0.0
 "Neural Chart, given standard potentials (oracle-type information)",samples with σ < 0,0.0,0.0,0.0,0.0
 "Neural Chart, given standard potentials (oracle-type information)",negative values,0.0,0.0,0.0,0.0
-"Neural Chart, no convex initialisation",hyperedges violating local detailed balance,0.01546475663356666,0.002871558779761905,0.028547439126784216,0.01876613259540032
-"Neural Chart, no convex initialisation",samples with σ < 0,0.0,0.0,0.0,0.0
+"Neural Chart, ideal activities",hyperedges violating local detailed balance,0.0,0.0,0.0,0.0
+"Neural Chart, ideal activities",samples with σ < 0,0.0,0.0,0.0,0.0
+"Neural Chart, ideal activities",negative values,0.0,0.0,0.0,0.0
+"Neural Chart, no convex initialisation",hyperedges violating local detailed balance,0.09559849330357142,0.02603276477496018,0.02519314746388982,0.12081543442751597
+"Neural Chart, no convex initialisation",samples with σ < 0,0.15476190476190477,0.0,0.0,0.23809523809523808
 "Neural Chart, no convex initialisation",negative values,0.0,0.0,0.0,0.0
 "Neural Chart, reversible (no drive)",hyperedges violating local detailed balance,0.0,0.0,0.0,0.0
 "Neural Chart, reversible (no drive)",samples with σ < 0,0.0,0.0,0.0,0.0

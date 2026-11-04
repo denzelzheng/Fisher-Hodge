@@ -13,7 +13,7 @@ convex, so its optimum is global (fit_linear).  The optimum is mapped back to th
 
 Variable projection (fit_varpro).  When the model has a learned state function inside mu (the activity correction
 ln gamma_theta), omega is the NNLS optimum at every value of ln gamma_theta, and ln gamma_theta descends the projected
-derivative residual.
+derivative residual, after a global line search of its gate (which starts at zero).
 
 Rollout refinement (train).  Every parameter is then refined on multi-step rollouts: K in [kmin, kmax] steps from a
 random start inside the training window, batch 8, Adam with a cosine schedule, gradient clip 1.
@@ -26,6 +26,8 @@ import scipy.linalg
 import scipy.optimize
 from scipy.optimize import nnls
 import torch
+
+from .diagnostics import activity_summary
 
 
 def _take(drive, idx):
@@ -243,25 +245,87 @@ def _projected_residual_backward(model, tr, dt, batch=16):
     return tot
 
 
-def fit_varpro(model, data, dt, params, max_iters=2000, lr=1e-2, window=100, min_gain=0.05, batch=16, log=print):
+GATE_GRID = tuple(0.25 * 1.1 ** k for k in range(45))         # 0.25 to 16.5, steps of 10 %
+
+
+@torch.no_grad()
+def gate_line_search(model, tr, dt, gate, grid=GATE_GRID, refine=12, log=print):
+    """the gate of a learned state function (zero at initialisation, so that only the gate has a gradient) set by a
+    global line search of the projected derivative residual over gate = t >= 0: the grid t in {0} + grid (fine, since
+    the valley can be narrow), then a golden-section refinement around the best grid point.  The descent of
+    fit_varpro starts from there.  The projected
+    residual of a crowded activity correction is not convex in the gate: it can rise for small t before it falls into
+    the valley of the right amplitude, so that a descent from t = 0 alone may leave in the wrong direction."""
+    quiet = lambda *a: None
+    g0 = gate.detach().clone()
+    lin = model.linear_parameters()
+    lin0 = [p.detach().clone() for p in lin]
+
+    def res(t):                                      # every evaluation starts from the same linear parameters
+        for p, v in zip(lin, lin0):
+            p.copy_(v)
+        gate.copy_(g0 + t)
+        r = fit_linear(model, tr, dt, log=quiet)['residual_theta']
+        return r if math.isfinite(r) else float('inf')
+    ts = [0.0] + list(grid)
+    rs = [res(t) for t in ts]
+    i = int(np.argmin(rs))
+    lo, hi = ts[max(i - 1, 0)], ts[min(i + 1, len(ts) - 1)]
+    best_t, best_r = ts[i], rs[i]
+    if i > 0:                                        # golden section on [lo, hi]
+        gr = (math.sqrt(5) - 1) / 2
+        a, b = hi - gr * (hi - lo), lo + gr * (hi - lo)
+        ra, rb = res(a), res(b)
+        for _ in range(refine):
+            if ra < rb:
+                hi, b, rb = b, a, ra
+                a = hi - gr * (hi - lo); ra = res(a)
+            else:
+                lo, a, ra = a, b, rb
+                b = lo + gr * (hi - lo); rb = res(b)
+        for t, r in ((a, ra), (b, rb)):
+            if r < best_r:
+                best_t, best_r = t, r
+    res(best_t)
+    log(f'gate line search: gate {best_t:.4g}, projected derivative residual {rs[0]:.4e} -> {best_r:.4e} '
+        f'({len(ts) + (2 + refine if i > 0 else 0)} evaluations)')
+    return dict(gate=best_t, residual_start=rs[0], residual=best_r, grid=dict(zip(map(float, ts), rs)))
+
+
+def fit_varpro(model, data, dt, params, max_iters=2000, lr=1e-2, window=100, min_gain=0.05, batch=16, log=print, gate=None):
     """variable-projected closed-form fit.  The linear parameters (the log-rate core, given or learned potentials) are
     the NNLS optimum (fit_linear) at the current value of the nonlinear state-function parameters `params` (e.g. the
     learned activity correction ln gamma_theta); `params` descend the projected derivative residual (Adam, lr, clip 1;
     by the envelope theorem the gradient at fixed optimal linear parameters is the gradient of the projected residual).
-    Fixed stopping rule: the projected residual improved by less than min_gain (relative) over the last `window`
-    iterations, or max_iters.  Without nonlinear parameters this is exactly fit_linear."""
+    gate: the gate parameter of the state function (in params); when given, gate_line_search sets it before the
+    descent.  Fixed stopping rule: the projected residual improved by less than min_gain (relative) over the last
+    `window` iterations, or max_iters.  The best iterate is kept, and the state function only when it lowers the
+    projected residual of the start (gate 0) by at least min_gain; otherwise the model returns to its entry state
+    (out['kept'] = False; the caller freezes it, see fit_chart).
+    Without nonlinear parameters this is exactly fit_linear."""
     tr = data['train'] if 'train' in data else data
     t0 = time.time()
     if not params:
         return dict(linear_fit=fit_linear(model, tr, dt, log=log), iters=0, time_s=time.time() - t0)
     quiet = lambda *a: None
+    state = list(params) + list(model.linear_parameters())
+    snapshot = lambda: [p.detach().clone() for p in state]
+
+    def restore(values):
+        with torch.no_grad():
+            for p, v in zip(state, values):
+                p.copy_(v)
+    entry = snapshot()
+    ls = gate_line_search(model, tr, dt, gate, log=log) if gate is not None else None
     opt = torch.optim.Adam(params, lr=lr)
-    hist, it = [], 0
+    hist, it, best, best_state = [], 0, math.inf, entry
     while True:
         fit_linear(model, tr, dt, log=quiet)                      # omega: the NNLS optimum at the current state functions
         opt.zero_grad(set_to_none=True)
         with torch.enable_grad():
             hist.append(_projected_residual_backward(model, tr, dt, batch))
+        if hist[-1] < best:
+            best, best_state = hist[-1], snapshot()
         if it % 50 == 0:
             log(f'varpro it {it:4d}: projected derivative residual {hist[-1]:.4e} t {time.time() - t0:.0f}s')
         stop = (it >= window and hist[-1] > (1 - min_gain) * hist[-1 - window]) or it >= max_iters or not math.isfinite(hist[-1])
@@ -272,11 +336,19 @@ def fit_varpro(model, data, dt, params, max_iters=2000, lr=1e-2, window=100, min
         it += 1
     for p in model.parameters():
         p.grad = None
+    start = ls['residual_start'] if ls is not None else hist[0]
+    kept = best < (1 - min_gain) * start
+    restore(best_state if kept else entry)
     info = fit_linear(model, tr, dt, log=log)                     # final omega at the final state functions
-    out = dict(linear_fit=info, iters=it, residual_start=hist[0], residual_end=hist[-1], time_s=time.time() - t0,
+    if not kept:
+        restore(entry)                                            # back to the entry state, omega included
+    out = dict(linear_fit=info, iters=it, residual_start=start, residual_end=best if kept else start, kept=bool(kept),
+               residual_best=best, gain=1 - best / start, min_gain=min_gain,
+               time_s=time.time() - t0, gate_line_search=ls,
                curve=hist[::10], rule=f'stop when the projected residual improves by < {min_gain:g} over {window} iterations '
                                       f'(max {max_iters}); Adam lr {lr:g}, clip 1')
-    log(f'varpro: {it} iterations, projected derivative residual {hist[0]:.4e} -> {hist[-1]:.4e}, {out["time_s"]:.0f}s')
+    log(f'varpro: {it} iterations, projected derivative residual {start:.4e}, best {best:.4e}, gain {out["gain"]:.3g} '
+        f'against {min_gain:g}: state function {"kept" if kept else "dropped"}, {out["time_s"]:.0f}s')
     return out
 
 
@@ -285,8 +357,8 @@ def take(drive, idx):
     return {k: v[idx] for k, v in drive.items()}
 
 
-def train(model, tr, iters, seed, dt, batch=8, lr=1e-3, kmin=4, kmax=8, log=print, callback=None, window=None):
-    """rollout training.  If tr has 'obs' (B, T+1, k) and 'obs_w' (k, H), the observables obs = J @ obs_w.T (linear
+def train(model, tr, iters, seed, dt, batch=8, lr=1e-3, kmin=4, kmax=8, log=print, callback=None, window=None, elapsed0=0.0):
+    """rollout training.  elapsed0: time already spent by the closed-form step, counted in the training time.  If tr has 'obs' (B, T+1, k) and 'obs_w' (k, H), the observables obs = J @ obs_w.T (linear
     functionals of the net fluxes, e.g. the turnover of a reservoir) add their relative error to the loss with weight 1.
     callback(it, loss) is called after every step (loss: float, nan for a skipped step).  window: the number of sampling
     steps of every training trajectory a rollout may use (default: all of tr['c'])."""
@@ -297,7 +369,7 @@ def train(model, tr, iters, seed, dt, batch=8, lr=1e-3, kmin=4, kmax=8, log=prin
     opt = torch.optim.Adam(model.parameters(), lr=lr)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, iters, eta_min=1e-5)
     hist, subs, nskip = [], [], 0
-    t0 = time.time()
+    t0 = time.time() - elapsed0
     model.train()
     for it in range(iters):
         idx = torch.tensor(rng.choice(ntr, min(batch, ntr), replace=False), device=C.device)
@@ -361,15 +433,24 @@ def state_function_parameters(model):
     """the nonlinear parameters of the learned thermodynamic state functions (the activity correction ln gamma_theta);
     empty for every configuration without one"""
     fe = getattr(model, 'free_energy', None)
-    if fe is not None and getattr(fe, 'residual', False) and hasattr(fe, 's_mu'):
-        return [fe.r_alpha, fe.r_beta, fe.r_delta, fe.s_mu]
+    if fe is not None and getattr(fe, 'residual', False) and hasattr(fe, 'activity_parameters'):
+        return fe.activity_parameters()
     return []
+
+
+def apply_activity_decision(model, varpro):
+    """whether the activity term is active is decided once, by the data, in the closed-form step: when the step rejects
+    it (gate 0, gain below the threshold), the gate stays at 0 and the state function is frozen during the rollouts"""
+    if not varpro.get('kept', True):
+        for p in state_function_parameters(model):
+            p.requires_grad_(False)
 
 
 def fit_chart(model, tr, dt, iters, seed=0, log=print, trainer=None, after_linear=None, **train_kw):
     """the four-step fit of the Neural Chart: variable-projected NNLS (omega in closed form at the current state
-    functions; at initialisation g = 0 and s = 0, so k is linear in omega), then the rollout refinement of every
-    parameter.  With no learned state function the first step is exactly the NNLS step.
+    functions; at initialisation g = 0 and s = 0, so k is linear in omega; the gate of a learned state function is set
+    by a line search, then the state function descends and is kept or rejected, see apply_activity_decision), then the
+    rollout refinement of every parameter.  With no learned state function the first step is exactly the NNLS step.
     trainer(model, tr, iters, seed, dt, log=log, **train_kw) (default: train); returns the info dict.  When the
     projection ran, its time is passed to the trainer as elapsed0 (it counts in the training time and budget)."""
     cfg = model.config
@@ -381,11 +462,13 @@ def fit_chart(model, tr, dt, iters, seed=0, log=print, trainer=None, after_linea
         info['linear_fit'] = fit_linear(model, dict(train=tr), dt, log=log)
         nonlin = state_function_parameters(model) if cfg.varpro else []
         if nonlin:
-            info['varpro'] = fit_varpro(model, dict(train=tr), dt, nonlin, log=log)
+            info['varpro'] = fit_varpro(model, dict(train=tr), dt, nonlin, log=log, gate=model.free_energy.s_mu)
             info['varpro'].pop('linear_fit', None)
+            apply_activity_decision(model, info['varpro'])
             train_kw = dict(train_kw, elapsed0=info['varpro']['time_s'])
         if after_linear is not None:
             after_linear(model)
     if iters > 0:
         info.update((trainer or train)(model, tr, iters, seed, dt, log=log, **train_kw))
+        info['activity'] = activity_summary(model.free_energy, tr['c'])
     return info

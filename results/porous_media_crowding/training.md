@@ -1,7 +1,8 @@
 | Method | parameters | training time (min) | final training loss |
 |---|---|---|---|
-| Neural Chart | 5,381 | 24.0 | 2.3e-04 |
-| Neural Chart, no state input | 5,058 | 2.2 | 3.1e-03 |
+| Neural Chart | 5,478 | 67.2 | 2.3e-04 |
+| Neural Chart, ideal activities | 5,381 | 50.8 | 2.3e-04 |
+| Neural Chart, no state input | 5,155 | 18.3 | 3.1e-03 |
 | Oracle (true rates in the Neural Chart class) | 0 (true rates) | N/A | N/A |
 | Oracle without crowding | 0 (true rates) | N/A | N/A |
 | UDE closure | 5,441 | 9.8 | 9.9e-05 |

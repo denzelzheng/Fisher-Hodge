@@ -1,7 +1,7 @@
 | Method | training conditions (ATP 0.5–2) | ATP 3–5 | ATP 0.15–0.3 | phosphorylated initial states | trajectories with a negative value | parameters |
 |---|---|---|---|---|---|---|
-| Neural Chart | 6.6e-03 | 0.021 | 0.011 | 6.6e-03 | 0 | 48 |
-| Neural Chart, given standard potentials (oracle-type information) | 6.0e-03 | 4.2e-03 | 9.9e-04 | 6.1e-03 | 0 | 23 |
+| Neural Chart | 6.8e-03 | 0.021 | 0.011 | 6.7e-03 | 0 | 2,182 |
+| Neural Chart, given standard potentials (oracle-type information) | 0.013 | 0.011 | 3.2e-03 | 0.012 | 0 | 2,157 |
 | Oracle (true rates in the Neural Chart class) | 7.1e-06 | 5.8e-06 | 7.3e-06 | 6.0e-06 | 0 | 48 |
 | CRNN (mass action) | 8.5e-03 | 0.027 | 0.020 | 8.7e-03 | 0 | 46 |
 | CRNN (condition features) | 8.1e-03 | 0.032 | 0.099 | 8.3e-03 | 0 | 5,890 |

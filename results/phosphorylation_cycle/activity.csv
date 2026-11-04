@@ -1,0 +1,5 @@
+Method,smallest s_μ,largest s_μ,"largest |ln γ|, training range"
+Neural Chart,0.0,0.0,0.0
+"Neural Chart, given standard potentials (oracle-type information)",0.0,0.0,0.0
+"Neural Chart, no convex initialisation",-0.15369235202421563,0.0,0.16926605039010667
+"Neural Chart, reversible (no drive)",11.529249348452497,13.07363947600034,49.279917084178905

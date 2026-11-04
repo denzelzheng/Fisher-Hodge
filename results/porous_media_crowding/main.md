@@ -1,7 +1,8 @@
 | Method | training conditions | temperature ×0.25 | temperature ×4 | drive ×4 | drive ×8 | unseen low-porosity media | 64×64 grid | point cloud | trajectories with a negative density (of 64) | parameters |
 |---|---|---|---|---|---|---|---|---|---|---|
-| Neural Chart | 0.067 | 0.114 | 0.101 | 0.168 | 0.376 | 0.062 | 0.077 | 0.091 | 0 | 5,381 |
-| Neural Chart, no state input | 0.241 | 0.318 | 0.144 | 0.412 | 0.601 | 0.127 | 0.254 | 0.250 | 0 | 5,058 |
+| Neural Chart | 0.067 | 0.114 | 0.101 | 0.168 | 0.376 | 0.062 | 0.077 | 0.091 | 0 | 5,478 |
+| Neural Chart, ideal activities | 0.067 | 0.114 | 0.101 | 0.168 | 0.376 | 0.062 | 0.077 | 0.091 | 0 | 5,381 |
+| Neural Chart, no state input | 0.241 | 0.318 | 0.144 | 0.412 | 0.601 | 0.127 | 0.254 | 0.250 | 0 | 5,155 |
 | Oracle (true rates in the Neural Chart class) | 0.049 | 0.069 | 0.033 | 0.103 | 0.197 | 0.028 | 0.031 | 0.079 | 0 | 0 (true rates) |
 | Oracle without crowding | 0.241 | 0.704 | 0.094 | 0.692 | 0.920 | 0.224 | 0.262 | 0.254 | 0 | 0 (true rates) |
 | UDE closure | 0.066 | 0.679 | 1.916 | 0.601 | 0.917 | 0.075 | 0.756 | 0.485 | 64 | 5,441 |

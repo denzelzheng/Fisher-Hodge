@@ -7,6 +7,9 @@ Schloegl models (DT 0.05; ranges below):
   high_concentration  schlogl_nonideal: a 3.5–4.0, b 2.0–3.5 (higher concentration, stronger crowding)
   planar_fronts       schlogl: a = 3, b 1.7–2.3 (13 values), a straight stripe of the high state
   grid16              8 trajectories of the training conditions on the 16 x 16 grid (same spacing)
+Schloegl model with strong crowding (schlogl_nonideal_strong; a and b uniform, no bistability quota):
+  train (48 x 100 steps), train_conditions (16 x 200) and grid16 (8 x 200, 16 x 16 grid): a 1.5–4.5, b 1.0–3.2;
+  high_a (16 x 200): a 4.6–5.0, b 2.0–3.5
 Phosphorylation cycle (DT 0.05): train (48 x 100 steps), train_conditions (dG 1–3, potential amplitude 0.7),
   strong_drive (dG 3–4), strong_potential (amplitude 1.2 and finer: wavenumbers up to 3 instead of 2), grid16.
 MAPK cascade (DT 0.5): train (48 x 20 steps), train_conditions (ATP 0.5–2), high_atp (3–5), low_atp (0.15–0.3),
@@ -27,6 +30,9 @@ from . import truth as TR
 # (count, steps, grid n, random seed) per set; the non-ideal model adds 500 to the seed
 GEN = dict(train=(48, 100, 8, 1), train_conditions=(16, 200, 8, 2), high_a_low_b=(16, 200, 8, 3),
            high_concentration=(16, 200, 8, 3), planar_fronts=(13, 200, 8, 4), grid16=(8, 200, 16, 5))
+# strong crowding: (count, steps, grid n, random seed, a range, b range) per set
+GEN_STRONG = dict(train=(48, 100, 8, 21, (1.5, 4.5), (1.0, 3.2)), train_conditions=(16, 200, 8, 22, (1.5, 4.5), (1.0, 3.2)),
+                  high_a=(16, 200, 8, 23, (4.6, 5.0), (2.0, 3.5)), grid16=(8, 200, 16, 24, (1.5, 4.5), (1.0, 3.2)))
 GEN_PC = dict(train=(48, 100, 8, 1, 'id'), train_conditions=(16, 200, 8, 2, 'id'), strong_drive=(16, 200, 8, 3, 'drive'),
               strong_potential=(16, 200, 8, 4, 'potential'), grid16=(8, 200, 16, 5, 'id'))
 # MAPK: (name, count, ATP range, initial state, steps), drawn in this order from one random stream (seed 0)
@@ -68,11 +74,21 @@ def sample_schlogl(rng, kind, i, n=8):
 
 
 def make_set_schlogl(name):
-    count, nsteps, n, seed = GEN[name]
-    rng = np.random.default_rng(seed + (500 if C.SYSTEM == 'schlogl_nonideal' else 0))
+    strong = C.SYSTEM == 'schlogl_nonideal_strong'
+    if strong:
+        count, nsteps, n, seed, ar, br = GEN_STRONG[name]
+    else:
+        count, nsteps, n, seed = GEN[name]
+        seed += 500 if C.SYSTEM == 'schlogl_nonideal' else 0
+    rng = np.random.default_rng(seed)
     out = dict(c=[], logab=[], a=[], b=[], bistable=[], bM=[])
     for i in range(count):
-        if name == 'planar_fronts':
+        if strong:
+            a, b = rng.uniform(*ar), rng.uniform(*br)
+            s = smooth_field(rng, n, 2 * n // 8, 1.0)
+            hi = s > np.quantile(s, rng.uniform(0.3, 0.7))
+            y0 = np.where(hi, 3.4, 0.6) * np.exp(0.1 * rng.standard_normal(n * n))
+        elif name == 'planar_fronts':
             a, b = 3.0, np.linspace(1.7, 2.3, count)[i]
             r = TR.roots(a, b)
             col = np.arange(n * n) % n

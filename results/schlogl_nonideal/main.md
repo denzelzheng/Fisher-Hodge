@@ -1,7 +1,7 @@
 | Method | training conditions | a 3.5–4.0, b 2.0–3.5 | 16×16 grid | trajectories with a negative value | parameters |
 |---|---|---|---|---|---|
-| Neural Chart | 3.4e-04 | 0.010 | 3.1e-04 | 0 | 55 |
-| Neural Chart, given standard potentials (oracle-type information) | 5.3e-04 | 0.012 | 4.0e-04 | 0 | 52 |
+| Neural Chart | 1.4e-04 | 4.5e-03 | 9.1e-05 | 0 | 103 |
+| Neural Chart, given standard potentials (oracle-type information) | 2.6e-04 | 7.6e-03 | 2.4e-04 | 0 | 100 |
 | Oracle (true rates in the Neural Chart class) | 1.4e-06 | 1.1e-07 | 1.9e-06 | 0 | 6 |
 | CRNN (mass action) | 0.060 | 0.726 | 0.062 | 0 | 6 |
 | CRNN (condition features) | 0.026 | 0.340 | 0.035 | 0 | 4,674 |

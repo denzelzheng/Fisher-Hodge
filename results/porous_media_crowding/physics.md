@@ -3,6 +3,9 @@
 | Neural Chart | edges violating local detailed balance | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | Neural Chart | samples with sigma < 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | Neural Chart | negative cell values | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Neural Chart, ideal activities | edges violating local detailed balance | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Neural Chart, ideal activities | samples with sigma < 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Neural Chart, ideal activities | negative cell values | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | Neural Chart, no state input | edges violating local detailed balance | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | Neural Chart, no state input | samples with sigma < 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | Neural Chart, no state input | negative cell values | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |

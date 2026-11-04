@@ -6,18 +6,19 @@ physics    local-detailed-balance violations, samples with sigma < 0, negative c
 ablations  the Neural Chart variants and what each one removes
 law        the learned mobility against the true mobility at the reference states (Neural Chart)
 training   parameters, training time, final training loss
+activity   the learned gate s_mu and the largest |ln gamma| of the activity correction over the training densities
 """
 import json
 import os
 
 from neuralchart.chart import ABLATIONS
-from benchmarks.common import LABELS, OWN_FLUX, RESULTS, load_runs, write_table, fmt, param_cell
+from benchmarks.common import LABELS, OWN_FLUX, RESULTS, activity_table, load_runs, write_table, fmt, param_cell
 from .test_sets import COLUMNS, LABEL
 
 MODELS = {
-    'porous_media': ['chart', 'chart-no-state', 'chart-const-k', 'chart-learned-drive', 'oracle', 'ude', 'flux_gnn', 'bsms',
+    'porous_media': ['chart', 'chart-ideal', 'chart-no-state', 'chart-const-k', 'chart-learned-drive', 'oracle', 'ude', 'flux_gnn', 'bsms',
                      'fno', 'generic_fno', 'helmfluid', 'persistence'],
-    'porous_media_crowding': ['chart', 'chart-no-state', 'oracle', 'oracle-no-crowding', 'ude', 'flux_gnn', 'bsms', 'fno',
+    'porous_media_crowding': ['chart', 'chart-ideal', 'chart-no-state', 'oracle', 'oracle-no-crowding', 'ude', 'flux_gnn', 'bsms', 'fno',
                               'generic_fno', 'helmfluid', 'persistence'],
 }
 LAW_SETS = [('training_conditions', 'unseen media, 32×32 grid'), ('low_porosity', 'unseen low-porosity media'),
@@ -77,6 +78,7 @@ def write_tables(variant, models=None, runs_dir=None, out=None):
             rows.append([LABELS[m], 'full model' if m == 'chart' else ABLATIONS[m]] +
                         [(_set(r, s) or {}).get('err_10T') for s in COLUMNS])
     write_table(os.path.join(out, 'ablations'), ['Method', 'what it removes'] + cols, rows)
+    activity_table(runs, abl, os.path.join(out, 'activity'))
     r = runs.get('chart')
     if r:
         rows = []

@@ -173,7 +173,7 @@ def accelerate(model, kw):
     return model
 
 
-def run_train(name, seed=0, iters=ITERS, device='cuda', lr=LR, fast_kw=None, data=None, out=None, ckpt_dir=None):
+def run_train(name, seed=0, iters=ITERS, device='cuda', lr=LR, fast_kw=None, data=None, out=None, ckpt_dir=None, budget_s=None):
     """train and evaluate one model; writes <out>/<name>.json, .log and the rollout snapshots <out>/snapshots/<name>.npz
     (out defaults to runs/brusselator) and the checkpoint <ckpt_dir>/<name>.pt (default: out)"""
     out = out or RUNS
@@ -211,7 +211,7 @@ def run_train(name, seed=0, iters=ITERS, device='cuda', lr=LR, fast_kw=None, dat
         after = (lambda m: log(f'NNLS log k {m.kinetics.core.detach().cpu().numpy().round(4).tolist()} '
                                f'true {np.round(true_log_k(), 4).tolist()}')) if model.config.mu0 == 'given' else None
         info = fit_chart(model, tr, DT, iters, seed, log=log, trainer=train_budget, after_linear=after,
-                         batch=BATCH, lr=lr, kmin=KMIN, kmax=KMAX)
+                         batch=BATCH, lr=lr, kmin=KMIN, kmax=KMAX, budget_s=budget_s or BUDGET_S)
         trained = model.config.train
     elif name != 'persistence':
         info = {}

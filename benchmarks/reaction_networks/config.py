@@ -1,10 +1,11 @@
-"""Settings of the four reaction-network benchmarks.  configure(name) selects one; the other modules of this package
+"""Settings of the reaction-network benchmarks.  configure(name) selects one; the other modules of this package
 read the module-level values (SYSTEM, DT, N_TRAIN, W_TRAIN, DATA, ...).
 
-    schlogl                 Schloegl model, bistable, on the 8 x 8 periodic grid (DT 0.05)
-    schlogl_nonideal        Schloegl model with crowded (non-ideal) activities, 8 x 8 grid (DT 0.05)
-    phosphorylation_cycle   chemostat-driven phosphorylation cycle in a potential, 8 x 8 grid (DT 0.05)
-    mapk_cascade            MAPK cascade with three tiers, 4 x 4 grid (DT 0.5)
+    schlogl                   Schloegl model, bistable, on the 8 x 8 periodic grid (DT 0.05)
+    schlogl_nonideal          Schloegl model with crowded (non-ideal) activities, 8 x 8 grid (DT 0.05)
+    schlogl_nonideal_strong   the same model with the chemostat a over 1.5–4.5 (stronger crowding), 8 x 8 grid (DT 0.05)
+    phosphorylation_cycle     chemostat-driven phosphorylation cycle in a potential, 8 x 8 grid (DT 0.05)
+    mapk_cascade              MAPK cascade with three tiers, 4 x 4 grid (DT 0.5)
 
 Protocol (every model, seed 0): training window 100 sampling steps (MAPK: 20 steps, also 10 time units), rollouts of
 K in [4, 20] steps, batch 8, Adam lr 1e-3 with a cosine schedule on p = max(step / 4000, elapsed / 12 h), gradient
@@ -16,12 +17,13 @@ import os
 
 from ..common import ROOT
 
-BENCHMARKS = ('schlogl', 'schlogl_nonideal', 'phosphorylation_cycle', 'mapk_cascade')
+BENCHMARKS = ('schlogl', 'schlogl_nonideal', 'schlogl_nonideal_strong', 'phosphorylation_cycle', 'mapk_cascade')
+NONIDEAL = ('schlogl_nonideal', 'schlogl_nonideal_strong')     # the Schloegl models with crowded activities
 SYSTEM = 'schlogl_nonideal'
 DT, N_TRAIN, W_TRAIN = 0.05, 8, 100
 T_TEST, T_STEPS = 200, 20                  # 10T, sampling steps per time unit T
-GRID = dict(schlogl=(0.05, 8, 100), schlogl_nonideal=(0.05, 8, 100), phosphorylation_cycle=(0.05, 8, 100),
-            mapk_cascade=(0.5, 4, 20))      # DT, training grid, training window
+GRID = dict(schlogl=(0.05, 8, 100), schlogl_nonideal=(0.05, 8, 100), schlogl_nonideal_strong=(0.05, 8, 100),
+            phosphorylation_cycle=(0.05, 8, 100), mapk_cascade=(0.5, 4, 20))      # DT, training grid, training window
 STEP = dict(dt_max=DT / 8, theta0=0.5, theta1=0.5, max_sub=4000, t_tol=1e-9)
 MAXSUB_TRAIN, MAXSUB_EVAL = 2000, 4000
 ITERS, LR, BATCH, KMIN, KMAX = 4000, 1e-3, 8, 4, 20
@@ -44,6 +46,11 @@ TEST_SETS = {
         'high_concentration': 'a 3.5–4.0, b 2.0–3.5',
         'grid16': '16×16 grid',
     },
+    'schlogl_nonideal_strong': {
+        'train_conditions': 'training conditions',
+        'high_a': 'a 4.6–5.0, b 2.0–3.5',
+        'grid16': '16×16 grid',
+    },
     'phosphorylation_cycle': {
         'train_conditions': 'training conditions (ΔG 1–3)',
         'strong_drive': 'drive ΔG 3–4',
@@ -59,6 +66,7 @@ TEST_SETS = {
 }
 TITLES = dict(schlogl='Schlögl model: bistability and travelling fronts',
               schlogl_nonideal='Schlögl model with non-ideal (crowded) activities',
+              schlogl_nonideal_strong='Schlögl model with strong crowding (chemostat a 1.5–4.5)',
               phosphorylation_cycle='Driven phosphorylation cycle', mapk_cascade='MAPK cascade')
 
 
@@ -77,6 +85,16 @@ def configure(system, data=None, out=None):
 
 def sets():
     return list(TEST_SETS[SYSTEM])
+
+
+def nonideal():
+    """the benchmark has crowded activities (ln gamma != 0)"""
+    return SYSTEM in NONIDEAL
+
+
+def ood_set():
+    """the test set above the training concentrations, where the learned ln gamma is extrapolated"""
+    return dict(schlogl_nonideal='high_concentration', schlogl_nonideal_strong='high_a')[SYSTEM]
 
 
 configure(SYSTEM)

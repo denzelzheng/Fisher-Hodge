@@ -196,7 +196,7 @@ class ChartKernel(Kernel):
     """MasterEquation with a c-independent potential: log a = E+ + <nu+, log c>, log b = E- + <nu-, log c>, with
     E+- = log k +- A/2 + (potential terms) once per context.  Optional per-call terms: a state-dependent log k
     (kinetics.state_branch, porous media) and a site-local activity correction (free_energy.local_excess, the learned
-    ln gamma of the non-ideal Schloegl model)."""
+    ln gamma)."""
 
     def __init__(s, model):
         super().__init__(model)

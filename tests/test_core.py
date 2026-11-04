@@ -38,6 +38,8 @@ def model(hg, activity=False, seed=0):
             m.free_energy.s_mu.fill_(0.7)
             m.free_energy.r_alpha.normal_()
             m.free_energy.r_beta.normal_()
+            m.free_energy.ramp_alpha.normal_()
+            m.free_energy.ramp_beta.normal_()
     return m
 
 
@@ -94,6 +96,17 @@ def test_activity_correction_is_monotone():
     assert (g[1:] - g[:-1] >= -1e-12).all()
     with torch.no_grad():
         assert abs(float(m.free_energy.correction(torch.zeros(1, hg.M), None)[0, 0])) < 1e-12
+
+
+def test_activity_free_energy_is_the_integral_of_mu():
+    """d F / d c = mu: the closed-form value of the activity correction is the integral of ln gamma"""
+    hg = network()
+    m = model(hg, activity=True).double()
+    dr = drive(3)
+    ctx = m.prepare({k: v.double() for k, v in dr.items()})
+    c = state(hg, 3).double().requires_grad_(True)
+    g, = torch.autograd.grad(m.free_energy.value(c, ctx).sum(), c)
+    assert torch.allclose(g, m.mu(c.detach(), ctx), atol=1e-9)
 
 
 def test_fast_integrator_matches_reference():

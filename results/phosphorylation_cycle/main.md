@@ -1,7 +1,7 @@
 | Method | training conditions (ΔG 1–3) | drive ΔG 3–4 | stronger, finer potential U | 16×16 grid | trajectories with a negative value | parameters |
 |---|---|---|---|---|---|---|
-| Neural Chart | 5.9e-06 | 6.5e-06 | 5.9e-06 | 8.2e-06 | 0 | 9 |
-| Neural Chart, given standard potentials (oracle-type information) | 3.3e-06 | 2.3e-06 | 2.6e-06 | 3.4e-06 | 0 | 4 |
+| Neural Chart | 5.9e-06 | 6.4e-06 | 5.9e-06 | 8.2e-06 | 0 | 300 |
+| Neural Chart, given standard potentials (oracle-type information) | 3.3e-06 | 2.4e-06 | 2.6e-06 | 3.4e-06 | 0 | 295 |
 | Oracle (true rates in the Neural Chart class) | 2.0e-06 | 1.7e-06 | 1.4e-06 | 1.9e-06 | 0 | 9 |
 | CRNN (mass action) | 0.017 | 0.018 | 0.021 | 0.025 | 0 | 10 |
 | CRNN (condition features) | 5.2e-03 | 0.045 | 0.011 | 7.6e-03 | 0 | 4,866 |

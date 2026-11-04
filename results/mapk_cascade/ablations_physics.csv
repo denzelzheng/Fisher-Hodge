@@ -1,15 +1,18 @@
 Method,quantity,training conditions (ATP 0.5–2),ATP 3–5,ATP 0.15–0.3,phosphorylated initial states
-Neural Chart,hyperedges violating local detailed balance,0.002897493131868132,0.0019101991758241758,0.021098042582417584,0.004700377747252747
+Neural Chart,hyperedges violating local detailed balance,0.002661401098901099,0.0018958905677655678,0.006102621336996337,0.00438558836996337
 Neural Chart,samples with σ < 0,0.0,0.0,0.0,0.0
 Neural Chart,negative values,0.0,0.0,0.0,0.0
-"Neural Chart, given standard potentials (oracle-type information)",hyperedges violating local detailed balance,0.0,0.0,0.0,0.0
+"Neural Chart, given standard potentials (oracle-type information)",hyperedges violating local detailed balance,0.0,1.4308608058608059e-05,0.0015238667582417582,0.0001216231684981685
 "Neural Chart, given standard potentials (oracle-type information)",samples with σ < 0,0.0,0.0,0.0,0.0
 "Neural Chart, given standard potentials (oracle-type information)",negative values,0.0,0.0,0.0,0.0
-"Neural Chart, no convex initialisation",hyperedges violating local detailed balance,0.026900183150183152,0.016934237637362636,0.052369505494505496,0.01555345695970696
+"Neural Chart, ideal activities",hyperedges violating local detailed balance,0.002661401098901099,0.0018958905677655678,0.006102621336996337,0.00438558836996337
+"Neural Chart, ideal activities",samples with σ < 0,0.0,0.0,0.0,0.0
+"Neural Chart, ideal activities",negative values,0.0,0.0,0.0,0.0
+"Neural Chart, no convex initialisation",hyperedges violating local detailed balance,0.035506810897435896,0.022779304029304028,0.08643830128205128,0.026821485805860804
 "Neural Chart, no convex initialisation",samples with σ < 0,0.0,0.0,0.0,0.0
 "Neural Chart, no convex initialisation",negative values,0.0,0.0,0.0,0.0
-"Neural Chart, reversible (no drive)",hyperedges violating local detailed balance,0.4554767941222124,0.45485150983944433,0.45141981766552086,0.4510124965124304
-"Neural Chart, reversible (no drive)",samples with σ < 0,0.9523809523809523,0.9523809523809523,0.9523809523809523,0.9494047619047619
+"Neural Chart, reversible (no drive)",hyperedges violating local detailed balance,0.39373651648332053,0.38647772708858086,0.3860639625164933,0.4246984404703824
+"Neural Chart, reversible (no drive)",samples with σ < 0,0.10416666666666667,0.3869047619047619,0.0,0.9047619047619048
 "Neural Chart, reversible (no drive)",negative values,0.0,0.0,0.0,0.0
 Oracle (true rates in the Neural Chart class),hyperedges violating local detailed balance,0.0,0.0,0.0,0.0
 Oracle (true rates in the Neural Chart class),samples with σ < 0,0.0,0.0,0.0,0.0

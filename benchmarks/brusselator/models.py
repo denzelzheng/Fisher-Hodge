@@ -61,12 +61,13 @@ def chem_featurizer(hg):
 
 
 # ------------------------------------------------------------------------------------------ the Neural Chart
-def chart_model(n, cls=NeuralChart):
+def chart_model(n, cls=NeuralChart, activity='ideal'):
     """the Neural Chart class on the n x n grid (standard potentials still free, log k = 0)"""
     hg = hg_of(n)
     with default_dtype(torch.float64):
         m = cls.from_parts(hg, k_ref=1.0, T_exponent=0.0, harmonic=False, featurizer=chem_featurizer(hg), step=dict(STEP),
-                           learn_mu0=True, learn_chem_mu0=True, kinetics_table=True, chem_prefactor=True)
+                           learn_mu0=True, learn_chem_mu0=True, kinetics_table=True, chem_prefactor=True,
+                           activity_correction=activity == 'learned', activity_anchor=True)
     m = m.double()
     m.step = dict(STEP)
     return m
@@ -109,7 +110,7 @@ def give_mu0(m):
 def build_chart(cfg, n=N_TRAIN, norm=None):
     """the Neural Chart of a ChartConfig: log k = log omega over the six hyperedge types"""
     assert cfg.task == TASK and cfg.kappa in ('learned', 'true') and not cfg.descriptors and not cfg.state
-    m = chart_model(n)
+    m = chart_model(n, activity=cfg.activity)
     if cfg.kappa == 'true':
         set_true(m)                                 # oracle: the true k and mu0
     elif cfg.mu0 == 'given':

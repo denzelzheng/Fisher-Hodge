@@ -25,13 +25,15 @@ from .models import FLOAT_MODELS, build, set_max_sub, accelerate
 SCENES = {
     'schlogl': ('planar_fronts', ['chart', 'flux_gnn', 'fno'], 'X', 'schlogl_front.gif'),
     'schlogl_nonideal': ('high_concentration', ['chart', 'fno', 'flux_gnn'], 'X', 'schlogl_nonideal_high_concentration.gif'),
+    'schlogl_nonideal_strong': ('high_a', ['chart', 'fno', 'flux_gnn'], 'X', 'schlogl_nonideal_strong_high_a.gif'),
     'phosphorylation_cycle': ('strong_drive', ['chart', 'flux_gnn', 'fno'], 'Xp fraction', 'phosphorylation_cycle_strong_drive.gif'),
     'mapk_cascade': ('low_atp', ['chart', 'flux_gnn', 'fno'], 'state', 'mapk_cascade_low_atp.gif'),
 }
-TRAJ = dict(schlogl=8, schlogl_nonideal=0, phosphorylation_cycle=0, mapk_cascade=0)   # the README trajectories
+TRAJ = dict(schlogl=8, schlogl_nonideal=0, schlogl_nonideal_strong=0, phosphorylation_cycle=0, mapk_cascade=0)   # the README trajectories
 SUPTITLE = {
     'schlogl': 'Schlögl model, travelling front (a = 3, b = {b:.2f}): concentration of X',
     'schlogl_nonideal': 'Non-ideal Schlögl model, a = {a:.2f}, b = {b:.2f} (outside the training range): concentration of X',
+    'schlogl_nonideal_strong': 'Schlögl model with strong crowding, a = {a:.2f}, b = {b:.2f} (training a 1.5–4.5): concentration of X',
     'phosphorylation_cycle': 'Phosphorylation cycle, drive ΔG = {dG:.2f} (training 1–3): phosphorylated fraction Xp / (X + Xp)',
     'mapk_cascade': 'MAPK cascade, ATP = {atp:.2f} (training 0.5–2): 22 species (rows) at 16 sites (columns)',
 }
@@ -118,6 +120,8 @@ TRACK = {
                     condition='a = {a:.2f}, b = {b:.2f} (training a 2.85–3.10, b 1.0–3.2)'),
     'schlogl_nonideal': dict(set='high_concentration', traj=0, species='X', label='X', steps=range(0, 61), speed=10,
                              condition='a = {a:.2f}, b = {b:.2f} (training a 2.85–3.10, b 1.0–3.2)'),
+    'schlogl_nonideal_strong': dict(set='high_a', traj=0, species='X', label='X', steps=range(0, 61), speed=10,
+                                    condition='a = {a:.2f}, b = {b:.2f} (training a 1.5–4.5, b 1.0–3.2)'),
     'phosphorylation_cycle': dict(set='strong_drive', traj=0, species='X', label='X', steps=range(0, 201, 4), speed=4,
                                   condition='drive ΔG = {dG:.2f} (training 1–3)'),
     'mapk_cascade': dict(set='low_atp', traj=0, species=('Kp', 'Kpp'), label='phosphorylated MAPK (Kp + Kpp)',
@@ -125,6 +129,7 @@ TRACK = {
 }
 TRACK_MODELS = ['chart', 'crnn_mass_action', 'flux_gnn', 'ude']
 TRACK_TITLE = dict(schlogl='Schlögl model', schlogl_nonideal='Non-ideal Schlögl model',
+                   schlogl_nonideal_strong='Schlögl model with strong crowding',
                    phosphorylation_cycle='Phosphorylation cycle', mapk_cascade='MAPK cascade')
 
 

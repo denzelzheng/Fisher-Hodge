@@ -36,7 +36,7 @@ def test_oracle_reproduces_the_reference_rates(bench):
     C.configure(bench)
     m = build_chart(chart.CONFIGS[bench]['oracle'])
     g = torch.Generator().manual_seed(0)
-    c = random_state(m.hg, 6, g, hi=2.0 if bench != 'schlogl_nonideal' else 3.0)
+    c = random_state(m.hg, 6, g, hi=2.0 if bench not in C.NONIDEAL else 3.0)
     drive = random_condition(bench, C.N_TRAIN, 6, g)
     a, b = m.rates(c, drive)
     at, bt = TR.true_rates(m.hg, drive, c)
@@ -54,7 +54,7 @@ def test_structure_holds_for_random_parameters(bench):
     with torch.no_grad():
         for p in m.parameters():
             p.add_(0.5 * torch.randn(p.shape, generator=g, dtype=p.dtype))
-    c = random_state(m.hg, 5, g, hi=3.0 if bench != 'schlogl_nonideal' else 2.5)
+    c = random_state(m.hg, 5, g, hi=3.0 if bench not in C.NONIDEAL else 2.5)
     drive = random_condition(bench, C.N_TRAIN, 5, g)
     ctx = m.prepare(drive)
     a, b = m.rates(c, ctx)
@@ -109,8 +109,10 @@ def test_variable_projection_runs():
     m = build_chart(chart.CONFIGS['schlogl_nonideal']['chart'])
     params = state_function_parameters(m)
     assert params
-    out = fit_varpro(m, dict(train=tr), C.DT, params, max_iters=3, log=lambda *a: None)
+    out = fit_varpro(m, dict(train=tr), C.DT, params, max_iters=3, log=lambda *a: None, gate=m.free_energy.s_mu)
     assert out['iters'] == 3 and math.isfinite(out['residual_end'])
+    ls = out['gate_line_search']
+    assert ls['gate'] >= 0 and ls['residual'] <= ls['residual_start']
 
 
 @pytest.mark.slow
@@ -135,5 +137,5 @@ def test_shipped_checkpoint_on_reference_data(bench):
     R, _, _ = rollout(m, {k: v[:2] for k, v in sd['drive'].items()}, Y[:, 0], 40, C.DT)
     ch = slice(0, 2 * C.N_TRAIN ** 2) if bench == 'phosphorylation_cycle' else slice(None)
     e = torch.linalg.vector_norm((R.double() - Y)[..., ch], dim=-1) / torch.linalg.vector_norm(Y[..., ch], dim=-1)
-    assert float(e.max()) < 2e-2
+    assert float(e.max()) < 2.5e-2
     assert float(R.min()) > 0

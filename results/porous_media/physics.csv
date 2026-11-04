@@ -2,13 +2,16 @@ Method,quantity,training conditions,temperature ×0.25,temperature ×4,drive ×4
 Neural Chart,edges violating local detailed balance,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
 Neural Chart,samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
 Neural Chart,negative cell values,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+"Neural Chart, ideal activities",edges violating local detailed balance,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+"Neural Chart, ideal activities",samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+"Neural Chart, ideal activities",negative cell values,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
 "Neural Chart, no state input",edges violating local detailed balance,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
 "Neural Chart, no state input",samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
 "Neural Chart, no state input",negative cell values,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
 "Neural Chart, constant mobility",edges violating local detailed balance,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
 "Neural Chart, constant mobility",samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
 "Neural Chart, constant mobility",negative cell values,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
-"Neural Chart, learned drive scale",edges violating local detailed balance,0.0009585013190840208,0.0007735020409845417,0.0010044820048117436,0.000826814585207688,0.0006437091075871821,0.0006922613731517901,0.000954067848237865,0.0009118004852244793
+"Neural Chart, learned drive scale",edges violating local detailed balance,0.0009569746779463506,0.0007735020409845417,0.0010048644139079646,0.000826814585207688,0.0006437091075871821,0.0006926432051281562,0.0009546400495683991,0.0009112916158625833
 "Neural Chart, learned drive scale",samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
 "Neural Chart, learned drive scale",negative cell values,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
 Oracle (true rates in the Neural Chart class),edges violating local detailed balance,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0

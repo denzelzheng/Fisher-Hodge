@@ -6,8 +6,11 @@
 | Neural Chart, given standard potentials (oracle-type information) | hyperedges violating local detailed balance | 0 | 0 | 0 | 0 |
 | Neural Chart, given standard potentials (oracle-type information) | samples with σ < 0 | 0 | 0 | 0 | 0 |
 | Neural Chart, given standard potentials (oracle-type information) | negative values | 0 | 0 | 0 | 0 |
-| Neural Chart, no convex initialisation | hyperedges violating local detailed balance | 0.015 | 2.9e-03 | 0.029 | 0.019 |
-| Neural Chart, no convex initialisation | samples with σ < 0 | 0 | 0 | 0 | 0 |
+| Neural Chart, ideal activities | hyperedges violating local detailed balance | 0 | 0 | 0 | 0 |
+| Neural Chart, ideal activities | samples with σ < 0 | 0 | 0 | 0 | 0 |
+| Neural Chart, ideal activities | negative values | 0 | 0 | 0 | 0 |
+| Neural Chart, no convex initialisation | hyperedges violating local detailed balance | 0.096 | 0.026 | 0.025 | 0.121 |
+| Neural Chart, no convex initialisation | samples with σ < 0 | 0.155 | 0 | 0 | 0.238 |
 | Neural Chart, no convex initialisation | negative values | 0 | 0 | 0 | 0 |
 | Neural Chart, reversible (no drive) | hyperedges violating local detailed balance | 0 | 0 | 0 | 0 |
 | Neural Chart, reversible (no drive) | samples with σ < 0 | 0 | 0 | 0 | 0 |

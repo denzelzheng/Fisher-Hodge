@@ -123,10 +123,13 @@ def chart_featurizer(disc):
     return feat
 
 
-def build_master(mode, disc, cls=None, **kin_kw):
-    """the master equation on a discretisation with an EdgeMobility of the given mode"""
+def build_master(mode, disc, cls=None, activity=False, **kin_kw):
+    """the master equation on a discretisation with an EdgeMobility of the given mode; activity: the learned activity
+    correction, a function of the density c / V of the cells"""
     hg = disc.hg()
-    return (cls or MasterEquation)(hg, FreeEnergy(hg), EdgeMobility(mode, **kin_kw), Drive(hg, harmonic=False),
+    fe = FreeEnergy(hg, residual=activity, residual_anchor=activity,
+                    site_volume=torch.exp(disc.g['logV']).to(torch.get_default_dtype()) if activity else None)
+    return (cls or MasterEquation)(hg, fe, EdgeMobility(mode, **kin_kw), Drive(hg, harmonic=False),
                                    chart_featurizer(disc), step=dict(STEP))
 
 
@@ -140,7 +143,8 @@ def build_chart(cfg, meta=None, disc=None):
     else:
         crowd = bool(meta is not None and meta.get('crowd'))
         mode = dict(true='true_crowding' if crowd else 'true', true_material='true')[cfg.kappa]
-    m = build_master(mode, disc, cls=NeuralChart, **(dict(rho_s=meta['RHO_S']) if mode == 'true_crowding' else {}))
+    m = build_master(mode, disc, cls=NeuralChart, activity=cfg.activity == 'learned',
+                     **(dict(rho_s=meta['RHO_S']) if mode == 'true_crowding' else {}))
     if cfg.drive != 'learned_scale':
         m.drive.s_A.requires_grad_(False)          # the drive is known physics: A = amp int F.dl / T exactly
     m.config = cfg

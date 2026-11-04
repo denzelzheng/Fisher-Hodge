@@ -61,7 +61,7 @@ def model_rollout(name, sd, i, norm, device, weights=RUNS, with_model=False):
     return (R[0].double().cpu().numpy(), model) if with_model else R[0].double().cpu().numpy()
 
 
-def make_gifs(device='cuda', data=None, weights=RUNS, scenes=SCENES, panel_in=2.8, max_mb=2.0):
+def make_gifs(device='cuda', data=None, weights=RUNS, scenes=SCENES, panel_in=2.8, max_mb=1.7):
     """one GIF per scene: X on the grid at the chosen sampling steps, with the relative error of the full state
     (X and Y) against the reference in every panel"""
     from scripts.gif_tools import comparison_gif

@@ -3,7 +3,7 @@ import os
 
 import json
 
-from ..common import RESULTS, LABELS, OWN_FLUX, fmt, write_table
+from ..common import RESULTS, LABELS, OWN_FLUX, activity_table, fmt, write_table
 from . import config as C
 
 MAIN = ['chart', 'chart-given-mu0', 'oracle', 'crnn_mass_action', 'crnn_features', 'ude', 'flux_gnn', 'fno', 'bsms', 'generic_fno', 'persistence']
@@ -75,6 +75,17 @@ def lngamma_table(R, stem):
                               'RMSE, extension to the high-concentration range', 'slope, learned against true'], rows)
 
 
+def lngamma_curve_table(R, stem, models=('chart', 'chart-given-mu0')):
+    """the learned ln gamma against the true one at 12 concentrations across the training range"""
+    G = [(m, (R.get(m, {}).get('extra') or {}).get('lngamma')) for m in models]
+    G = [(m, g) for m, g in G if g and 'table' in g]
+    if not G:
+        return None
+    x = G[0][1]['table']['x']
+    rows = [[f'{xi:.3f}', G[0][1]['table']['true'][i]] + [g['table']['model'][i] for _, g in G] for i, xi in enumerate(x)]
+    return write_table(stem, ['concentration x', 'true ln γ'] + [f'{LABELS[m]}, learned ln γ' for m, _ in G], rows)
+
+
 def mapk_table(R, models, stem):
     cols = _cols()
     rows = []
@@ -115,8 +126,10 @@ def make_tables(runs=None):
     main_table(R, ABLATIONS, os.path.join(out, 'ablations'))
     physics_table(R, ABLATIONS, os.path.join(out, 'ablations_physics'))
     readout_table(R, MAIN[:-1] + ABLATIONS[2:-1], os.path.join(out, 'thermodynamic_readouts'))
-    if C.SYSTEM == 'schlogl_nonideal':
+    activity_table(R, MAIN[:2] + ABLATIONS[2:-1], os.path.join(out, 'activity'))
+    if C.nonideal():
         lngamma_table(R, os.path.join(out, 'activity_coefficient'))
+        lngamma_curve_table(R, os.path.join(out, 'activity_coefficient_curve'))
     if C.SYSTEM == 'mapk_cascade':
         mapk_table(R, MAIN + ABLATIONS[2:-1], os.path.join(out, 'conservation_and_output'))
     if C.SYSTEM == 'schlogl':

@@ -11,7 +11,7 @@
 
 Data: --data, default $NEURALCHART_DATA/brusselator if set, else data/brusselator.  The device defaults to cuda.
 
-Models: chart, chart-given-mu0, chart-zero-init, chart-reversible, oracle (neuralchart.chart.CONFIGS['brusselator'])
+Models: chart, chart-given-mu0, chart-ideal, chart-zero-init, chart-reversible, oracle (neuralchart.chart.CONFIGS['brusselator'])
 and the baselines crnn_mass_action, crnn_features, flux_gnn, ude, fno, bsms, generic_fno, persistence.
 --fast uses neuralchart.fast with error control (rtol 5e-5) in float32, the setting of every reported number; the
 UDE closure then integrates with error control only.  Optional speed flags: --compact, --compile_rates, --fuse_net.
@@ -81,6 +81,7 @@ def main(argv=None):
     p.add_argument('--model', default='chart')
     p.add_argument('--seed', type=int, default=0)
     p.add_argument('--iters', type=int, default=ITERS)
+    p.add_argument('--budget_h', type=float, default=None, help='train: wall-clock budget of the training in hours (default 12)')
     p.add_argument('--lr', type=float, default=LR)
     p.add_argument('--device', default='cuda')
     p.add_argument('--sets', nargs='*', default=list(GEN), help='generate: the sets to compute')
@@ -103,7 +104,8 @@ def main(argv=None):
         cmd_check('cpu')
     elif a.cmd == 'train':
         from .training import run_train
-        run_train(a.model, a.seed, a.iters, a.device, a.lr, fkw, data=a.data, out=a.out, ckpt_dir=a.checkpoint_dir)
+        run_train(a.model, a.seed, a.iters, a.device, a.lr, fkw, data=a.data, out=a.out, ckpt_dir=a.checkpoint_dir,
+                  budget_s=None if a.budget_h is None else a.budget_h * 3600)
     elif a.cmd == 'evaluate':
         cmd_evaluate(a, fkw)
     elif a.cmd == 'tables':

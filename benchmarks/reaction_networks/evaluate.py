@@ -24,20 +24,26 @@ def err_channels(n):
 def lngamma_curve(model, x):
     """the model's excess chemical potential mu - log x - mu0 of X at uniform states x (1-D numpy)"""
     fe = model.free_energy
-    c = torch.as_tensor(x, dtype=torch.float64)[:, None].expand(len(x), model.hg.M).contiguous()
+    p = next(iter(fe.parameters()), None)
+    dev = p.device if p is not None else 'cpu'
+    c = torch.as_tensor(x, dtype=torch.float64, device=dev)[:, None].expand(len(x), model.hg.M).contiguous()
     with torch.no_grad():
         return fe.correction(c, None)[:, 0].double().cpu().numpy() if fe.c_dependent else np.zeros(len(x))
 
 
 def lngamma_metrics(model, norm, ood_max):
+    """the learned ln gamma against the true one over the training range [c_min, c_max] of the data and above it up to
+    ood_max; 'table': 12 points of the training range"""
     xi = np.linspace(norm['c_min'], norm['c_max'], 200)
     xo = np.linspace(norm['c_max'], ood_max, 50)
     li, lo = lngamma_curve(model, xi), lngamma_curve(model, xo)
     ti, to = TR.lng_np(xi, TR.PHI), TR.lng_np(xo, TR.PHI)
     slope = float(np.polyfit(ti, li, 1)[0])
+    xt = np.linspace(norm['c_min'], norm['c_max'], 12)
     return dict(rmse_id=float(np.sqrt(np.mean((li - ti) ** 2))), maxerr_id=float(np.abs(li - ti).max()),
                 rmse_ood=float(np.sqrt(np.mean((lo - to) ** 2))), slope_id=slope, x_id=[xi[0], xi[-1]], x_ood=[xo[0], xo[-1]],
-                curve_x=np.linspace(0.02, 2.6, 60).tolist(), curve_model=lngamma_curve(model, np.linspace(0.02, 2.6, 60)).tolist())
+                curve_x=np.linspace(0.02, 2.6, 60).tolist(), curve_model=lngamma_curve(model, np.linspace(0.02, 2.6, 60)).tolist(),
+                table=dict(x=xt.tolist(), model=lngamma_curve(model, xt).tolist(), true=TR.lng_np(xt, TR.PHI).tolist()))
 
 
 def front_speed(Cs, bb, n, a=3.0):

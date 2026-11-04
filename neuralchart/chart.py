@@ -1,9 +1,10 @@
 """The Neural Chart: one model class, one configuration per benchmark, one fit.
 
     a_h, b_h = k_h exp(+- f_h / 2)                    (each rate also carries the mass-action factor of its reactants)
-    f   the force from the chemical potential and the drive: mu = log c + U / T + mu0_theta / T (+ ln gamma_theta(c)),
+    f   the force from the chemical potential and the drive: mu = log c + U / T + mu0_theta / T + ln gamma_theta(c),
         with the conditions (temperature, drive, chemostat levels) entering only through U / T, the drive and the
-        chemostat log-activities.  On the reaction networks the standard potentials mu0_theta are learned (the
+        chemostat log-activities.  ln gamma_theta = s_mu r(c) is the learned activity correction on every benchmark, one
+        family with fixed hyperparameters and s_mu = 0 at initialisation (the ablation chart-ideal removes it).  On the reaction networks the standard potentials mu0_theta are learned (the
         variant chart-given-mu0 takes them from thermochemical data); porous media has no mu0.
     log k_h = log omega_c(h) + g_theta(xi_h) + s * m(log s_h)     (times fixed geometric and physical prefactors)
         omega_c   one positive constant per hyperedge class
@@ -29,8 +30,9 @@ from typing import Optional
 from .model import MasterEquation
 from .fit import fit_chart  # noqa: F401  (re-exported)
 
-TASKS = ('porous_media', 'brusselator', 'schlogl', 'schlogl_nonideal', 'phosphorylation_cycle', 'mapk_cascade')
-REACTION_TASKS = ('schlogl', 'schlogl_nonideal', 'phosphorylation_cycle', 'mapk_cascade')
+TASKS = ('porous_media', 'brusselator', 'schlogl', 'schlogl_nonideal', 'schlogl_nonideal_strong', 'phosphorylation_cycle',
+         'mapk_cascade')
+REACTION_TASKS = ('schlogl', 'schlogl_nonideal', 'schlogl_nonideal_strong', 'phosphorylation_cycle', 'mapk_cascade')
 # the module that assembles the Neural Chart of each task (build_chart(cfg, **task inputs))
 BUILDERS = dict(porous_media='benchmarks.porous_media.models', brusselator='benchmarks.brusselator.models',
                 **{t: 'benchmarks.reaction_networks.models' for t in REACTION_TASKS})
@@ -47,8 +49,8 @@ class ChartConfig:
     kappa        'learned', 'true' (the true k: oracle) or 'true_material' (porous media with crowding: the true
                  material mobility without the crowding factor)
     init         'nnls' (closed-form omega) or 'one' (omega = 1: the ablation without convex initialisation)
-    activity     reaction networks: 'ideal' (mu = log c + mu0), 'learned' (mu = log c + mu0 + ln gamma_theta(c)) or
-                 'true' (the generator's ln gamma, oracle only)
+    activity     'learned' (mu = log c + mu0 + ln gamma_theta(c), the default of every benchmark), 'ideal' (ln gamma = 0)
+                 or 'true' (the generator's ln gamma, oracle of the crowded Schloegl models only)
     varpro       the closed-form step is variable projected (no effect without a learned state function)
     fast, control, rtol, precision: the integrator (neuralchart.fast)"""
     task: str
@@ -63,12 +65,12 @@ class ChartConfig:
     control: str = 'sample_err'
     rtol: float = 5e-5
     precision: Optional[str] = 'fp32'
-    activity: str = 'ideal'
+    activity: str = 'learned'
     varpro: bool = True
 
     def __post_init__(s):
         assert s.task in TASKS and s.mu0 in ('given', 'learned') and s.drive in ('fixed', 'off', 'learned_scale')
-        assert s.activity in ('ideal', 'learned', 'true') and (s.activity == 'ideal' or s.task in REACTION_TASKS)
+        assert s.activity in ('ideal', 'learned', 'true') and (s.activity != 'true' or s.task in REACTION_TASKS)
         assert s.kappa in ('learned', 'true', 'true_material') and s.init in ('nnls', 'one')
         assert s.descriptors or not s.state, 'the state term needs the descriptor model'
         assert s.task == 'porous_media' or not (s.descriptors or s.state), 'only porous media has descriptors'
@@ -80,17 +82,30 @@ class ChartConfig:
 
 _PM = ChartConfig(task='porous_media', descriptors=True, state=True, rtol=0.3)
 _BR = ChartConfig(task='brusselator', mu0='learned', rtol=5e-5)
-_C5 = ChartConfig(task='schlogl_nonideal', mu0='learned', activity='learned', rtol=1e-4)
+_C5 = ChartConfig(task='schlogl_nonideal', mu0='learned', rtol=1e-4)
+
+
+def _nonideal(base):
+    return {
+        'chart': base,
+        'chart-ideal': base.replace(activity='ideal'),
+        'chart-given-mu0': base.replace(mu0='given'),
+        'chart-zero-init': base.replace(init='one'),
+        'chart-reversible': base.replace(drive='off'),
+        'chart-no-varpro': base.replace(varpro=False),
+        'oracle': base.replace(mu0='given', activity='true', kappa='true', train=False),
+    }
 
 
 def _reaction(task):
     base = ChartConfig(task=task, mu0='learned', rtol=1e-4)
     return {
         'chart': base,
+        'chart-ideal': base.replace(activity='ideal'),
         'chart-given-mu0': base.replace(mu0='given'),
         'chart-zero-init': base.replace(init='one'),
         'chart-reversible': base.replace(drive='off'),
-        'oracle': base.replace(mu0='given', kappa='true', train=False),
+        'oracle': base.replace(mu0='given', activity='ideal', kappa='true', train=False),
     }
 
 
@@ -98,28 +113,23 @@ def _reaction(task):
 CONFIGS = {
     'porous_media': {
         'chart': _PM,
+        'chart-ideal': _PM.replace(activity='ideal'),
         'chart-no-state': _PM.replace(state=False),
         'chart-const-k': _PM.replace(descriptors=False, state=False),
         'chart-learned-drive': _PM.replace(drive='learned_scale'),
-        'oracle': _PM.replace(descriptors=False, state=False, kappa='true', train=False),
-        'oracle-no-crowding': _PM.replace(descriptors=False, state=False, kappa='true_material', train=False),
+        'oracle': _PM.replace(descriptors=False, state=False, kappa='true', activity='ideal', train=False),
+        'oracle-no-crowding': _PM.replace(descriptors=False, state=False, kappa='true_material', activity='ideal', train=False),
     },
     'brusselator': {
         'chart': _BR,
+        'chart-ideal': _BR.replace(activity='ideal'),
         'chart-given-mu0': _BR.replace(mu0='given'),
         'chart-zero-init': _BR.replace(init='one'),
         'chart-reversible': _BR.replace(drive='off'),
-        'oracle': _BR.replace(mu0='given', kappa='true', train=False),
+        'oracle': _BR.replace(mu0='given', activity='ideal', kappa='true', train=False),
     },
-    'schlogl_nonideal': {
-        'chart': _C5,
-        'chart-ideal': _C5.replace(activity='ideal'),
-        'chart-given-mu0': _C5.replace(mu0='given'),
-        'chart-zero-init': _C5.replace(init='one'),
-        'chart-reversible': _C5.replace(drive='off'),
-        'chart-no-varpro': _C5.replace(varpro=False),
-        'oracle': _C5.replace(mu0='given', activity='true', kappa='true', train=False),
-    },
+    'schlogl_nonideal': _nonideal(_C5),
+    'schlogl_nonideal_strong': _nonideal(_C5.replace(task='schlogl_nonideal_strong')),
     'schlogl': _reaction('schlogl'),
     'phosphorylation_cycle': _reaction('phosphorylation_cycle'),
     'mapk_cascade': _reaction('mapk_cascade'),

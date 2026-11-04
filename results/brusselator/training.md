@@ -1,9 +1,9 @@
 | Method | gradient steps | training time (h) | final training loss | substeps per sampling step (mean) | largest substeps per sampling step |
 |---|---|---|---|---|---|
-| Neural Chart | 4000 | 0.34 | 3.5e-07 | 23.247 | 120 |
-| Neural Chart, given standard potentials (oracle-type information) | 4000 | 0.36 | 4.0e-10 | 23.260 | 120 |
-| Neural Chart, no convex initialisation | 4000 | 0.15 | 0.106 | 15.542 | 163 |
-| Neural Chart, reversible (no drive) | 4000 | 0.12 | 0.157 | 8.431 | 30 |
+| Neural Chart | 4000 | 1.12 | 3.5e-07 | 23.245 | 120 |
+| Neural Chart, given standard potentials (oracle-type information) | 4000 | 1.41 | 9.4e-06 | 23.306 | 120 |
+| Neural Chart, ideal activities | 4000 | 0.42 | 3.5e-07 | 23.246 | 120 |
+| Neural Chart, reversible (no drive) | 4000 | 0.99 | 0.068 | 14.327 | 1082 |
 | Oracle (true rates in the Neural Chart class) | 0 (not trained) | – | – | – | – |
 | CRNN (mass action) | 4000 | 0.32 | 3.4e-07 | 23.247 | 120 |
 | CRNN (condition features) | 4000 | 0.22 | 0.026 | 19.230 | 160 |

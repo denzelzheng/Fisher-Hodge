@@ -2,20 +2,20 @@
 
     python -m benchmarks.brusselator.run tables [--runs DIR]
 reads DIR/<model>.json (default results/brusselator/runs) and writes
-results/brusselator/{main, physics, ablations, oscillation_patterns, entropy_readout, training}.{md, csv}.
+results/brusselator/{main, physics, ablations, oscillation_patterns, entropy_readout, training, activity}.{md, csv}.
 """
 import json
 import os
 
-from benchmarks.common import LABELS, OWN_FLUX, write_table, fmt
+from benchmarks.common import LABELS, OWN_FLUX, activity_table, write_table, fmt
 from neuralchart.chart import ABLATIONS
 from .config import RESULTS
 from .test_sets import TEST_SETS, LABELS as SET_LABELS
 
-MODELS = ['chart', 'chart-given-mu0', 'chart-zero-init', 'chart-reversible', 'oracle', 'crnn_mass_action',
+MODELS = ['chart', 'chart-given-mu0', 'chart-ideal', 'chart-zero-init', 'chart-reversible', 'oracle', 'crnn_mass_action',
           'crnn_features', 'ude', 'flux_gnn', 'bsms', 'fno', 'generic_fno', 'persistence']
 MAIN = ['chart', 'chart-given-mu0', 'oracle', 'crnn_mass_action', 'crnn_features', 'ude', 'flux_gnn', 'bsms', 'fno', 'generic_fno', 'persistence']
-ABLATION_MODELS = ['chart', 'chart-given-mu0', 'chart-zero-init', 'chart-reversible', 'oracle']
+ABLATION_MODELS = ['chart', 'chart-given-mu0', 'chart-ideal', 'chart-zero-init', 'chart-reversible', 'oracle']
 
 
 def _set(r, s):
@@ -128,3 +128,4 @@ def make_tables(models=MODELS, out=RESULTS, runs=None):
                             ('entropy_readout', entropy_table(R, models)),
                             ('training', training_table(R, models))):
         print(write_table(os.path.join(out, stem), h, rows), '\n')
+    activity_table(R, ABLATION_MODELS, os.path.join(out, 'activity'))

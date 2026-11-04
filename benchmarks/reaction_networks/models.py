@@ -86,10 +86,11 @@ def pc_featurizer(hg):
     return feat
 
 
-def _base(hg, cls, **kw):
+def _base(hg, cls, activity='ideal', **kw):
     with default_dtype(torch.float64):
         m = cls.from_parts(hg, k_ref=1.0, T_exponent=0.0, harmonic=False, step=dict(C.STEP), learn_mu0=True,
-                           learn_chem_mu0=True, kinetics_table=True, **kw)
+                           learn_chem_mu0=True, kinetics_table=True, activity_correction=activity == 'learned',
+                           activity_anchor=True, **kw)
     m = m.double()
     m.step = dict(C.STEP)
     return m
@@ -98,20 +99,17 @@ def _base(hg, cls, **kw):
 def base_model(n, activity, cls=None):
     """the Schloegl class: activity-form rates, optional learned activity correction (zero gate at the start)"""
     hg = TR.hg_of(n)
-    m = _base(hg, cls or chart.NeuralChart, featurizer=chem_featurizer(hg), kinetics_split=False,
-              activity_correction=activity == 'learned', activity_anchor=True)
-    m.free_energy.local_excess = True                    # neuralchart.fast: the excess potential is site-local
-    return m
+    return _base(hg, cls or chart.NeuralChart, activity, featurizer=chem_featurizer(hg), kinetics_split=False)
 
 
-def base_model_pc(n, cls=None):
+def base_model_pc(n, activity='ideal', cls=None):
     hg = TR.hg_of(n)
-    return _base(hg, cls or chart.NeuralChart, featurizer=pc_featurizer(hg), kinetics_split=True)
+    return _base(hg, cls or chart.NeuralChart, activity, featurizer=pc_featurizer(hg), kinetics_split=True)
 
 
-def base_model_mapk(n, cls=None):
+def base_model_mapk(n, activity='ideal', cls=None):
     hg = TR.hg_of(n)
-    return _base(hg, cls or chart.NeuralChart, hidden=32, featurizer=TR.mapk_featurizer(hg, False))
+    return _base(hg, cls or chart.NeuralChart, activity, hidden=32, featurizer=TR.mapk_featurizer(hg, False))
 
 
 def _pc_ref_state(hg):
@@ -170,12 +168,13 @@ def build_chart(cfg, n=None, norm=None):
     assert cfg.task in chart.REACTION_TASKS and cfg.kappa in ('learned', 'true') and not cfg.descriptors and not cfg.state
     if cfg.task != C.SYSTEM:
         C.configure(cfg.task)
+    activity = 'learned' if cfg.activity == 'learned' else 'ideal'
     if cfg.task == 'mapk_cascade':
-        m = base_model_mapk(n)
+        m = base_model_mapk(n, activity)
     elif cfg.task == 'phosphorylation_cycle':
-        m = base_model_pc(n)
+        m = base_model_pc(n, activity)
     else:
-        m = base_model(n, 'learned' if cfg.activity == 'learned' else 'ideal')
+        m = base_model(n, activity)
     if cfg.kappa == 'true' or cfg.mu0 == 'given':
         set_true(m)
     if cfg.kappa != 'true' and cfg.mu0 == 'given':
@@ -206,7 +205,7 @@ def cond_z(drive, norm):
 
 
 def n_cond():
-    return dict(schlogl_nonideal=2, schlogl=2, phosphorylation_cycle=1, mapk_cascade=1)[C.SYSTEM]
+    return dict(schlogl_nonideal=2, schlogl_nonideal_strong=2, schlogl=2, phosphorylation_cycle=1, mapk_cascade=1)[C.SYSTEM]
 
 
 def edge_potential(hg, drive):

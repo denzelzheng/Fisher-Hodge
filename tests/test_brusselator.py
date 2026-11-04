@@ -33,7 +33,7 @@ def test_ablations_are_one_override():
     base = CONFIGS['brusselator']['chart']
     for name, cfg in CONFIGS['brusselator'].items():
         diff = [k for k in base.__dataclass_fields__ if getattr(cfg, k) != getattr(base, k)]
-        assert len(diff) <= (3 if name == 'oracle' else 1), (name, diff)        # the oracle: given mu0, true k, not trained
+        assert len(diff) <= (4 if name == 'oracle' else 1), (name, diff)        # the oracle: given mu0, ideal activities, true k, not trained
 
 
 @torch.no_grad()

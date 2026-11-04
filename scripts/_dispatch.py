@@ -3,8 +3,8 @@ import argparse
 import sys
 
 BENCHMARKS = ('porous_media', 'porous_media_crowding', 'brusselator', 'schlogl', 'schlogl_nonideal',
-              'phosphorylation_cycle', 'mapk_cascade')
-REACTION_NETWORKS = ('schlogl', 'schlogl_nonideal', 'phosphorylation_cycle', 'mapk_cascade')
+              'schlogl_nonideal_strong', 'phosphorylation_cycle', 'mapk_cascade')
+REACTION_NETWORKS = ('schlogl', 'schlogl_nonideal', 'schlogl_nonideal_strong', 'phosphorylation_cycle', 'mapk_cascade')
 
 
 def run(command, doc):

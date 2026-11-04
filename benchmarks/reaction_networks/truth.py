@@ -1,10 +1,10 @@
 """The reaction networks and their reference dynamics.
 
-Schloegl model (schlogl, schlogl_nonideal): A + 2X <-> 3X, X <-> B at every site of the n x n periodic grid, X diffuses,
+Schloegl model (schlogl, schlogl_nonideal, schlogl_nonideal_strong): A + 2X <-> 3X, X <-> B at every site of the n x n periodic grid, X diffuses,
 A and B are chemostats.  Every hyperedge is mass action in the activity y = x gamma(x),
     a_R1 = k1 a y^2,  b_R1 = k1' y^3,  a_R2 = k2 y,  b_R2 = k2' b,  transport D (y_i - y_j),
 with k1 = 1, k1' = 0.5, k2 = 5, k2' = 1, D = 1.  ln gamma(x) = PHI x / (1 - PHI x) with PHI = 0.25 on the non-ideal
-benchmark and PHI = 0 (ideal, bistable) on schlogl.
+benchmarks and PHI = 0 (ideal, bistable) on schlogl.
 
 Phosphorylation cycle (phosphorylation_cycle): species X, Xp, E on the n x n grid (E immobile and catalytic),
 R1  X + E + ATP <-> Xp + E + ADP, driven by dG = log(ATP / ADP) with ATP ADP = 1, a = k1 X E e^{dG/2}, b = k1 Xp E e^{-dG/2};
@@ -53,12 +53,12 @@ INPUT_SITES = [0, 1, 4, 5]                       # the 2 x 2 corner
 
 
 def phi_of():
-    return PHI if C.SYSTEM == 'schlogl_nonideal' else 0.0
+    return PHI if C.nonideal() else 0.0
 
 
 def n_channels():
     """state species per site"""
-    return dict(schlogl_nonideal=1, schlogl=1, phosphorylation_cycle=3, mapk_cascade=22)[C.SYSTEM]
+    return dict(schlogl_nonideal=1, schlogl_nonideal_strong=1, schlogl=1, phosphorylation_cycle=3, mapk_cascade=22)[C.SYSTEM]
 
 
 # ------------------------------------------------------------------------------------------ Schloegl

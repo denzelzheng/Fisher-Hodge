@@ -94,16 +94,35 @@ def featurizer(hg, edge_keys=()):
 
 
 # ------------------------------------------------------------------------------------------ free energy
+def smooth_ramp(z):
+    """h(z) = (z + sqrt(z^2 + 1)) / 2: increasing, convex and unbounded, h -> 0 as z -> -inf and h ~ z as z -> +inf"""
+    q = torch.sqrt(z * z + 1)
+    return 0.5 * torch.where(z >= 0, z + q, 1 / (q + z.abs()))
+
+
+def smooth_ramp_integral(z):
+    """H(z) = (z (z + sqrt(z^2 + 1)) + asinh z) / 4, the antiderivative of smooth_ramp"""
+    return 0.5 * z * smooth_ramp(z) + 0.25 * torch.asinh(z)
+
+
 class FreeEnergy(nn.Module):
     """F / T = sum_m c_m (log c_m - 1) + sum_m c_m U_m / T + G(c):  mu = log c + U / T + dmu(c).
     The ideal part is fixed.  learn_mu0=True adds learned standard potentials mu0 per species (an ablation; by default
     they are given).  residual=True adds the activity correction dmu = s_mu * r(c), with one gate s_mu per species
-    that starts at zero.  r_s(c_s) = mean_j softplus(alpha_sj) tanh(softplus(beta_sj) c_s / rho_scale + delta_sj) is
-    separable and non-decreasing, i.e. the gradient of a convex local excess free energy.  residual_anchor=True uses
-    r(c) - r(0), so that ln gamma(0) = 0 (the reference state of the standard potentials)."""
-    def __init__(s, hg, learn_mu0=False, residual=False, residual_units=16, rho_scale=1.0, residual_anchor=False):
+    that starts at zero.  r is one family with fixed hyperparameters on every task, J = 16 units of each kind:
+        r_s(c) = mean_j softplus(alpha_sj) tanh(softplus(beta_sj) c / rho_scale + delta_sj)
+               + mean_j softplus(alpha'_sj) h(softplus(beta'_sj) c / rho_scale + delta'_sj),
+    h the smooth ramp (z + sqrt(z^2 + 1)) / 2.  The tanh units are bounded steps; the ramp units are convex and grow
+    without bound (strong crowding), and every convex non-decreasing function is a non-negative mix of ramps.  r is
+    separable and non-decreasing, i.e. the gradient of a convex local excess free energy, whose value is in closed
+    form.  residual_anchor=True uses r(c) - r(0), so that ln gamma(0) = 0 (the reference state of the standard
+    potentials).  site_volume (V,): on a mesh with unequal cells c is the mass of a cell and the correction is a function
+    of the density c / V, r(c / V), with the free energy V G(c / V); default: c is the density."""
+    def __init__(s, hg, learn_mu0=False, residual=False, residual_units=16, rho_scale=1.0, residual_anchor=False,
+                 site_volume=None):
         super().__init__()
         s.hg, s.NS, s.V = hg, hg.n_species, hg.V
+        s.register_buffer('inv_v', None if site_volume is None else 1.0 / site_volume, persistent=False)
         s.mu0 = nn.Parameter(torch.zeros(s.NS)) if learn_mu0 else None
         s.residual, s.RS = residual, rho_scale
         s.residual_anchor = bool(residual_anchor)
@@ -112,34 +131,80 @@ class FreeEnergy(nn.Module):
             s.r_alpha = nn.Parameter(torch.zeros(s.NS, J))
             s.r_beta = nn.Parameter(torch.zeros(s.NS, J))
             s.r_delta = nn.Parameter(torch.linspace(-3.0, 1.0, J).repeat(s.NS, 1))
+            s.ramp_alpha = nn.Parameter(torch.zeros(s.NS, J))
+            s.ramp_beta = nn.Parameter(torch.zeros(s.NS, J))
+            s.ramp_delta = nn.Parameter(torch.linspace(-3.0, 1.0, J).repeat(s.NS, 1))
             s.s_mu = nn.Parameter(torch.zeros(s.NS))
 
     @property
     def c_dependent(s):
         return s.residual
 
+    local_excess = True                                  # neuralchart.fast: the excess potential is site-local
+
+    def activity_parameters(s):
+        """the nonlinear parameters of the activity correction (empty without one)"""
+        if not s.residual:
+            return []
+        return [s.r_alpha, s.r_beta, s.r_delta, s.ramp_alpha, s.ramp_beta, s.ramp_delta, s.s_mu]
+
+    def _load_from_state_dict(s, sd, prefix, *args, **kw):
+        """weights of the earlier tanh-only family load with the ramp units switched off (amplitude softplus(-40))"""
+        if s.residual and prefix + 'r_alpha' in sd and prefix + 'ramp_alpha' not in sd:
+            sd[prefix + 'ramp_alpha'] = torch.full_like(s.ramp_alpha, -40.0)
+            sd[prefix + 'ramp_beta'] = s.ramp_beta.detach().clone()
+            sd[prefix + 'ramp_delta'] = s.ramp_delta.detach().clone()
+        super()._load_from_state_dict(sd, prefix, *args, **kw)
+
+    def _density(s, cs):
+        """the density the correction sees: c / V per site (site_volume), c itself without a site volume"""
+        return cs if s.inv_v is None else cs * s.inv_v.to(cs.dtype)[None, None, :]
+
     def _res_parts(s, cs):
-        """per-unit pieces of the correction for cs (B, NS, V): amplitude (NS, J), slope (NS, J), argument (B, NS, V, J)"""
+        """per-unit pieces of the tanh units for densities cs (B, NS, V): amplitude (NS, J), slope (NS, J), argument (B, NS, V, J)"""
         al, be = Fn.softplus(s.r_alpha).to(cs.dtype), Fn.softplus(s.r_beta).to(cs.dtype) / s.RS
         x = be[None, :, None, :] * cs[..., None] + s.r_delta.to(cs.dtype)[None, :, None, :]
         return al / al.shape[-1], be, x
 
+    def _ramp_parts(s, cs):
+        """the same pieces for the ramp units"""
+        al, be = Fn.softplus(s.ramp_alpha).to(cs.dtype), Fn.softplus(s.ramp_beta).to(cs.dtype) / s.RS
+        x = be[None, :, None, :] * cs[..., None] + s.ramp_delta.to(cs.dtype)[None, :, None, :]
+        return al / al.shape[-1], be, x
+
     def residual_mu(s, cs):
-        """the ungated correction r(c) (B, NS, V)"""
+        """the ungated correction r(c / V) (B, NS, V)"""
+        return s.residual_of_density(s._density(cs))
+
+    def residual_of_density(s, cs):
+        """r at densities cs (B, NS, V)"""
         al, _, x = s._res_parts(cs)
-        r = (al[None, :, None, :] * torch.tanh(x)).sum(-1)
+        ap, _, xp = s._ramp_parts(cs)
+        r = (al[None, :, None, :] * torch.tanh(x)).sum(-1) + (ap[None, :, None, :] * smooth_ramp(xp)).sum(-1)
         if s.residual_anchor:
-            r = r - (al * torch.tanh(s.r_delta.to(cs.dtype))).sum(-1)[None, :, None]
+            r = r - s._r0(cs.dtype)[None, :, None]
         return r
 
-    def _residual_G(s, cs):
-        """int_0^c s_mu r per site and species, summed, (B,)"""
+    def _r0(s, dt):
+        """r(0) per species (NS,)"""
+        al = Fn.softplus(s.r_alpha).to(dt) / s.r_alpha.shape[-1]
+        ap = Fn.softplus(s.ramp_alpha).to(dt) / s.ramp_alpha.shape[-1]
+        return (al * torch.tanh(s.r_delta.to(dt))).sum(-1) + (ap * smooth_ramp(s.ramp_delta.to(dt))).sum(-1)
+
+    def _residual_G(s, c):
+        """int_0^c s_mu r(c' / V) dc' per site and species, summed, (B,)"""
+        cs = s._density(c)
         al, be, x = s._res_parts(cs)
         x0 = s.r_delta.to(cs.dtype)[None, :, None, :]
         lc = lambda z: z.abs() + Fn.softplus(-2 * z.abs()) - math.log(2.0)          # log cosh
         G = ((al / be)[None, :, None, :] * (lc(x) - lc(x0))).sum(-1)               # (B, NS, V)
+        ap, bp, xp = s._ramp_parts(cs)
+        xp0 = s.ramp_delta.to(cs.dtype)[None, :, None, :]
+        G = G + ((ap / bp)[None, :, None, :] * (smooth_ramp_integral(xp) - smooth_ramp_integral(xp0))).sum(-1)
         if s.residual_anchor:
-            G = G - (al * torch.tanh(s.r_delta.to(cs.dtype))).sum(-1)[None, :, None] * cs
+            G = G - s._r0(cs.dtype)[None, :, None] * cs
+        if s.inv_v is not None:
+            G = G / s.inv_v.to(cs.dtype)[None, None, :]
         return (s.s_mu.to(cs.dtype)[None, :, None] * G).sum((1, 2))
 
     def potential(s, feats):

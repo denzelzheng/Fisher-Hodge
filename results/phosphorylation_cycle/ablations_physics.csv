@@ -5,11 +5,14 @@ Neural Chart,negative values,0.0,0.0,0.0,0.0
 "Neural Chart, given standard potentials (oracle-type information)",hyperedges violating local detailed balance,0.0,0.0,0.0,0.0
 "Neural Chart, given standard potentials (oracle-type information)",samples with σ < 0,0.0,0.0,0.0,0.0
 "Neural Chart, given standard potentials (oracle-type information)",negative values,0.0,0.0,0.0,0.0
-"Neural Chart, no convex initialisation",hyperedges violating local detailed balance,0.0038209945436507935,0.0037279885912698415,0.0037977430555555555,0.0038093687996031745
+"Neural Chart, ideal activities",hyperedges violating local detailed balance,0.0,0.0,0.0,0.0
+"Neural Chart, ideal activities",samples with σ < 0,0.0,0.0,0.0,0.0
+"Neural Chart, ideal activities",negative values,0.0,0.0,0.0,0.0
+"Neural Chart, no convex initialisation",hyperedges violating local detailed balance,0.033838665674603176,0.033102368551587304,0.053943452380952384,0.037543402777777776
 "Neural Chart, no convex initialisation",samples with σ < 0,0.0,0.0,0.0,0.0
 "Neural Chart, no convex initialisation",negative values,0.0,0.0,0.0,0.0
-"Neural Chart, reversible (no drive)",hyperedges violating local detailed balance,0.0,9.300595238095239e-06,0.0006975446428571429,0.04202473958333333
-"Neural Chart, reversible (no drive)",samples with σ < 0,0.0,0.0,0.0,0.0
+"Neural Chart, reversible (no drive)",hyperedges violating local detailed balance,0.38976892430278887,0.3791534341375551,0.36967239065868623,0.47605487092899207
+"Neural Chart, reversible (no drive)",samples with σ < 0,0.026785714285714284,0.0,0.020833333333333332,0.2261904761904762
 "Neural Chart, reversible (no drive)",negative values,0.0,0.0,0.0,0.0
 Oracle (true rates in the Neural Chart class),hyperedges violating local detailed balance,0.0,0.0,0.0,0.0
 Oracle (true rates in the Neural Chart class),samples with σ < 0,0.0,0.0,0.0,0.0
