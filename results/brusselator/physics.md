@@ -1,15 +1,18 @@
 | Method | quantity | training conditions | b 3.2–3.7 | b 4.0–4.6 | a 1.3–1.5 (a and b outside training) | Turing regime (below the Hopf line) | 64×64 grid |
 |---|---|---|---|---|---|---|---|
-| Neural Chart | hyperedges violating local detailed balance | 0.017 | 0.021 | 0.017 | 0.022 | 0.011 | 0.014 |
+| Neural Chart | hyperedges violating local detailed balance | 0.017 | 0.021 | 0.017 | 0.021 | 0.011 | 0.014 |
 | Neural Chart | samples with sigma < 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | Neural Chart | negative concentration values (fraction) | 0 | 0 | 0 | 0 | 0 | 0 |
-| Neural Chart, given standard potentials (oracle-type information) | hyperedges violating local detailed balance | 0 | 0 | 0 | 0 | 0 | 0 |
+| Neural Chart, given standard potentials (oracle-type information) | hyperedges violating local detailed balance | 0 | 5.1e-07 | 2.5e-07 | 5.1e-07 | 0 | 0 |
 | Neural Chart, given standard potentials (oracle-type information) | samples with sigma < 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | Neural Chart, given standard potentials (oracle-type information) | negative concentration values (fraction) | 0 | 0 | 0 | 0 | 0 | 0 |
-| Neural Chart, ideal activities | hyperedges violating local detailed balance | 0.017 | 0.021 | 0.017 | 0.022 | 0.011 | 0.014 |
-| Neural Chart, ideal activities | samples with sigma < 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| Neural Chart, ideal activities | negative concentration values (fraction) | 0 | 0 | 0 | 0 | 0 | 0 |
-| Neural Chart, reversible (no drive) | hyperedges violating local detailed balance | 0 | 1.5e-06 | 0 | 0 | 0 | 2.5e-06 |
+| Neural Chart, constant mobility per class | hyperedges violating local detailed balance | 0.017 | 0.021 | 0.017 | 0.021 | 0.011 | 0.014 |
+| Neural Chart, constant mobility per class | samples with sigma < 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Neural Chart, constant mobility per class | negative concentration values (fraction) | 0 | 0 | 0 | 0 | 0 | 0 |
+| Neural Chart, no excess free energy | hyperedges violating local detailed balance | 0.017 | 0.021 | 0.017 | 0.022 | 0.011 | 0.014 |
+| Neural Chart, no excess free energy | samples with sigma < 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Neural Chart, no excess free energy | negative concentration values (fraction) | 0 | 0 | 0 | 0 | 0 | 0 |
+| Neural Chart, reversible (no drive) | hyperedges violating local detailed balance | 3.4e-03 | 7.4e-03 | 0.011 | 2.5e-03 | 2.2e-03 | 4.8e-03 |
 | Neural Chart, reversible (no drive) | samples with sigma < 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | Neural Chart, reversible (no drive) | negative concentration values (fraction) | 0 | 0 | 0 | 0 | 0 | 0 |
 | No chart (Flux-GNN) | hyperedges violating local detailed balance | 0.130 | 0.115 | 0.114 | 0.131 | 0.107 | 0.139 |

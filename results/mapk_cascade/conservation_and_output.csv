@@ -23,7 +23,3 @@ Persistence (u(t) = u(0)),"Kpp fraction at 10T, mean absolute error",0.193904052
 "Neural Chart, constant mobility per class","Kpp fraction at 10T, mean absolute error",0.0046585299851567875,0.0017603953558408755,0.0003214703102852271,0.003635467286915317
 "Neural Chart, no excess free energy","moieties, largest relative drift",1.0501927813390565e-05,5.643929896194745e-06,1.5540699621340374e-05,6.912051040053036e-06
 "Neural Chart, no excess free energy","Kpp fraction at 10T, mean absolute error",0.00932552090318517,0.0031292048656411716,0.00045186254073773023,0.009365664139084722
-"Neural Chart, no convex initialisation","moieties, largest relative drift",2.5215533253563256e-05,0.00020088828842075983,9.152870273838735e-06,2.3428128677818377e-05
-"Neural Chart, no convex initialisation","Kpp fraction at 10T, mean absolute error",0.17824087650802817,0.23674880911859195,0.05745391249702126,0.24542209623020372
-"Neural Chart, reversible (no drive)","moieties, largest relative drift",4.25112689454145e-05,4.302251624695925e-05,3.882572009622995e-05,1.0533826784587332e-05
-"Neural Chart, reversible (no drive)","Kpp fraction at 10T, mean absolute error",0.17059169818296305,0.3883532940761983,0.13205984516191005,0.44676443950383604

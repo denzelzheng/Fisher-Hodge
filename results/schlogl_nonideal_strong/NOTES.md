@@ -12,7 +12,3 @@ The non-ideal Schlögl model, ln γ(x) = 0.25 x / (1 − 0.25 x), with the chemo
 ## Integrator tolerance
 
 `calibrate` gives the oracle a median 10T error of 8.5e-7 and 1.0e-7 at every rtol from 1e-2 to 1e-5. The largest error over time and trajectories is 7.6e-5 at rtol 1e-4. The benchmark uses rtol 1e-4, as the other reaction networks do.
-
-## Hardware
-
-UDE closure, Flux-GNN and the Neural Chart variants except `chart-zero-init` and `chart-no-varpro` ran on an NVIDIA L40, with the recommended flags. The other models ran on an RTX PRO 6000 Blackwell.

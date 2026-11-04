@@ -14,7 +14,3 @@
 | Neural Chart, constant mobility per class | cycle affinity, model; reference | 25.789; 17.033 | 27.194; 18.437 | 24.186; 15.429 | 25.845; 17.089 |
 | Neural Chart, no excess free energy | σ, relative error | 0.533 | 0.510 | 0.543 | 1.800 |
 | Neural Chart, no excess free energy | cycle affinity, model; reference | 25.685; 17.033 | 27.090; 18.437 | 24.082; 15.429 | 25.742; 17.089 |
-| Neural Chart, no convex initialisation | σ, relative error | 0.678 | 0.464 | 0.982 | 0.283 |
-| Neural Chart, no convex initialisation | cycle affinity, model; reference | 3.507; 17.033 | 4.912; 18.437 | 1.904; 15.429 | 3.563; 17.089 |
-| Neural Chart, reversible (no drive) | σ, relative error | 0.786 | 0.852 | 0.597 | 0.783 |
-| Neural Chart, reversible (no drive) | cycle affinity, model; reference | 2.9e-15; 17.033 | 3.7e-15; 18.437 | 3.1e-15; 15.429 | 2.1e-15; 17.089 |

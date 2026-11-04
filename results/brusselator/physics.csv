@@ -1,14 +1,17 @@
 Method,quantity,training conditions,b 3.2–3.7,b 4.0–4.6,a 1.3–1.5 (a and b outside training),Turing regime (below the Hopf line),64×64 grid
-Neural Chart,hyperedges violating local detailed balance,0.016691843668619793,0.020977025598405353,0.01716946559838053,0.021700541178385418,0.010694630940755208,0.013905243083546567
+Neural Chart,hyperedges violating local detailed balance,0.016971842447916666,0.021259329487436408,0.017191336557180477,0.021468353271484376,0.010701497395833334,0.013928413391113281
 Neural Chart,samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0
 Neural Chart,negative concentration values (fraction),0.0,0.0,0.0,0.0,0.0,0.0
-"Neural Chart, given standard potentials (oracle-type information)",hyperedges violating local detailed balance,0.0,0.0,0.0,0.0,0.0,0.0
+"Neural Chart, given standard potentials (oracle-type information)",hyperedges violating local detailed balance,0.0,5.086265607841801e-07,2.5431328039209006e-07,5.086263020833333e-07,0.0,0.0
 "Neural Chart, given standard potentials (oracle-type information)",samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0
 "Neural Chart, given standard potentials (oracle-type information)",negative concentration values (fraction),0.0,0.0,0.0,0.0,0.0,0.0
-"Neural Chart, ideal activities",hyperedges violating local detailed balance,0.016694132486979166,0.02097881112610429,0.01717049158565295,0.021702072576414128,0.010703023274739583,0.013908010066226984
-"Neural Chart, ideal activities",samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0
-"Neural Chart, ideal activities",negative concentration values (fraction),0.0,0.0,0.0,0.0,0.0,0.0
-"Neural Chart, reversible (no drive)",hyperedges violating local detailed balance,0.0,1.5258796823525403e-06,0.0,0.0,0.0,2.479557479098761e-06
+"Neural Chart, constant mobility per class",hyperedges violating local detailed balance,0.016973626956590514,0.020997879282094137,0.01718724568684896,0.021472173429406084,0.0107452392578125,0.013936236178633914
+"Neural Chart, constant mobility per class",samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0
+"Neural Chart, constant mobility per class",negative concentration values (fraction),0.0,0.0,0.0,0.0,0.0,0.0
+"Neural Chart, no excess free energy",hyperedges violating local detailed balance,0.0169532862107779,0.021236176165861088,0.017427335029434235,0.021699020817825525,0.010693613688151042,0.013906484186738658
+"Neural Chart, no excess free energy",samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0
+"Neural Chart, no excess free energy",negative concentration values (fraction),0.0,0.0,0.0,0.0,0.0,0.0
+"Neural Chart, reversible (no drive)",hyperedges violating local detailed balance,0.003430687897428281,0.007366858141565957,0.011190046148767594,0.002511089330591497,0.00223236083984375,0.004791090962635632
 "Neural Chart, reversible (no drive)",samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0
 "Neural Chart, reversible (no drive)",negative concentration values (fraction),0.0,0.0,0.0,0.0,0.0,0.0
 No chart (Flux-GNN),hyperedges violating local detailed balance,0.1299263496117972,0.11467938029456341,0.11438407897949218,0.13085536956787108,0.10658607482910157,0.13931154422136618

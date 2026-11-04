@@ -1,7 +1,7 @@
 | Method | training conditions | b 3.2–3.7 | b 4.0–4.6 | a 1.3–1.5 (a and b outside training) | Turing regime (below the Hopf line) | 64×64 grid | trajectories with a negative value (max over sets) | parameters |
 |---|---|---|---|---|---|---|---|---|
-| Neural Chart | 2.5e-03 | 3.0e-03 | 3.4e-03 | 3.6e-03 | 2.0e-03 | 0.013 | 0 | 206 |
-| Neural Chart, given standard potentials (oracle-type information) | 1.6e-04 | 4.3e-05 | 3.5e-05 | 1.2e-04 | 3.6e-05 | 1.7e-04 | 0 | 200 |
+| Neural Chart | 3.3e-03 | 2.1e-03 | 1.7e-03 | 5.2e-03 | 1.6e-03 | 0.013 | 0 | 5,998 |
+| Neural Chart, given standard potentials (oracle-type information) | 7.0e-05 | 1.9e-04 | 1.7e-04 | 1.5e-04 | 1.1e-04 | 1.7e-04 | 0 | 5,992 |
 | No chart (Flux-GNN) | 0.075 | 0.499 | 0.639 | 0.638 | 0.292 | 0.201 | 0 | 151,170 |
 | CRNN (mass action) | 2.4e-03 | 3.0e-03 | 3.4e-03 | 4.1e-03 | 0.026 | 0.013 | 0 | 12 |
 | CRNN (condition features) | 0.724 | 0.755 | 0.771 | 0.802 | 0.698 | 0.749 | 0 | 4,866 |

@@ -9,6 +9,8 @@ CRNN (mass action),"σ, relative error",0.8873288170492807,0.9334879803652687,0.
 CRNN (mass action),"cycle affinity, model; reference",2.844; 2.846,2.878; 2.879,2.671; 2.672
 CRNN (condition features),"σ, relative error",0.7164115639079169,0.9348696422082301,0.694003570126321
 CRNN (condition features),"cycle affinity, model; reference",2.197; 2.846,0.258; 2.879,1.817; 2.672
+"Neural Chart, constant mobility per class","σ, relative error",0.8807044332410221,0.9517586834779664,0.8906188040477241
+"Neural Chart, constant mobility per class","cycle affinity, model; reference",3.120; 2.846,3.154; 2.879,2.947; 2.672
 "Neural Chart, no excess free energy","σ, relative error",0.8270542426398627,0.9928025350743481,0.8596851745474503
 "Neural Chart, no excess free energy","cycle affinity, model; reference",3.175; 2.846,3.209; 2.879,3.002; 2.672
 "Neural Chart, no convex initialisation","σ, relative error",0.9524159974719484,0.999689013100572,0.9580051303816115

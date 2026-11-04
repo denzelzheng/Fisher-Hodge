@@ -5,6 +5,9 @@ Neural Chart,negative values,0.0,0.0,0.0
 "Neural Chart, given standard potentials (oracle-type information)",hyperedges violating local detailed balance,0.000554949576133341,0.00022116065109695682,0.0003239668791508256
 "Neural Chart, given standard potentials (oracle-type information)",samples with σ < 0,0.0,0.0,0.0
 "Neural Chart, given standard potentials (oracle-type information)",negative values,0.0,0.0,0.0
+"Neural Chart, constant mobility per class",hyperedges violating local detailed balance,0.020956172877028754,0.2717742873763816,0.08544503929119314
+"Neural Chart, constant mobility per class",samples with σ < 0,0.0,0.05654761904761905,0.005952380952380952
+"Neural Chart, constant mobility per class",negative values,0.0,0.0,0.0
 "Neural Chart, no excess free energy",hyperedges violating local detailed balance,0.04666538903794557,0.25389875535002704,0.07225323394725407
 "Neural Chart, no excess free energy",samples with σ < 0,0.0,0.0,0.0
 "Neural Chart, no excess free energy",negative values,0.0,0.0,0.0

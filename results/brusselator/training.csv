@@ -1,8 +1,9 @@
 Method,gradient steps,training time (h),final training loss,substeps per sampling step (mean),largest substeps per sampling step
-Neural Chart,4000,1.08,3.5037594468135637e-07,23.245,120
-"Neural Chart, given standard potentials (oracle-type information)",4000,1.07,3.7445645093546623e-10,23.259,120
-"Neural Chart, ideal activities",4000,0.42,3.5029716229534714e-07,23.247,120
-"Neural Chart, reversible (no drive)",4000,0.33,0.15711331000775983,8.431,30
+Neural Chart,4000,4.06,1.2336342496925755e-07,23.211,121
+"Neural Chart, given standard potentials (oracle-type information)",4000,4.05,1.4439710378460325e-10,23.266,120
+"Neural Chart, constant mobility per class",4000,1.58,1.2943572867103616e-07,23.198,120
+"Neural Chart, no excess free energy",4000,2.73,3.0506502159002823e-07,23.259,121
+"Neural Chart, reversible (no drive)",4000,1.62,0.06131180749719392,13.712,389
 No chart (Flux-GNN),4000,9.00,3.7427440729516094e-05,18.501,168
 CRNN (mass action),4000,0.32,3.427040455764524e-07,23.247,120
 CRNN (condition features),4000,0.22,0.0259398554229356,19.230,160

@@ -24,7 +24,3 @@
 | Neural Chart, constant mobility per class | Kpp fraction at 10T, mean absolute error | 4.7e-03 | 1.8e-03 | 3.2e-04 | 3.6e-03 |
 | Neural Chart, no excess free energy | moieties, largest relative drift | 1.1e-05 | 5.6e-06 | 1.6e-05 | 6.9e-06 |
 | Neural Chart, no excess free energy | Kpp fraction at 10T, mean absolute error | 9.3e-03 | 3.1e-03 | 4.5e-04 | 9.4e-03 |
-| Neural Chart, no convex initialisation | moieties, largest relative drift | 2.5e-05 | 2.0e-04 | 9.2e-06 | 2.3e-05 |
-| Neural Chart, no convex initialisation | Kpp fraction at 10T, mean absolute error | 0.178 | 0.237 | 0.057 | 0.245 |
-| Neural Chart, reversible (no drive) | moieties, largest relative drift | 4.3e-05 | 4.3e-05 | 3.9e-05 | 1.1e-05 |
-| Neural Chart, reversible (no drive) | Kpp fraction at 10T, mean absolute error | 0.171 | 0.388 | 0.132 | 0.447 |

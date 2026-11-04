@@ -6,6 +6,9 @@
 | Neural Chart, given standard potentials (oracle-type information) | hyperedges violating local detailed balance | 5.5e-04 | 2.2e-04 | 3.2e-04 |
 | Neural Chart, given standard potentials (oracle-type information) | samples with σ < 0 | 0 | 0 | 0 |
 | Neural Chart, given standard potentials (oracle-type information) | negative values | 0 | 0 | 0 |
+| Neural Chart, constant mobility per class | hyperedges violating local detailed balance | 0.021 | 0.272 | 0.085 |
+| Neural Chart, constant mobility per class | samples with σ < 0 | 0 | 0.057 | 6.0e-03 |
+| Neural Chart, constant mobility per class | negative values | 0 | 0 | 0 |
 | Neural Chart, no excess free energy | hyperedges violating local detailed balance | 0.047 | 0.254 | 0.072 |
 | Neural Chart, no excess free energy | samples with σ < 0 | 0 | 0 | 0 |
 | Neural Chart, no excess free energy | negative values | 0 | 0 | 0 |
