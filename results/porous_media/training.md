@@ -1,13 +1,12 @@
 | Method | parameters | training time (min) | final training loss |
 |---|---|---|---|
-| Neural Chart | 5,478 | 50.3 | 1.5e-04 |
-| Neural Chart, ideal activities | 5,381 | 47.7 | 1.5e-04 |
-| Neural Chart, no state input | 5,155 | 24.5 | 1.5e-04 |
-| Neural Chart, constant mobility | 98 | 16.0 | 0.030 |
-| Neural Chart, learned drive scale | 5,479 | 51.9 | 1.5e-04 |
-| Oracle (true rates in the Neural Chart class) | 0 (true rates) | N/A | N/A |
+| Neural Chart | 5,478 | 47.1 | 1.5e-04 |
+| Neural Chart, ideal activities | 5,381 | 16.2 | 1.5e-04 |
+| Neural Chart, no state input | 5,155 | 23.7 | 1.5e-04 |
+| Neural Chart, constant mobility | 98 | 15.4 | 0.030 |
+| Neural Chart, learned drive scale | 5,479 | 47.9 | 1.5e-04 |
+| No chart (Flux-GNN) | 151,234 | 639.0 | 4.5e-04 |
 | UDE closure | 5,441 | 11.7 | 2.8e-04 |
-| Flux-GNN | 151,234 | 639.0 | 4.5e-04 |
 | BSMS-GNN | 1,724,417 | 48.0 | 0.358 |
 | FNO | 1,188,609 | 118.9 | 2.1e-03 |
 | GENERIC-FNO | 1,002,388 | 35.6 | 1.2e-03 |

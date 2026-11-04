@@ -36,7 +36,6 @@ class EdgeMobility(nn.Module):
     log omega is the parameter `core`; g is an MLP of the 12 edge descriptors (pointwise, no message passing) whose last
     layer starts at zero; s m is the state term (s starts at zero)."""
     rho_dependent = False
-    split = True
     chem_prefactor = False
 
     def __init__(s, mode='material_state', hidden=64, rho_s=None):

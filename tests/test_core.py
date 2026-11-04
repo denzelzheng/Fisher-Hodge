@@ -31,7 +31,7 @@ def network(n=3):
 def model(hg, activity=False, seed=0):
     torch.manual_seed(seed)
     m = MasterEquation.from_parts(hg, k_ref=1.0, T_exponent=0.0, harmonic=False, kinetics_table=True,
-                                  kinetics_split=False, activity_correction=activity, activity_anchor=activity)
+                                  activity_correction=activity, activity_anchor=activity)
     with torch.no_grad():
         m.kinetics.core.copy_(0.5 * torch.randn_like(m.kinetics.core))
         if activity:
@@ -62,6 +62,20 @@ def test_hypergraph_algebra():
     assert torch.allclose(hg.apply_S(J), J @ torch.as_tensor(S).T)
     y = torch.randn(4, hg.M)
     assert torch.allclose(hg.apply_ST(y), y @ torch.as_tensor(S))
+
+
+def test_rate_form():
+    """a, b = k eps exp(+- f / 2), eps = exp(<nu+ + nu-, y> / 2): with ln gamma = 0 the reactants enter as mass action in c"""
+    hg = network()
+    m = model(hg, activity=True)
+    c, dr = state(hg, 4), drive(4)
+    ctx = m.prepare(dr)
+    a, b = m.rates(c, ctx)
+    y = torch.log(c) + m.free_energy.correction(c, ctx)
+    f = hg.dot(y + ctx['Ufull'], '+') - hg.dot(y + ctx['Ufull'], '-') + ctx['A']
+    eps = torch.exp(0.5 * (hg.dot(y, '+') + hg.dot(y, '-')))
+    assert torch.allclose(a, ctx['k'] * eps * torch.exp(0.5 * f), rtol=1e-4)
+    assert torch.allclose(b, ctx['k'] * eps * torch.exp(-0.5 * f), rtol=1e-4)
 
 
 @pytest.mark.parametrize('activity', [False, True])

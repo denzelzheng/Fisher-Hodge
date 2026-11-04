@@ -12,10 +12,10 @@ from neuralchart.chart import ABLATIONS
 from .config import RESULTS
 from .test_sets import TEST_SETS, LABELS as SET_LABELS
 
-MODELS = ['chart', 'chart-given-mu0', 'chart-ideal', 'chart-zero-init', 'chart-reversible', 'oracle', 'crnn_mass_action',
-          'crnn_features', 'ude', 'flux_gnn', 'bsms', 'fno', 'generic_fno', 'persistence']
-MAIN = ['chart', 'chart-given-mu0', 'oracle', 'crnn_mass_action', 'crnn_features', 'ude', 'flux_gnn', 'bsms', 'fno', 'generic_fno', 'persistence']
-ABLATION_MODELS = ['chart', 'chart-given-mu0', 'chart-ideal', 'chart-zero-init', 'chart-reversible', 'oracle']
+MODELS = ['chart', 'chart-given-mu0', 'chart-ideal', 'chart-zero-init', 'chart-reversible', 'flux_gnn', 'crnn_mass_action',
+          'crnn_features', 'ude', 'bsms', 'fno', 'generic_fno', 'persistence']
+MAIN = ['chart', 'chart-given-mu0', 'flux_gnn', 'crnn_mass_action', 'crnn_features', 'ude', 'bsms', 'fno', 'generic_fno', 'persistence']
+ABLATION_MODELS = ['chart', 'chart-given-mu0', 'chart-ideal', 'chart-zero-init', 'chart-reversible', 'flux_gnn']
 
 
 def _set(r, s):

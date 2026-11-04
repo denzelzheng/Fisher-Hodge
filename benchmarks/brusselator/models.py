@@ -65,7 +65,7 @@ def chart_model(n, cls=NeuralChart, activity='ideal'):
     """the Neural Chart class on the n x n grid (standard potentials still free, log k = 0)"""
     hg = hg_of(n)
     with default_dtype(torch.float64):
-        m = cls.from_parts(hg, k_ref=1.0, T_exponent=0.0, harmonic=False, featurizer=chem_featurizer(hg), step=dict(STEP),
+        m = cls.from_parts(hg, k_ref=1.0, harmonic=False, featurizer=chem_featurizer(hg), step=dict(STEP),
                            learn_mu0=True, learn_chem_mu0=True, kinetics_table=True, chem_prefactor=True,
                            activity_correction=activity == 'learned', activity_anchor=True)
     m = m.double()

@@ -2,12 +2,12 @@ Method,quantity,training conditions,"a 3.5–4.0, b 2.0–3.5",16×16 grid
 Neural Chart,hyperedges violating local detailed balance,0.0,0.0,0.0
 Neural Chart,samples with σ < 0,0.0,0.0,0.0
 Neural Chart,negative values,0.0,0.0,0.0
-"Neural Chart, given standard potentials (oracle-type information)",hyperedges violating local detailed balance,0.0,0.0,8.220777192275757e-06
+"Neural Chart, given standard potentials (oracle-type information)",hyperedges violating local detailed balance,0.0,0.0,8.221791034959056e-06
 "Neural Chart, given standard potentials (oracle-type information)",samples with σ < 0,0.0,0.0,0.0
 "Neural Chart, given standard potentials (oracle-type information)",negative values,0.0,0.0,0.0
-Oracle (true rates in the Neural Chart class),hyperedges violating local detailed balance,0.0,0.0,0.0
-Oracle (true rates in the Neural Chart class),samples with σ < 0,0.0,0.0,0.0
-Oracle (true rates in the Neural Chart class),negative values,0.0,0.0,0.0
+No chart (Flux-GNN),hyperedges violating local detailed balance,0.09999302455357142,0.5171595982142857,0.1068754650297619
+No chart (Flux-GNN),samples with σ < 0,0.0,0.8898809523809523,0.0
+No chart (Flux-GNN),negative values,0.0,0.0,0.0
 CRNN (mass action),hyperedges violating local detailed balance,0.11199079241071429,0.25345284598214285,0.08372279575892858
 CRNN (mass action),samples with σ < 0,0.0,0.0,0.0
 CRNN (mass action),negative values,0.0,0.0,0.0
@@ -17,9 +17,6 @@ CRNN (condition features),negative values,0.0,0.0,0.0
 UDE closure,hyperedges violating local detailed balance,0.17531614954046024,0.19528576117023771,0.13902483601730195
 UDE closure,samples with σ < 0,0.2916666666666667,0.002976190476190476,0.23214285714285715
 UDE closure,negative values,0.0,0.0,0.0
-Flux-GNN,hyperedges violating local detailed balance,0.09999302455357142,0.5171595982142857,0.1068754650297619
-Flux-GNN,samples with σ < 0,0.0,0.8898809523809523,0.0
-Flux-GNN,negative values,0.0,0.0,0.0
 FNO,hyperedges violating local detailed balance,N/A,N/A,N/A
 FNO,samples with σ < 0,N/A,N/A,N/A
 FNO,negative values,0.0,0.0,9.47411380597015e-05

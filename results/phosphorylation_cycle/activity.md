@@ -2,5 +2,5 @@
 |---|---|---|---|
 | Neural Chart | 0 | 0 | 0 |
 | Neural Chart, given standard potentials (oracle-type information) | 0 | 0 | 0 |
-| Neural Chart, no convex initialisation | -1.5e-01 | 0 | 0.169 |
-| Neural Chart, reversible (no drive) | 11.529 | 13.074 | 49.280 |
+| Neural Chart, no convex initialisation | -4.1e-02 | 0.372 | 1.641 |
+| Neural Chart, reversible (no drive) | 0 | 0 | 0 |

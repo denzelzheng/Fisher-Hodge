@@ -1,6 +1,6 @@
 """The Neural Chart: one model class, one configuration per benchmark, one fit.
 
-    a_h, b_h = k_h exp(+- f_h / 2)                    (each rate also carries the mass-action factor of its reactants)
+    a_h, b_h = k_h eps_h exp(+- f_h / 2)              (eps_h = exp(<nu+ + nu-, y> / 2), y = log c + ln gamma(c) the log activity)
     f   the force from the chemical potential and the drive: mu = log c + U / T + mu0_theta / T + ln gamma_theta(c),
         with the conditions (temperature, drive, chemostat levels) entering only through U / T, the drive and the
         chemostat log-activities.  ln gamma_theta = s_mu r(c) is the learned activity correction on every benchmark, one
@@ -145,6 +145,7 @@ ABLATIONS = {
     'chart-learned-drive': 'the fixed drive scale: a global scale of the drive is learned',
     'chart-ideal': 'the activity correction: ln gamma = 0',
     'chart-no-varpro': 'the variable projection: ideal NNLS start, then rollout refinement',
+    'flux_gnn': 'the chart: a graph network gives the one-way rates, with no chemical potential, force or symmetric mobility',
     'oracle': 'nothing learned: the true rates in the Neural Chart class',
     'oracle-no-crowding': 'nothing learned: the true material mobility without the crowding factor',
 }

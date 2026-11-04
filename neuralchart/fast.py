@@ -203,7 +203,6 @@ class ChartKernel(Kernel):
         fe, kin = model.free_energy, model.kinetics
         s.excess = bool(fe.c_dependent and getattr(fe, 'local_excess', False))
         assert s.excess or not fe.c_dependent, 'fast path: the excess potential must not depend on c'
-        s.split = bool(getattr(kin, 'split', False))
         s.state = bool(getattr(kin, 'rho_dependent', False))
         s.params_inside = s.state
         assert not s.state or hasattr(kin, 'state_branch'), 'fast path: unsupported state-dependent mobility'
@@ -215,12 +214,8 @@ class ChartKernel(Kernel):
         logk = torch.log(k)
         phi, A = ctx['Ufull'], ctx['A']
         pp, pm = s.ops.dot_p(phi), s.ops.dot_m(phi)
-        if s.split:
-            Ea = logk + 0.5 * A + 0.5 * (pp - pm)
-            Eb = logk - 0.5 * A + 0.5 * (pm - pp)
-        else:
-            Ea = logk + pp + 0.5 * A
-            Eb = logk + pm - 0.5 * A
+        Ea = logk + 0.5 * A + 0.5 * (pp - pm)
+        Eb = logk - 0.5 * A + 0.5 * (pm - pp)
         P = dict(Ea=Ea.to(dtype), Eb=Eb.to(dtype))
         if s.state:
             P.update(invV=feats['invV'].to(dtype), tail=feats['tail'], head=feats['head'])
@@ -236,11 +231,7 @@ class ChartKernel(Kernel):
             la, lb = la + dk, lb + dk
         if s.excess:
             pc = s.model.free_energy.correction(c, None)
-            pp, pm = s.ops.dot_p(pc), s.ops.dot_m(pc)
-            if s.split:
-                la, lb = la + 0.5 * (pp - pm), lb + 0.5 * (pm - pp)
-            else:
-                la, lb = la + pp, lb + pm
+            la, lb = la + s.ops.dot_p(pc), lb + s.ops.dot_m(pc)
         return torch.exp(la), torch.exp(lb)
 
 

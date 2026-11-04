@@ -1,8 +1,11 @@
 """The master equation behind the Neural Chart.
 
-For every hyperedge h (a reaction, or a transport step between two cells) the forward and backward rates are
+For every hyperedge h (a reaction, or a transport step between two cells), with y = log c + ln gamma(c) the log
+activity and phi = (U + mu0) / T the potential, the forward and backward rates are
 
-    a_h = k_h exp(<nu+_h, mu> + A_h / 2),   b_h = k_h exp(<nu-_h, mu> - A_h / 2),   J = a - b,   dc/dt = S J.
+    a_h, b_h = k_h eps_h exp(+- f_h / 2),   eps_h = exp(<nu+_h + nu-_h, y> / 2),   f_h = <nu+_h - nu-_h, y + phi> + A_h,
+
+so a_h = k_h exp(<nu+_h, y> + (<nu+_h - nu-_h, phi> + A_h) / 2), and J = a - b,   dc/dt = S J.
 
 The model has three parts.
   * FreeEnergy: the chemical potential mu = log c + U / T (+ mu0 / T) (+ ln gamma(c)).  The ideal part is fixed by
@@ -15,9 +18,8 @@ The force f_h = log(a_h / b_h) = -<S_h, mu> + A_h is therefore fixed by physics.
 moiety in ker S^T is conserved, the rates carry the concentrations of the species they consume, so c stays positive
 under the positive integrators, local detailed balance log(a / b) = f holds, and sigma = sum_h J_h f_h >= 0.
 
-The rates have two equivalent forms.  'split' writes a_h = k_h c^{nu+} exp((<nu+ - nu-, phi> + A_h) / 2) with
-phi = mu - log c (the square-root approximation of transport on a grid).  The 'activity' form writes
-a_h = k_h exp(<nu+, mu> + A_h / 2).  For an ideal free energy they differ only by a c-independent factor in k.
+The one form covers mass action in the activity (the reactants enter through y) and the square-root approximation of
+transport in a potential (phi enters the force only, split evenly between the two directions).
 """
 import copy
 import math
@@ -238,15 +240,14 @@ class Mobility(nn.Module):
       r_theta  an MLP of the orientation-invariant hyperedge features, gated by s_k, which starts at zero.
                table=True drops it (log k is the core table alone).
     p = 1 is the Einstein relation, p = 0 keeps k independent of temperature.  chem_prefactor=True: chemostatted
-    reactants and products also multiply k by their mass-action factor exp(<nu+ + nu-, log c_chem> / 2).
-    split=True: a_h = k_h c^{nu+} exp((<nu+ - nu-, phi> + A_h) / 2); split=False: a_h = k_h exp(<nu+, mu> + A_h / 2)."""
+    reactants and products also multiply k by their mass-action factor exp(<nu+ + nu-, log c_chem> / 2)."""
     rho_dependent = False
 
     def __init__(s, n_edge_feats, hidden=32, k_ref=1.0, T_exponent=1.0, hg=None, table=False, chem_prefactor=True,
-                 core='type', residual=None, split=True):
+                 core='type', residual=None):
         super().__init__()
         assert core in ('type', 'edge') and hg is not None
-        s.chem_prefactor, s.split, s.core_kind = chem_prefactor, split, core
+        s.chem_prefactor, s.core_kind = chem_prefactor, core
         n_core = hg.H if core == 'edge' else int(hg.meta['typ'].max()) + 1
         s.core = nn.Parameter(torch.zeros(n_core))
         s.residual = MLP(n_edge_feats, hidden, 1) if (residual if residual is not None else not table) else None
@@ -350,12 +351,12 @@ class MasterEquation(nn.Module):
     @classmethod
     def from_parts(cls, hg, hidden=32, k_ref=1.0, T_exponent=1.0, harmonic=True, featurizer=None, step=None,
               learn_mu0=False, learn_chem_mu0=False, kinetics_table=False, chem_prefactor=True, kinetics_core='type',
-              kinetics_split=True, activity_correction=False, rho_scale=1.0, chem_mu0_known=None, activity_anchor=False):
+              activity_correction=False, rho_scale=1.0, chem_mu0_known=None, activity_anchor=False):
         """kinetics_table=True: log k is the core table alone; kinetics_core='edge': one log rate per hyperedge;
         activity_correction=True: the learned activity correction of FreeEnergy."""
         feat = featurizer or globals()['featurizer'](hg)
         kin = Mobility(feat.n_edge_sym, hidden, k_ref=k_ref, T_exponent=T_exponent, hg=hg, table=kinetics_table,
-                       chem_prefactor=chem_prefactor, core=kinetics_core, split=kinetics_split)
+                       chem_prefactor=chem_prefactor, core=kinetics_core)
         fe = FreeEnergy(hg, learn_mu0, residual=activity_correction, rho_scale=rho_scale, residual_anchor=activity_anchor)
         dr = Drive(hg, harmonic, learn_chem_mu0, chem_mu0_known)
         return cls(hg, fe, kin, dr, feat, step)
@@ -402,16 +403,13 @@ class MasterEquation(nn.Module):
     def rates(s, c, drive):
         """one-way fluxes (a, b), each (B, H), evaluated in the log domain (c > 0, which the integrators guarantee)"""
         ctx = s.context(drive)
-        phi = s.free_energy.phi(c, ctx)
+        y = torch.log(c) + s.free_energy.correction(c, ctx)
+        phi = ctx['Ufull']
         k = ctx['k'] if ctx['k'] is not None else s.kinetics(ctx['feats'], s.hg, c)
         A = ctx['A']
         dot = s.hg.dot
-        lc = torch.log(c)
-        if s.kinetics.split:
-            u, v = lc + 0.5 * phi, 0.5 * phi
-            return k * torch.exp(dot(u, '+') - dot(v, '-') + 0.5 * A), k * torch.exp(dot(u, '-') - dot(v, '+') - 0.5 * A)
-        m = lc + phi
-        return k * torch.exp(dot(m, '+') + 0.5 * A), k * torch.exp(dot(m, '-') - 0.5 * A)
+        u, v = y + 0.5 * phi, 0.5 * phi
+        return k * torch.exp(dot(u, '+') - dot(v, '-') + 0.5 * A), k * torch.exp(dot(u, '-') - dot(v, '+') - 0.5 * A)
 
     def flux(s, c, drive):
         a, b = s.rates(c, drive)

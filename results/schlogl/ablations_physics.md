@@ -9,12 +9,12 @@
 | Neural Chart, ideal activities | hyperedges violating local detailed balance | 0 | 0 | 0 | 0 |
 | Neural Chart, ideal activities | samples with σ < 0 | 0 | 0 | 0 | 0 |
 | Neural Chart, ideal activities | negative values | 0 | 0 | 0 | 0 |
-| Neural Chart, no convex initialisation | hyperedges violating local detailed balance | 0.096 | 0.026 | 0.025 | 0.121 |
-| Neural Chart, no convex initialisation | samples with σ < 0 | 0.155 | 0 | 0 | 0.238 |
+| Neural Chart, no convex initialisation | hyperedges violating local detailed balance | 0.102 | 0.027 | 0.020 | 0.129 |
+| Neural Chart, no convex initialisation | samples with σ < 0 | 0.182 | 0 | 0 | 0.268 |
 | Neural Chart, no convex initialisation | negative values | 0 | 0 | 0 | 0 |
 | Neural Chart, reversible (no drive) | hyperedges violating local detailed balance | 0 | 0 | 0 | 0 |
 | Neural Chart, reversible (no drive) | samples with σ < 0 | 0 | 0 | 0 | 0 |
 | Neural Chart, reversible (no drive) | negative values | 0 | 0 | 0 | 0 |
-| Oracle (true rates in the Neural Chart class) | hyperedges violating local detailed balance | 0 | 0 | 0 | 0 |
-| Oracle (true rates in the Neural Chart class) | samples with σ < 0 | 0 | 0 | 0 | 0 |
-| Oracle (true rates in the Neural Chart class) | negative values | 0 | 0 | 0 | 0 |
+| No chart (Flux-GNN) | hyperedges violating local detailed balance | 0.241 | 0.202 | 0.113 | 0.205 |
+| No chart (Flux-GNN) | samples with σ < 0 | 0.235 | 0 | 0.081 | 0.190 |
+| No chart (Flux-GNN) | negative values | 0 | 0 | 0 | 0 |

@@ -1,12 +1,10 @@
 | Method | parameters | training time (min) | final training loss |
 |---|---|---|---|
 | Neural Chart | 5,478 | 67.2 | 2.3e-04 |
-| Neural Chart, ideal activities | 5,381 | 50.8 | 2.3e-04 |
+| Neural Chart, ideal activities | 5,381 | 28.4 | 2.3e-04 |
 | Neural Chart, no state input | 5,155 | 18.3 | 3.1e-03 |
-| Oracle (true rates in the Neural Chart class) | 0 (true rates) | N/A | N/A |
-| Oracle without crowding | 0 (true rates) | N/A | N/A |
+| No chart (Flux-GNN) | 151,234 | 416.4 | 1.1e-04 |
 | UDE closure | 5,441 | 9.8 | 9.9e-05 |
-| Flux-GNN | 151,234 | 416.4 | 1.1e-04 |
 | BSMS-GNN | 1,724,417 | 2.0 | 0.369 |
 | FNO | 1,188,609 | 5.3 | 8.7e-04 |
 | GENERIC-FNO | 1,002,388 | 2.9 | 6.1e-04 |

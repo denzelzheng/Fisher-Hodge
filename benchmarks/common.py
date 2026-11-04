@@ -24,7 +24,7 @@ LABELS = {
     'oracle': 'Oracle (true rates in the Neural Chart class)',
     'oracle-no-crowding': 'Oracle without crowding',
     'ude': 'UDE closure',
-    'flux_gnn': 'Flux-GNN',
+    'flux_gnn': 'No chart (Flux-GNN)',
     'crnn_mass_action': 'CRNN (mass action)',
     'crnn_features': 'CRNN (condition features)',
     'fno': 'FNO',

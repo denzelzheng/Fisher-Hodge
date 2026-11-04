@@ -8,12 +8,12 @@ Neural Chart,negative values,0.0,0.0,0.0,0.0
 "Neural Chart, ideal activities",hyperedges violating local detailed balance,0.0,0.0,0.0,0.0
 "Neural Chart, ideal activities",samples with σ < 0,0.0,0.0,0.0,0.0
 "Neural Chart, ideal activities",negative values,0.0,0.0,0.0,0.0
-"Neural Chart, no convex initialisation",hyperedges violating local detailed balance,0.033838665674603176,0.033102368551587304,0.053943452380952384,0.037543402777777776
+"Neural Chart, no convex initialisation",hyperedges violating local detailed balance,0.010734437003968254,0.011540488591269842,0.016973586309523808,0.012288411458333334
 "Neural Chart, no convex initialisation",samples with σ < 0,0.0,0.0,0.0,0.0
 "Neural Chart, no convex initialisation",negative values,0.0,0.0,0.0,0.0
-"Neural Chart, reversible (no drive)",hyperedges violating local detailed balance,0.38976892430278887,0.3791534341375551,0.36967239065868623,0.47605487092899207
-"Neural Chart, reversible (no drive)",samples with σ < 0,0.026785714285714284,0.0,0.020833333333333332,0.2261904761904762
+"Neural Chart, reversible (no drive)",hyperedges violating local detailed balance,0.0,9.300595238095239e-06,0.0006975446428571429,0.04202473958333333
+"Neural Chart, reversible (no drive)",samples with σ < 0,0.0,0.0,0.0,0.0
 "Neural Chart, reversible (no drive)",negative values,0.0,0.0,0.0,0.0
-Oracle (true rates in the Neural Chart class),hyperedges violating local detailed balance,0.0,0.0,0.0,0.0
-Oracle (true rates in the Neural Chart class),samples with σ < 0,0.0,0.0,0.0,0.0
-Oracle (true rates in the Neural Chart class),negative values,0.0,0.0,0.0,0.0
+No chart (Flux-GNN),hyperedges violating local detailed balance,0.03890749007936508,0.14000604543375988,0.08971974206349206,0.03631107390873016
+No chart (Flux-GNN),samples with σ < 0,0.0,0.0,0.0,0.0
+No chart (Flux-GNN),negative values,0.0,0.0,0.0,0.0

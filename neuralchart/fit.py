@@ -265,7 +265,10 @@ def gate_line_search(model, tr, dt, gate, grid=GATE_GRID, refine=12, log=print):
         for p, v in zip(lin, lin0):
             p.copy_(v)
         gate.copy_(g0 + t)
-        r = fit_linear(model, tr, dt, log=quiet)['residual_theta']
+        try:
+            r = fit_linear(model, tr, dt, log=quiet)['residual_theta']
+        except (AssertionError, ValueError, np.linalg.LinAlgError):      # the rates overflow at this gate
+            return float('inf')
         return r if math.isfinite(r) else float('inf')
     ts = [0.0] + list(grid)
     rs = [res(t) for t in ts]
@@ -292,16 +295,17 @@ def gate_line_search(model, tr, dt, gate, grid=GATE_GRID, refine=12, log=print):
     return dict(gate=best_t, residual_start=rs[0], residual=best_r, grid=dict(zip(map(float, ts), rs)))
 
 
-def fit_varpro(model, data, dt, params, max_iters=2000, lr=1e-2, window=100, min_gain=0.05, batch=16, log=print, gate=None):
+def fit_varpro(model, data, dt, params, max_iters=2000, lr=1e-2, window=100, descent_gain=0.05, min_gain=0.5, batch=16, log=print,
+               gate=None):
     """variable-projected closed-form fit.  The linear parameters (the log-rate core, given or learned potentials) are
     the NNLS optimum (fit_linear) at the current value of the nonlinear state-function parameters `params` (e.g. the
     learned activity correction ln gamma_theta); `params` descend the projected derivative residual (Adam, lr, clip 1;
     by the envelope theorem the gradient at fixed optimal linear parameters is the gradient of the projected residual).
     gate: the gate parameter of the state function (in params); when given, gate_line_search sets it before the
-    descent.  Fixed stopping rule: the projected residual improved by less than min_gain (relative) over the last
+    descent.  Fixed stopping rule: the projected residual improved by less than descent_gain (relative) over the last
     `window` iterations, or max_iters.  The best iterate is kept, and the state function only when it lowers the
-    projected residual of the start (gate 0) by at least min_gain; otherwise the model returns to its entry state
-    (out['kept'] = False; the caller freezes it, see fit_chart).
+    projected residual of the start (gate 0) by at least min_gain, one value on every task; otherwise the model returns
+    to its entry state (out['kept'] = False; the caller freezes it, see fit_chart).
     Without nonlinear parameters this is exactly fit_linear."""
     tr = data['train'] if 'train' in data else data
     t0 = time.time()
@@ -328,7 +332,7 @@ def fit_varpro(model, data, dt, params, max_iters=2000, lr=1e-2, window=100, min
             best, best_state = hist[-1], snapshot()
         if it % 50 == 0:
             log(f'varpro it {it:4d}: projected derivative residual {hist[-1]:.4e} t {time.time() - t0:.0f}s')
-        stop = (it >= window and hist[-1] > (1 - min_gain) * hist[-1 - window]) or it >= max_iters or not math.isfinite(hist[-1])
+        stop = (it >= window and hist[-1] > (1 - descent_gain) * hist[-1 - window]) or it >= max_iters or not math.isfinite(hist[-1])
         if stop:
             break
         torch.nn.utils.clip_grad_norm_(params, 1.0)
@@ -345,7 +349,7 @@ def fit_varpro(model, data, dt, params, max_iters=2000, lr=1e-2, window=100, min
     out = dict(linear_fit=info, iters=it, residual_start=start, residual_end=best if kept else start, kept=bool(kept),
                residual_best=best, gain=1 - best / start, min_gain=min_gain,
                time_s=time.time() - t0, gate_line_search=ls,
-               curve=hist[::10], rule=f'stop when the projected residual improves by < {min_gain:g} over {window} iterations '
+               curve=hist[::10], rule=f'stop when the projected residual improves by < {descent_gain:g} over {window} iterations '
                                       f'(max {max_iters}); Adam lr {lr:g}, clip 1')
     log(f'varpro: {it} iterations, projected derivative residual {start:.4e}, best {best:.4e}, gain {out["gain"]:.3g} '
         f'against {min_gain:g}: state function {"kept" if kept else "dropped"}, {out["time_s"]:.0f}s')

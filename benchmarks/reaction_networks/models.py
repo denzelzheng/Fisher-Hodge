@@ -4,8 +4,7 @@ Neural Chart.  mu = log c + mu0 (+ ln gamma_theta(c) on the non-ideal Schloegl m
 log k is one value per hyperedge type (omega_c), and the chemostats also enter k through their mass-action factor.  The
 standard potentials mu0 of the species and the chemostats are learned together with k: they enter log a and log b
 linearly, so the closed-form step fits them with omega.  The variant chart-given-mu0 takes them from the reference model
-instead (the information an oracle would have) and learns k only.  Schloegl models use the activity form of the rates (mass action in the activity),
-the phosphorylation cycle and the MAPK cascade the split form.
+instead (the information an oracle would have) and learns k only.
 
 Baselines (inputs: the hyperedge type and the z-scored conditions; the phosphorylation cycle adds the potential):
   crnn_mass_action  CRNN with the chemostats as exact mass-action factors and a log rate table per hyperedge type
@@ -88,7 +87,7 @@ def pc_featurizer(hg):
 
 def _base(hg, cls, activity='ideal', **kw):
     with default_dtype(torch.float64):
-        m = cls.from_parts(hg, k_ref=1.0, T_exponent=0.0, harmonic=False, step=dict(C.STEP), learn_mu0=True,
+        m = cls.from_parts(hg, k_ref=1.0, harmonic=False, step=dict(C.STEP), learn_mu0=True,
                            learn_chem_mu0=True, kinetics_table=True, activity_correction=activity == 'learned',
                            activity_anchor=True, **kw)
     m = m.double()
@@ -99,12 +98,12 @@ def _base(hg, cls, activity='ideal', **kw):
 def base_model(n, activity, cls=None):
     """the Schloegl class: activity-form rates, optional learned activity correction (zero gate at the start)"""
     hg = TR.hg_of(n)
-    return _base(hg, cls or chart.NeuralChart, activity, featurizer=chem_featurizer(hg), kinetics_split=False)
+    return _base(hg, cls or chart.NeuralChart, activity, featurizer=chem_featurizer(hg))
 
 
 def base_model_pc(n, activity='ideal', cls=None):
     hg = TR.hg_of(n)
-    return _base(hg, cls or chart.NeuralChart, activity, featurizer=pc_featurizer(hg), kinetics_split=True)
+    return _base(hg, cls or chart.NeuralChart, activity, featurizer=pc_featurizer(hg))
 
 
 def base_model_mapk(n, activity='ideal', cls=None):

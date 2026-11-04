@@ -6,8 +6,8 @@ import json
 from ..common import RESULTS, LABELS, OWN_FLUX, activity_table, fmt, write_table
 from . import config as C
 
-MAIN = ['chart', 'chart-given-mu0', 'oracle', 'crnn_mass_action', 'crnn_features', 'ude', 'flux_gnn', 'fno', 'bsms', 'generic_fno', 'persistence']
-ABLATIONS = ['chart', 'chart-given-mu0', 'chart-ideal', 'chart-no-varpro', 'chart-zero-init', 'chart-reversible', 'oracle']
+MAIN = ['chart', 'chart-given-mu0', 'flux_gnn', 'crnn_mass_action', 'crnn_features', 'ude', 'fno', 'bsms', 'generic_fno', 'persistence']
+ABLATIONS = ['chart', 'chart-given-mu0', 'chart-ideal', 'chart-no-varpro', 'chart-zero-init', 'chart-reversible', 'flux_gnn']
 
 
 def _cols():

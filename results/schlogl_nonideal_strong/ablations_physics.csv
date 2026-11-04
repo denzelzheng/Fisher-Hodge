@@ -1,22 +1,22 @@
 Method,quantity,training conditions,"a 4.6–5.0, b 2.0–3.5",16×16 grid
-Neural Chart,hyperedges violating local detailed balance,1.894692965005021e-05,6.313662766226113e-05,9.534251799590028e-06
+Neural Chart,hyperedges violating local detailed balance,1.839215758400618e-05,6.132962629814375e-05,9.176921876864063e-06
 Neural Chart,samples with σ < 0,0.0,0.0,0.0
 Neural Chart,negative values,0.0,0.0,0.0
-"Neural Chart, given standard potentials (oracle-type information)",hyperedges violating local detailed balance,1.8560795886927633e-05,2.125127507650459e-05,0.0
+"Neural Chart, given standard potentials (oracle-type information)",hyperedges violating local detailed balance,1.9361459079556237e-05,2.0384866275277233e-05,0.0
 "Neural Chart, given standard potentials (oracle-type information)",samples with σ < 0,0.0,0.0,0.0
 "Neural Chart, given standard potentials (oracle-type information)",negative values,0.0,0.0,0.0
-"Neural Chart, ideal activities",hyperedges violating local detailed balance,0.0007614361857904294,0.033086253369272234,0.0005469333505842777
-"Neural Chart, ideal activities",samples with σ < 0,0.0,0.008928571428571428,0.0
+"Neural Chart, ideal activities",hyperedges violating local detailed balance,0.0007642675524331633,0.038131803107239674,0.005213382196477125
+"Neural Chart, ideal activities",samples with σ < 0,0.0,0.017857142857142856,0.005952380952380952
 "Neural Chart, ideal activities",negative values,0.0,0.0,0.0
-"Neural Chart, ideal-fit initialisation",hyperedges violating local detailed balance,0.026731728015275274,0.4113861328421028,0.07195698048055249
-"Neural Chart, ideal-fit initialisation",samples with σ < 0,0.0,0.15178571428571427,0.017857142857142856
+"Neural Chart, ideal-fit initialisation",hyperedges violating local detailed balance,0.02246438301103122,0.2863185615903609,0.036237982906388175
+"Neural Chart, ideal-fit initialisation",samples with σ < 0,0.0,0.0625,0.005952380952380952
 "Neural Chart, ideal-fit initialisation",negative values,0.0,0.0,0.0
-"Neural Chart, no convex initialisation",hyperedges violating local detailed balance,0.004427632394890239,0.24798439226194674,0.03136017923471494
-"Neural Chart, no convex initialisation",samples with σ < 0,0.0,0.08035714285714286,0.0
+"Neural Chart, no convex initialisation",hyperedges violating local detailed balance,0.0028456767603064577,0.19311891247985424,0.01954045047717082
+"Neural Chart, no convex initialisation",samples with σ < 0,0.0,0.07142857142857142,0.0
 "Neural Chart, no convex initialisation",negative values,0.0,0.0,0.0
-"Neural Chart, reversible (no drive)",hyperedges violating local detailed balance,0.0006376108105884531,0.0,7.750796394329517e-06
+"Neural Chart, reversible (no drive)",hyperedges violating local detailed balance,0.0006298764629388817,0.0,7.751096780194397e-06
 "Neural Chart, reversible (no drive)",samples with σ < 0,0.0,0.0,0.0
 "Neural Chart, reversible (no drive)",negative values,0.0,0.0,0.0
-Oracle (true rates in the Neural Chart class),hyperedges violating local detailed balance,0.0,0.0,0.0
-Oracle (true rates in the Neural Chart class),samples with σ < 0,0.0,0.0,0.0
-Oracle (true rates in the Neural Chart class),negative values,0.0,0.0,0.0
+No chart (Flux-GNN),hyperedges violating local detailed balance,0.5440615699404762,0.49888392857142855,0.4904145740327381
+No chart (Flux-GNN),samples with σ < 0,0.9553571428571429,1.0,0.8511904761904762
+No chart (Flux-GNN),negative values,0.0,0.0,0.0

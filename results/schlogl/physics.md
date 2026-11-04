@@ -6,9 +6,9 @@
 | Neural Chart, given standard potentials (oracle-type information) | hyperedges violating local detailed balance | 0 | 0 | 0 | 0 |
 | Neural Chart, given standard potentials (oracle-type information) | samples with σ < 0 | 0 | 0 | 0 | 0 |
 | Neural Chart, given standard potentials (oracle-type information) | negative values | 0 | 0 | 0 | 0 |
-| Oracle (true rates in the Neural Chart class) | hyperedges violating local detailed balance | 0 | 0 | 0 | 0 |
-| Oracle (true rates in the Neural Chart class) | samples with σ < 0 | 0 | 0 | 0 | 0 |
-| Oracle (true rates in the Neural Chart class) | negative values | 0 | 0 | 0 | 0 |
+| No chart (Flux-GNN) | hyperedges violating local detailed balance | 0.241 | 0.202 | 0.113 | 0.205 |
+| No chart (Flux-GNN) | samples with σ < 0 | 0.235 | 0 | 0.081 | 0.190 |
+| No chart (Flux-GNN) | negative values | 0 | 0 | 0 | 0 |
 | CRNN (mass action) | hyperedges violating local detailed balance | 0 | 0 | 0 | 0 |
 | CRNN (mass action) | samples with σ < 0 | 0 | 0 | 0 | 0 |
 | CRNN (mass action) | negative values | 0 | 0 | 0 | 0 |
@@ -18,9 +18,6 @@
 | UDE closure | hyperedges violating local detailed balance | 0.143 | 0.456 | 0.062 | 0.118 |
 | UDE closure | samples with σ < 0 | 0.259 | 0.835 | 0.081 | 0.214 |
 | UDE closure | negative values | 0 | 0.043 | 0 | 0 |
-| Flux-GNN | hyperedges violating local detailed balance | 0.241 | 0.202 | 0.113 | 0.205 |
-| Flux-GNN | samples with σ < 0 | 0.235 | 0 | 0.081 | 0.190 |
-| Flux-GNN | negative values | 0 | 0 | 0 | 0 |
 | FNO | hyperedges violating local detailed balance | N/A | N/A | N/A | N/A |
 | FNO | samples with σ < 0 | N/A | N/A | N/A | N/A |
 | FNO | negative values | 0 | 0 | 0 | 7.2e-03 |
