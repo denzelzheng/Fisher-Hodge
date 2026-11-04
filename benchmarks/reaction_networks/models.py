@@ -1,8 +1,7 @@
 """Models of the reaction-network benchmarks: the Neural Chart of each network and the baselines.
 
-Neural Chart.  mu = log c + mu0 (+ ln gamma_theta(c) on the non-ideal Schloegl model), the drive is the chemostat force,
-log k is one value per hyperedge type (omega_c), and the chemostats also enter k through their mass-action factor.  The
-standard potentials mu0 of the species and the chemostats are learned together with k: they enter log a and log b
+Neural Chart (neuralchart.model).  The drive is the chemostat force, and the chemostats also enter k through their
+mass-action factor.  The standard potentials mu0 of the species and the chemostats are learned together with k: they enter log a and log b
 linearly, so the closed-form step fits them with omega.  The variant chart-given-mu0 takes them from the reference model
 instead (the information an oracle would have) and learns k only.
 
@@ -95,35 +94,25 @@ def pc_featurizer(hg, descriptors=False):
 
 class TrueMediumMobility(Mobility):
     """the oracle on heterogeneous media: the class constants times the true factor of the medium"""
-    def forward(s, feats, hg=None, c=None):
-        return super().forward(feats, hg, c) * torch.exp(feats['raw']['logm'].to(feats['edge_sym'].dtype))
+    def base(s, feats):
+        return super().base(feats) * torch.exp(feats['raw']['logm'].to(feats['edge_sym'].dtype))
 
 
-def _base(hg, cls, activity='ideal', **kw):
+def _base(hg, cls, excess, material, featurizer):
     with default_dtype(torch.float64):
-        m = cls.from_parts(hg, k_ref=1.0, harmonic=False, step=dict(C.STEP), learn_mu0=True,
-                           learn_chem_mu0=True, kinetics_table=True, activity_correction=activity == 'learned',
-                           activity_anchor=True, **kw)
+        m = cls.from_parts(hg, harmonic=False, step=dict(C.STEP), learn_mu0=True, learn_chem_mu0=True, featurizer=featurizer,
+                           excess=excess == 'learned', material=material)
     m = m.double()
     m.step = dict(C.STEP)
     return m
 
 
-def base_model(n, activity, cls=None):
-    """the Schloegl class: activity-form rates, optional learned activity correction (zero gate at the start)"""
+def base_model(n, excess='none', material=False):
+    """the Neural Chart on the n x n grid of the benchmark; the inputs (featurizer) are all that differs"""
     hg = TR.hg_of(n)
-    return _base(hg, cls or chart.NeuralChart, activity, featurizer=chem_featurizer(hg))
-
-
-def base_model_pc(n, activity='ideal', cls=None, descriptors=False):
-    hg = TR.hg_of(n)
-    return _base(hg, cls or chart.NeuralChart, activity, featurizer=pc_featurizer(hg, descriptors),
-                 kinetics_descriptors=descriptors)
-
-
-def base_model_mapk(n, activity='ideal', cls=None):
-    hg = TR.hg_of(n)
-    return _base(hg, cls or chart.NeuralChart, activity, hidden=32, featurizer=TR.mapk_featurizer(hg, False))
+    feat = (TR.mapk_featurizer(hg, False) if C.SYSTEM == 'mapk_cascade' else pc_featurizer(hg, C.hetero()) if C.is_pc()
+            else chem_featurizer(hg))
+    return _base(hg, chart.NeuralChart, excess, material, feat)
 
 
 def _pc_ref_state(hg):
@@ -171,27 +160,18 @@ _TRUE_LOGK = {}
 def true_log_k():
     """log k per hyperedge type of the reference model, in the gauge of the given standard potentials"""
     if C.SYSTEM not in _TRUE_LOGK:
-        m = set_true(base_model_mapk(4) if C.SYSTEM == 'mapk_cascade' else base_model_pc(4) if C.is_pc()
-                     else base_model(4, 'ideal'))
+        m = set_true(base_model(4))
         _TRUE_LOGK[C.SYSTEM] = m.kinetics.core.detach().cpu().tolist()
     return _TRUE_LOGK[C.SYSTEM]
 
 
 def build_chart(cfg, n=None, norm=None):
-    """the Neural Chart of a ChartConfig: log k = log omega over the hyperedge types; mu0 learned (with omega) or given
-    (the reference values, frozen); activity ideal, learned (ln gamma_theta with a zero gate) or true (oracle)"""
+    """the Neural Chart of a ChartConfig; mu0 learned (with omega) or given (the reference values, frozen)"""
     n = C.N_TRAIN if n is None else n
-    assert cfg.task in chart.REACTION_TASKS and cfg.kappa in ('learned', 'true') and not cfg.state
-    assert not cfg.descriptors or cfg.task == 'phosphorylation_heterogeneous', 'this benchmark has no descriptors'
+    assert cfg.task in chart.REACTION_TASKS and cfg.kappa in ('learned', 'constant', 'true')
     if cfg.task != C.SYSTEM:
         C.configure(cfg.task)
-    activity = 'learned' if cfg.activity == 'learned' else 'ideal'
-    if cfg.task == 'mapk_cascade':
-        m = base_model_mapk(n, activity)
-    elif cfg.task in ('phosphorylation_cycle', 'phosphorylation_heterogeneous'):
-        m = base_model_pc(n, activity, descriptors=cfg.descriptors)
-    else:
-        m = base_model(n, activity)
+    m = base_model(n, 'learned' if cfg.excess == 'learned' else 'none', cfg.kappa == 'learned')
     if cfg.kappa == 'true' or cfg.mu0 == 'given':
         set_true(m)
     if cfg.kappa != 'true' and cfg.mu0 == 'given':
@@ -199,7 +179,7 @@ def build_chart(cfg, n=None, norm=None):
             m.kinetics.core.zero_()
         m.free_energy.mu0.requires_grad_(False); m.drive.chem_mu0.requires_grad_(False)
         m.linear_parameters = lambda: [m.kinetics.core]
-    if cfg.activity == 'true':
+    if cfg.excess == 'true':
         m.free_energy.__class__ = TrueActivity
     if cfg.kappa == 'true' and C.hetero():
         m.kinetics.__class__ = TrueMediumMobility

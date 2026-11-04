@@ -3,11 +3,11 @@ import os
 
 import json
 
-from ..common import RESULTS, LABELS, OWN_FLUX, activity_table, fmt, write_table
+from ..common import RESULTS, LABELS, OWN_FLUX, excess_table, fmt, write_table
 from . import config as C
 
 MAIN = ['chart', 'chart-given-mu0', 'flux_gnn', 'crnn_mass_action', 'crnn_features', 'ude', 'fno', 'bsms', 'generic_fno', 'persistence']
-ABLATIONS = ['chart', 'chart-given-mu0', 'chart-const-k', 'chart-ideal', 'chart-no-varpro', 'chart-zero-init', 'chart-reversible', 'flux_gnn']
+ABLATIONS = ['chart', 'chart-given-mu0', 'chart-const-k', 'chart-no-excess', 'chart-zero-init', 'chart-reversible', 'flux_gnn']
 
 
 def _cols():
@@ -138,7 +138,7 @@ def make_tables(runs=None):
     main_table(R, ABLATIONS, os.path.join(out, 'ablations'))
     physics_table(R, ABLATIONS, os.path.join(out, 'ablations_physics'))
     readout_table(R, MAIN[:-1] + ABLATIONS[2:-1], os.path.join(out, 'thermodynamic_readouts'))
-    activity_table(R, MAIN[:2] + ABLATIONS[2:-1], os.path.join(out, 'activity'))
+    excess_table(R, MAIN[:2] + ABLATIONS[2:-1], os.path.join(out, 'excess'))
     if C.nonideal():
         lngamma_table(R, os.path.join(out, 'activity_coefficient'))
         lngamma_curve_table(R, os.path.join(out, 'activity_coefficient_curve'))

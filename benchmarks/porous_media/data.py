@@ -510,6 +510,8 @@ class Disc:
             from neuralchart.graphs import Hypergraph
             s._hg = Hypergraph.from_graph(s.g['edges'].cpu().numpy(), s.V, cycle_basis=np.zeros((s.H, 0)))
             s._hg._L = np.full((s.V, 1), 1.0 / math.sqrt(s.V))
+            s._hg.meta['edge_weight'] = s.g['w'].cpu().numpy()
+            s._hg.meta['site_volume'] = torch.exp(s.g['logV']).cpu().numpy()
         return s._hg
 
 

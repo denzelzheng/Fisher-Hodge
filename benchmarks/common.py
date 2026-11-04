@@ -13,14 +13,11 @@ CHECKPOINTS = os.path.join(ROOT, 'checkpoints')
 # model key -> label in tables and figures
 LABELS = {
     'chart': 'Neural Chart',
-    'chart-no-state': 'Neural Chart, no state input',
-    'chart-const-k': 'Neural Chart, constant mobility',
+    'chart-const-k': 'Neural Chart, constant mobility per class',
     'chart-given-mu0': 'Neural Chart, given standard potentials (oracle-type information)',
     'chart-zero-init': 'Neural Chart, no convex initialisation',
     'chart-reversible': 'Neural Chart, reversible (no drive)',
-    'chart-learned-drive': 'Neural Chart, learned drive scale',
-    'chart-ideal': 'Neural Chart, ideal activities',
-    'chart-no-varpro': 'Neural Chart, ideal-fit initialisation',
+    'chart-no-excess': 'Neural Chart, no excess free energy',
     'oracle': 'Oracle (true rates in the Neural Chart class)',
     'oracle-no-crowding': 'Oracle without crowding',
     'ude': 'UDE closure',
@@ -34,8 +31,7 @@ LABELS = {
     'persistence': 'Persistence (u(t) = u(0))',
 }
 # models with their own edge (hyperedge) flux: the local-detailed-balance and entropy columns apply to them
-OWN_FLUX = ('chart', 'chart-no-state', 'chart-const-k', 'chart-given-mu0', 'chart-zero-init', 'chart-reversible',
-            'chart-learned-drive', 'chart-ideal', 'chart-no-varpro', 'oracle', 'oracle-no-crowding', 'ude', 'flux_gnn',
+OWN_FLUX = ('chart', 'chart-const-k', 'chart-given-mu0', 'chart-zero-init', 'chart-reversible', 'chart-no-excess', 'oracle', 'oracle-no-crowding', 'ude', 'flux_gnn',
             'crnn_mass_action', 'crnn_features')
 
 
@@ -99,17 +95,15 @@ def write_table(path_stem, header, rows):
     return '\n'.join(md)
 
 
-def activity_table(runs, models, stem):
-    """the learned activity correction of every Neural Chart variant: the gate s_mu and the largest |ln gamma| over the
-    densities of the training data, the largest values over the species"""
+def excess_table(runs, models, stem):
+    """the size of the learned functions of every Neural Chart variant over the states of the training data"""
     rows = []
     for m in models:
         r = runs.get(m) or {}
-        a = r.get('activity') or (r.get('extra') or {}).get('activity')
+        a = r.get('summary') or (r.get('extra') or {}).get('summary')
         if a:
-            s = a['s_mu']
-            rows.append([LABELS[m], min(s), max(s), a['max_abs_lngamma_all']])
-    return write_table(stem, ['Method', 'smallest s_μ', 'largest s_μ', 'largest |ln γ|, training range'], rows)
+            rows.append([LABELS[m], a['max_abs_grad_G'], a['max_abs_g'], f'{a["params_G"]:,}', f'{a["params_g"]:,}'])
+    return write_table(stem, ['Method', 'largest |∇G|, training states', 'largest |g_θ|, training states', 'parameters of G_θ', 'parameters of g_θ'], rows)
 
 
 def load_runs(benchmark):

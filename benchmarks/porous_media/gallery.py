@@ -394,7 +394,7 @@ def make_gallery(device='cuda', data_dir=None, weights=None, variants=('porous_m
 def medium_and_law(path=None, data_dir=None, j=0):
     """the pore map, the true mobility and the learned mobility of the Neural Chart on an unseen medium, on the 32 x 32
     grid and on the point cloud (no retraining).  Cell values are geometric means over the edges of a cell; the
-    learned mobility is taken at the edge-mean density rhobar = 1."""
+    learned mobility omega exp(g) / D is taken at the uniform density 1."""
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
@@ -416,7 +416,8 @@ def medium_and_law(path=None, data_dir=None, j=0):
         sd = data[key]; disc = data['discs'][sd['disc']]
         m = base if sd['disc'] == 'g32' else rebind('chart', base, meta, disc, 'cpu')
         feats = m.featurizer({k: v[j:j + 1] for k, v in sd['drive'].items()})
-        kap = m.kinetics.kappa(feats)[0].double() + m.kinetics.state_branch(torch.zeros(1, 1)).double()[0, 0]
+        c1 = torch.exp(disc.g['logV'].double())[None]                  # the state of uniform density 1
+        kap = m.kinetics.core.double()[m.kinetics.typ] - math.log(D) + m.kinetics.state_term(feats['edge_sym'].double(), c1)[0]
         mt = sd['drive']['mtrue'][j].double()
         E = disc.g['edges']
         def per_cell(logk):

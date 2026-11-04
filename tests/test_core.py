@@ -28,18 +28,14 @@ def network(n=3):
     return Hypergraph.reaction_transport(['X', 'A', 'B'], RX, grid_n=n, diffusing=['X'], chemostats=['A', 'B'])
 
 
-def model(hg, activity=False, seed=0):
+def model(hg, excess=False, seed=0):
     torch.manual_seed(seed)
-    m = MasterEquation.from_parts(hg, k_ref=1.0, T_exponent=0.0, harmonic=False, kinetics_table=True,
-                                  activity_correction=activity, activity_anchor=activity)
+    m = MasterEquation.from_parts(hg, harmonic=False, excess=excess, material=excess)
     with torch.no_grad():
         m.kinetics.core.copy_(0.5 * torch.randn_like(m.kinetics.core))
-        if activity:
-            m.free_energy.s_mu.fill_(0.7)
-            m.free_energy.r_alpha.normal_()
-            m.free_energy.r_beta.normal_()
-            m.free_energy.ramp_alpha.normal_()
-            m.free_energy.ramp_beta.normal_()
+        if excess:
+            m.free_energy.l3.weight.normal_(0, 0.1)
+            m.kinetics.net.net[-1].weight.normal_(0, 0.1)
     return m
 
 
@@ -67,21 +63,22 @@ def test_hypergraph_algebra():
 def test_rate_form():
     """a, b = k eps exp(+- f / 2), eps = exp(<nu+ + nu-, y> / 2): with ln gamma = 0 the reactants enter as mass action in c"""
     hg = network()
-    m = model(hg, activity=True)
+    m = model(hg, excess=True)
     c, dr = state(hg, 4), drive(4)
     ctx = m.prepare(dr)
     a, b = m.rates(c, ctx)
     y = torch.log(c) + m.free_energy.correction(c, ctx)
     f = hg.dot(y + ctx['Ufull'], '+') - hg.dot(y + ctx['Ufull'], '-') + ctx['A']
     eps = torch.exp(0.5 * (hg.dot(y, '+') + hg.dot(y, '-')))
-    assert torch.allclose(a, ctx['k'] * eps * torch.exp(0.5 * f), rtol=1e-4)
-    assert torch.allclose(b, ctx['k'] * eps * torch.exp(-0.5 * f), rtol=1e-4)
+    k = m.kinetics(ctx['feats'], c)
+    assert torch.allclose(a, k * eps * torch.exp(0.5 * f), rtol=1e-4)
+    assert torch.allclose(b, k * eps * torch.exp(-0.5 * f), rtol=1e-4)
 
 
-@pytest.mark.parametrize('activity', [False, True])
-def test_local_detailed_balance_and_entropy(activity):
+@pytest.mark.parametrize('excess', [False, True])
+def test_local_detailed_balance_and_entropy(excess):
     hg = network()
-    m = model(hg, activity)
+    m = model(hg, excess)
     c, dr = state(hg, 5), drive(5)
     ctx = m.prepare(dr)
     a, b = m.rates(c, ctx)
@@ -94,7 +91,7 @@ def test_local_detailed_balance_and_entropy(activity):
 
 def test_conservation_and_positivity():
     hg = Hypergraph.from_graph(np.array([[0, 1], [1, 2], [2, 0], [0, 2]]), 3)
-    m = MasterEquation.from_parts(hg, harmonic=False, kinetics_table=True)
+    m = MasterEquation.from_parts(hg, harmonic=False, excess=False, material=False)
     dr = dict(U=torch.randn(2, 3), line=3.0 * torch.randn(2, hg.H))
     c = torch.tensor([[1.0, 1e-3, 0.5], [0.2, 0.3, 2.0]])
     c1, _ = positive_ssp_rk2(m, c, m.prepare(dr), 0.5)
@@ -102,20 +99,21 @@ def test_conservation_and_positivity():
     assert torch.allclose(c1.sum(-1), c.sum(-1), rtol=1e-12)
 
 
-def test_activity_correction_is_monotone():
+def test_excess_starts_at_zero_and_grows_without_bound():
     hg = network()
-    m = model(hg, activity=True)
-    x = torch.linspace(1e-3, 5.0, 200)[:, None].expand(200, hg.M).contiguous()
-    g = m.free_energy.correction(x, None)[:, 0]
-    assert (g[1:] - g[:-1] >= -1e-12).all()
-    with torch.no_grad():
-        assert abs(float(m.free_energy.correction(torch.zeros(1, hg.M), None)[0, 0])) < 1e-12
+    m = MasterEquation.from_parts(hg, harmonic=False)
+    c = state(hg, 2)
+    assert float(m.free_energy.correction(c, None).abs().max()) == 0
+    fe = model(hg, excess=True).free_energy
+    x = torch.tensor([[1e1], [1e2], [1e3]]).expand(3, fe.NS).contiguous()[:, None]
+    g = fe.excess_potential(x).abs().amax(-1)[:, 0]
+    assert float(g[2]) > 5 * float(g[1]) > 25 * float(g[0]) > 0     # linear tails of the excess potential
 
 
-def test_activity_free_energy_is_the_integral_of_mu():
-    """d F / d c = mu: the closed-form value of the activity correction is the integral of ln gamma"""
+def test_free_energy_is_the_integral_of_mu():
+    """d F / d c = mu: the value of the excess free energy and its written-out gradient agree"""
     hg = network()
-    m = model(hg, activity=True).double()
+    m = model(hg, excess=True).double()
     dr = drive(3)
     ctx = m.prepare({k: v.double() for k, v in dr.items()})
     c = state(hg, 3).double().requires_grad_(True)
@@ -166,7 +164,5 @@ def test_every_ablation_is_one_override():
             diff = {k for k, v in dataclasses.asdict(cfg).items() if v != base[k]}
             if name.startswith('oracle'):
                 assert 'train' in diff
-            elif name == 'chart-const-k':                 # no material network, hence no state term either
-                assert 'descriptors' in diff and diff <= {'descriptors', 'state'}
             elif name != 'chart':
                 assert len(diff) == 1, (task, name, diff)

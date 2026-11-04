@@ -1,6 +1,6 @@
 """Models of the porous-media benchmark: the Neural Chart and the baselines on any discretisation.
 
-Neural Chart       EdgeMobility inside neuralchart.MasterEquation; the force (U / T, the drive) is fixed by physics
+Neural Chart       neuralchart.MasterEquation with the mesh geometry and the 12 local descriptors as inputs
 UDE closure        the same edges and descriptors with a free antisymmetric edge flux
 Flux-GNN           neuralchart.baselines.FluxGNN with the black-box inputs below
 FNO                residual next-step map on n x n grids
@@ -17,7 +17,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as Fn
 
-from neuralchart.model import MasterEquation, FreeEnergy, Drive, MLP, Context
+from neuralchart.model import Mobility, MLP, Context
 from neuralchart.baselines import FluxGNN
 from neuralchart.baselines.bsms_gnn import MeshGraphNets, BSMSGNN, bistride_hierarchy, hierarchy_tensors
 from .data import D, DT, N, KREF, line_integrals, edge_inputs
@@ -26,126 +26,56 @@ STEP = dict(dt_max=DT / 8, theta0=0.9, theta1=1.0, max_sub=20000, t_tol=1e-9)
 
 
 # ------------------------------------------------------------------------------------------ the Neural Chart
-class EdgeMobility(nn.Module):
-    """the mobility of the Neural Chart on porous media: k_e = D T w_e exp(kappa_e), w_e the geometric weight.
-    mode 'material_state': kappa = log omega + g(xi_e) + s m(log rhobar_e) (the Neural Chart);
-         'material':       kappa = log omega + g(xi_e) (no state input);
-         'constant':       kappa = log omega (constant mobility);
-         'true':           kappa = log of the true edge mobility (feats['mtrue']);
-         'true_crowding':  the true edge mobility times the true crowding factor 1 / (1 + rhobar_e / rho_s).
-    log omega is the parameter `core`; g is an MLP of the 12 edge descriptors (pointwise, no message passing) whose last
-    layer starts at zero; s m is the state term (s starts at zero)."""
-    rho_dependent = False
-    chem_prefactor = False
+class TrueMobility(Mobility):
+    """the oracles: k = D T w_e M_e, the true edge mobility; crowding: times the true crowding factor 1 / (1 + rhobar_e / rho_s)"""
+    def __init__(s, n_edge_feats, hg, rho_s=None):
+        super().__init__(n_edge_feats, hg, material=False)
+        s.rho_s = rho_s
 
-    def __init__(s, mode='material_state', hidden=64, rho_s=None):
-        super().__init__()
-        s.mode = mode
-        s.core = nn.Parameter(torch.zeros(()))
-        if mode == 'true_crowding':
-            # the true crowding factor on top of the true material mobility, as a fixed (parameter-free) state
-            # term: log k += -log(1 + rhobar_e / rho_s), symmetric in the two cells (local detailed balance exact)
-            s.rho_dependent = True
-            s.rho_s = float(rho_s)
-        if mode in ('material', 'material_state'):
-            s.net = MLP(12, hidden, 1, last='zero')
-        if mode == 'material_state':
-            # state branch: kappa += s_rho * m(log rhobar_e), m a monotone (non-decreasing) MLP with positive weights, s_rho a
-            # learned scale that starts at zero (the model starts exactly at the material-only law); symmetric in the two
-            # endpoints, so local detailed balance and sigma >= 0 stay exact
-            s.rho_dependent = True
-            s.m_w = nn.ParameterList([nn.Parameter(0.5 * torch.randn(1, 16)), nn.Parameter(0.5 * torch.randn(16, 16) / 4), nn.Parameter(0.5 * torch.randn(16, 1) / 4)])
-            s.m_b = nn.ParameterList([nn.Parameter(torch.zeros(16)), nn.Parameter(torch.zeros(16)), nn.Parameter(torch.zeros(1))])
-            s.m_a = nn.Parameter(torch.zeros(()))         # linear part: softplus(m_a) * u, non-negative slope
-            s.s_rho = nn.Parameter(torch.zeros(()))
+    @property
+    def rho_dependent(s):
+        return s.rho_s is not None
 
-    RHO_FLOOR = 1e-3
+    def base(s, feats):
+        dt = feats['edge_sym'].dtype
+        return D * s.w.to(dt)[None] * feats['T'].to(dt)[:, None] * feats['mtrue'].to(dt)
 
-    def state_branch(s, logr):
-        """s * (m(u) - m(u_floor)), u = log rhobar; m(u) = softplus(a) u' + m_mono(u'), u' = u / 3, with m_mono a
-        positive-weight MLP with softplus activations: non-decreasing, and linear (not saturated) in both tails"""
-        def m(z):
-            u = z / 3.0
-            h = u[..., None]
-            for i, (w, b) in enumerate(zip(s.m_w, s.m_b)):
-                h = h @ Fn.softplus(w).to(h.dtype) + b.to(h.dtype)
-                if i < 2:
-                    h = Fn.softplus(h)
-            return Fn.softplus(s.m_a).to(u.dtype) * u + h[..., 0]
-        if s.mode == 'true_crowding':
-            return -torch.log1p(torch.exp(logr) / s.rho_s)
-        return s.s_rho.to(logr.dtype) * (m(logr) - m(torch.full_like(logr[..., :1], math.log(s.RHO_FLOOR))))
-
-    def rhobar_log(s, feats, c):
-        rho = c * feats['invV'][None]
-        if s.mode == 'true_crowding':                      # exactly the truth's rhobar (no floor)
-            return torch.log(0.5 * (rho[:, feats['tail']] + rho[:, feats['head']]))
-        return torch.log(torch.clamp(0.5 * (rho[:, feats['tail']] + rho[:, feats['head']]), min=s.RHO_FLOOR))
-
-    def kappa(s, feats):
-        x = feats['ein']
-        if s.mode in ('true', 'true_crowding'):
-            return torch.log(feats['mtrue'])
-        k = s.core.to(x.dtype).expand(x.shape[0], x.shape[1])
-        if s.mode in ('material', 'material_state'):
-            k = k + s.net(x).squeeze(-1)
-        return k
-
-    def forward(s, feats, hg=None, c=None):
-        if s.mode in ('material_state', 'true_crowding'):
-            if 'kap_mat' not in feats:                   # the material part once per context, the state part per call
-                feats['kap_mat'] = s.kappa(feats)
-            kap = feats['kap_mat']
-        else:
-            kap = s.kappa(feats)
-        if s.mode in ('material_state', 'true_crowding') and c is not None:
-            kap = kap + _ckpt(lambda c_: s.state_branch(s.rhobar_log(feats, c_)), c)     # checkpointed: memory only
-        return D * feats['w'][None] * feats['T'][:, None] * torch.exp(kap)
+    def state_term(s, x, c):
+        return -torch.log1p(torch.exp(s.log_cbar(c)[..., 0]) / s.rho_s)
 
 
 def chart_featurizer(disc):
-    """the inputs of the Neural Chart on a discretisation: potential U / T - log(V_i / Vbar), the drive line integrals,
-    the edge descriptors and the geometric weights"""
-    w, logV, E = disc.g['w'], disc.g['logV'], disc.g['edges']
+    """the inputs of the Neural Chart on a discretisation: potential U / T - log(V_i / Vbar), the drive line integrals and the
+    hyperedge features: the class one-hot (one class) and the 12 local descriptors"""
+    logV, E = disc.g['logV'], disc.g['edges']
 
     def feat(F):
         U = F['U']; B = U.shape[0]
         T = F['T'].to(U.dtype)
+        x = torch.cat([torch.ones(B, disc.H, 1, dtype=U.dtype, device=U.device), F['ein'].to(U.dtype)], -1)
         f = dict(U=U - T[:, None] * logV.to(U.device, U.dtype)[None], T=T, line=F['amp'][:, None] * F['line'], chem_logc=None, chem_mu0=None,
-                 edge_sym=torch.zeros(B, disc.H, 1, dtype=U.dtype, device=U.device), edge_ori=torch.zeros(B, disc.H, dtype=U.dtype, device=U.device),
-                 node={}, ein=F['ein'], pmed=F['pmed'], w=w.to(U.device, U.dtype), raw=F,
-                 tail=E[:, 0].to(U.device), head=E[:, 1].to(U.device), invV=torch.exp(-logV).to(U.device, U.dtype))
+                 edge_sym=x, edge_ori=torch.zeros(B, disc.H, dtype=U.dtype, device=U.device),
+                 node={}, ein=F['ein'], pmed=F['pmed'], raw=F, tail=E[:, 0].to(U.device), head=E[:, 1].to(U.device),
+                 invV=torch.exp(-logV).to(U.device, U.dtype))
         if 'mtrue' in F:
             f['mtrue'] = F['mtrue']
         return f
-    feat.n_edge_sym = 1
+    feat.n_edge_sym = 13
     return feat
 
 
-def build_master(mode, disc, cls=None, activity=False, **kin_kw):
-    """the master equation on a discretisation with an EdgeMobility of the given mode; activity: the learned activity
-    correction, a function of the density c / V of the cells"""
-    hg = disc.hg()
-    fe = FreeEnergy(hg, residual=activity, residual_anchor=activity,
-                    site_volume=torch.exp(disc.g['logV']).to(torch.get_default_dtype()) if activity else None)
-    return (cls or MasterEquation)(hg, fe, EdgeMobility(mode, **kin_kw), Drive(hg, harmonic=False),
-                                   chart_featurizer(disc), step=dict(STEP))
-
-
 def build_chart(cfg, meta=None, disc=None):
-    """the Neural Chart of a ChartConfig on porous media: k = D T w_e omega exp(g(xi_e) + s m(log rhobar_e)) with one
-    hyperedge class (transport).  With crowding in the data, the oracle uses the true crowding factor as well."""
+    """the Neural Chart of a ChartConfig on porous media.  With crowding in the data, the oracle uses the true crowding factor."""
     from neuralchart.chart import NeuralChart
     assert cfg.task == 'porous_media'
-    if cfg.kappa == 'learned':
-        mode = 'material_state' if cfg.state else 'material' if cfg.descriptors else 'constant'
-    else:
-        crowd = bool(meta is not None and meta.get('crowd'))
-        mode = dict(true='true_crowding' if crowd else 'true', true_material='true')[cfg.kappa]
-    m = build_master(mode, disc, cls=NeuralChart, activity=cfg.activity == 'learned',
-                     **(dict(rho_s=meta['RHO_S']) if mode == 'true_crowding' else {}))
-    if cfg.drive != 'learned_scale':
-        m.drive.s_A.requires_grad_(False)          # the drive is known physics: A = amp int F.dl / T exactly
+    m = NeuralChart.from_parts(disc.hg(), harmonic=False, featurizer=chart_featurizer(disc), step=dict(STEP), learn_mu0=True,
+                               excess=cfg.excess == 'learned', material=cfg.kappa == 'learned')
+    if cfg.kappa in ('true', 'true_material'):
+        crowd = cfg.kappa == 'true' and bool(meta is not None and meta.get('crowd'))
+        m.kinetics = TrueMobility(m.featurizer.n_edge_sym, disc.hg(), rho_s=meta['RHO_S'] if crowd else None)
+    if cfg.drive == 'off':
+        m.knobs['drive_scale'] = 0.0
+    m.drive.s_A.requires_grad_(False)              # the drive is known physics: A = amp int F.dl / T exactly
     m.config = cfg
     return m
 

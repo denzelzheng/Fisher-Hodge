@@ -194,31 +194,27 @@ class Kernel:
 
 class ChartKernel(Kernel):
     """MasterEquation with a c-independent potential: log a = E+ + <nu+, log c>, log b = E- + <nu-, log c>, with
-    E+- = log k +- A/2 + (potential terms) once per context.  Optional per-call terms: a state-dependent log k
-    (kinetics.state_branch, porous media) and a site-local activity correction (free_energy.local_excess, the learned
-    ln gamma)."""
+    E+- = log k +- A/2 + (potential terms) once per context.  Per-call terms: g_theta in log k (kinetics.state_term) and the
+    site-local excess potential (free_energy.correction)."""
 
     def __init__(s, model):
         super().__init__(model)
         fe, kin = model.free_energy, model.kinetics
         s.excess = bool(fe.c_dependent and getattr(fe, 'local_excess', False))
         assert s.excess or not fe.c_dependent, 'fast path: the excess potential must not depend on c'
-        s.state = bool(getattr(kin, 'rho_dependent', False))
-        s.params_inside = s.state
-        assert not s.state or hasattr(kin, 'state_branch'), 'fast path: unsupported state-dependent mobility'
+        s.state = bool(kin.rho_dependent)
 
     def prepare(s, ctx, dtype):
         m = s.model
         feats = ctx['feats']
-        k = ctx['k'] if ctx['k'] is not None else m.kinetics(feats)          # state-dependent k: the material part only
-        logk = torch.log(k)
+        logk = torch.log(ctx['k'])
         phi, A = ctx['Ufull'], ctx['A']
         pp, pm = s.ops.dot_p(phi), s.ops.dot_m(phi)
         Ea = logk + 0.5 * A + 0.5 * (pp - pm)
         Eb = logk - 0.5 * A + 0.5 * (pm - pp)
         P = dict(Ea=Ea.to(dtype), Eb=Eb.to(dtype))
         if s.state:
-            P.update(invV=feats['invV'].to(dtype), tail=feats['tail'], head=feats['head'])
+            P.update(x=feats['edge_sym'].to(dtype))
         return P
 
     def rates(s, c, P):
@@ -226,8 +222,7 @@ class ChartKernel(Kernel):
         la = P['Ea'] + s.ops.dot_p(lc)
         lb = P['Eb'] + s.ops.dot_m(lc)
         if s.state:
-            kin = s.model.kinetics
-            dk = kin.state_branch(kin.rhobar_log(P, c))
+            dk = s.model.kinetics.state_term(P['x'], c)
             la, lb = la + dk, lb + dk
         if s.excess:
             pc = s.model.free_energy.correction(c, None)

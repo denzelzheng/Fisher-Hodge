@@ -1,25 +1,24 @@
-"""The master equation behind the Neural Chart.
+"""The master equation behind the Neural Chart: one architecture on every benchmark.
 
-For every hyperedge h (a reaction, or a transport step between two cells), with y = log c + ln gamma(c) the log
-activity and phi = (U + mu0) / T the potential, the forward and backward rates are
+For every hyperedge h (a reaction, or a transport step between two cells), with y = log c + dG(c) (dG the excess potential) and
+phi = (U + mu0) / T the potential, the forward and backward rates are
 
     a_h, b_h = k_h eps_h exp(+- f_h / 2),   eps_h = exp(<nu+_h + nu-_h, y> / 2),   f_h = <nu+_h - nu-_h, y + phi> + A_h,
 
 so a_h = k_h exp(<nu+_h, y> + (<nu+_h - nu-_h, phi> + A_h) / 2), and J = a - b,   dc/dt = S J.
 
 The model has three parts.
-  * FreeEnergy: the chemical potential mu = log c + U / T (+ mu0 / T) (+ ln gamma(c)).  The ideal part is fixed by
-    physics.  An optional activity correction ln gamma is a separable, non-decreasing function of c that starts at
-    zero, so the free energy stays convex.
-  * Mobility: the symmetric prefactor k_h > 0, one value per hyperedge for both directions.  This is the only part
-    that carries learned functions of the local material.
+  * FreeEnergy: mu = y + phi with dG(c) = grad G_theta(c / V) - grad G_theta(0), G_theta the excess free energy, one scalar MLP per
+    site over all local species, weights shared across sites, last layer zero at initialisation.  No monotone or separable
+    constraint; G_theta is quadratic in the tails, so the excess potential grows without bound.
+  * Mobility: the symmetric prefactor k_h > 0, log k_h = log omega_c(h) + g_theta(class one-hot, xi_h, log cbar_h), times the known
+    factors T, the mesh edge weight w_e (default 1) and the chemostat mass-action factor.  cbar_h is the mean over the cells h
+    touches of the local density vector of all species, xi_h the local descriptors where a benchmark has them, g_theta one
+    MLP whose last layer is zero at initialisation.
   * Drive: the non-conservative force A_h, fixed by the conditions (an external force field, chemostat potentials).
-The force f_h = log(a_h / b_h) = -<S_h, mu> + A_h is therefore fixed by physics.  For every parameter value every
+The force f_h = log(a_h / b_h) = -<S_h, mu> + A_h is therefore fixed by the free energy.  For every parameter value every
 moiety in ker S^T is conserved, the rates carry the concentrations of the species they consume, so c stays positive
 under the positive integrators, local detailed balance log(a / b) = f holds, and sigma = sum_h J_h f_h >= 0.
-
-The one form covers mass action in the activity (the reactants enter through y) and the square-root approximation of
-transport in a potential (phi enters the force only, split evenly between the two directions).
 """
 import copy
 import math
@@ -96,118 +95,71 @@ def featurizer(hg, edge_keys=()):
 
 
 # ------------------------------------------------------------------------------------------ free energy
-def smooth_ramp(z):
-    """h(z) = (z + sqrt(z^2 + 1)) / 2: increasing, convex and unbounded, h -> 0 as z -> -inf and h ~ z as z -> +inf"""
-    q = torch.sqrt(z * z + 1)
-    return 0.5 * torch.where(z >= 0, z + q, 1 / (q + z.abs()))
+def _site_volume(s, hg):
+    """the buffer inv_v from the mesh input hg.meta['site_volume'] (None: c is the density)"""
+    v = hg.meta.get('site_volume')
+    s.register_buffer('inv_v', None if v is None else 1.0 / torch.as_tensor(np.asarray(v), dtype=torch.get_default_dtype()),
+                      persistent=False)
 
 
-def smooth_ramp_integral(z):
-    """H(z) = (z (z + sqrt(z^2 + 1)) + asinh z) / 4, the antiderivative of smooth_ramp"""
-    return 0.5 * z * smooth_ramp(z) + 0.25 * torch.asinh(z)
+def _linear(x, layer):
+    """a linear layer in the dtype of x (the parameters may be float64 under an FP32 integrator)"""
+    return Fn.linear(x, layer.weight.to(x.dtype), layer.bias.to(x.dtype))
+
+
+def _mlp(net, x):
+    n = net.net
+    return _linear(Fn.silu(_linear(Fn.silu(_linear(x, n[0])), n[2])), n[4])
 
 
 class FreeEnergy(nn.Module):
-    """F / T = sum_m c_m (log c_m - 1) + sum_m c_m U_m / T + G(c):  mu = log c + U / T + dmu(c).
-    The ideal part is fixed.  learn_mu0=True adds learned standard potentials mu0 per species (an ablation; by default
-    they are given).  residual=True adds the activity correction dmu = s_mu * r(c), with one gate s_mu per species
-    that starts at zero.  r is one family with fixed hyperparameters on every task, J = 16 units of each kind:
-        r_s(c) = mean_j softplus(alpha_sj) tanh(softplus(beta_sj) c / rho_scale + delta_sj)
-               + mean_j softplus(alpha'_sj) h(softplus(beta'_sj) c / rho_scale + delta'_sj),
-    h the smooth ramp (z + sqrt(z^2 + 1)) / 2.  The tanh units are bounded steps; the ramp units are convex and grow
-    without bound (strong crowding), and every convex non-decreasing function is a non-negative mix of ramps.  r is
-    separable and non-decreasing, i.e. the gradient of a convex local excess free energy, whose value is in closed
-    form.  residual_anchor=True uses r(c) - r(0), so that ln gamma(0) = 0 (the reference state of the standard
-    potentials).  site_volume (V,): on a mesh with unequal cells c is the mass of a cell and the correction is a function
-    of the density c / V, r(c / V), with the free energy V G(c / V); default: c is the density."""
-    def __init__(s, hg, learn_mu0=False, residual=False, residual_units=16, rho_scale=1.0, residual_anchor=False,
-                 site_volume=None):
+    """F / T = sum_m c_m (log c_m - 1) + sum_m c_m U_m / T + sum_sites V [G(c / V) - G(0) - <grad G(0), c / V>]:
+    mu = log c + U / T + dG(c),  dG(c) = grad G(c / V) - grad G(0), the excess potential of the excess free energy G.
+    excess=True: G is one scalar MLP of the local densities of all species, weights shared across sites: Linear-SiLU-Linear-q-
+    Linear with q(z) = softplus(z)^2, which is quadratic in the tails, and a zero last layer (G = 0 at initialisation).  The
+    gradient is written out, so it needs no second-order autograd.  learn_mu0=True adds standard potentials per species."""
+    local_excess = True                                  # neuralchart.fast: the excess potential is site-local
+
+    def __init__(s, hg, learn_mu0=False, excess=False, hidden=32):
         super().__init__()
         s.hg, s.NS, s.V = hg, hg.n_species, hg.V
-        s.register_buffer('inv_v', None if site_volume is None else 1.0 / site_volume, persistent=False)
         s.mu0 = nn.Parameter(torch.zeros(s.NS)) if learn_mu0 else None
-        s.residual, s.RS = residual, rho_scale
-        s.residual_anchor = bool(residual_anchor)
-        if residual:
-            J = residual_units
-            s.r_alpha = nn.Parameter(torch.zeros(s.NS, J))
-            s.r_beta = nn.Parameter(torch.zeros(s.NS, J))
-            s.r_delta = nn.Parameter(torch.linspace(-3.0, 1.0, J).repeat(s.NS, 1))
-            s.ramp_alpha = nn.Parameter(torch.zeros(s.NS, J))
-            s.ramp_beta = nn.Parameter(torch.zeros(s.NS, J))
-            s.ramp_delta = nn.Parameter(torch.linspace(-3.0, 1.0, J).repeat(s.NS, 1))
-            s.s_mu = nn.Parameter(torch.zeros(s.NS))
+        s.excess = bool(excess)
+        _site_volume(s, hg)
+        if excess:
+            s.l1, s.l2, s.l3 = nn.Linear(s.NS, hidden), nn.Linear(hidden, hidden), nn.Linear(hidden, 1)
+            nn.init.zeros_(s.l3.weight); nn.init.zeros_(s.l3.bias)
 
     @property
     def c_dependent(s):
-        return s.residual
+        return s.excess
 
-    local_excess = True                                  # neuralchart.fast: the excess potential is site-local
+    def excess_parameters(s):
+        """the parameters of G_theta (empty without it)"""
+        return [p for l in (s.l1, s.l2, s.l3) for p in l.parameters()] if s.excess else []
 
-    def activity_parameters(s):
-        """the nonlinear parameters of the activity correction (empty without one)"""
-        if not s.residual:
-            return []
-        return [s.r_alpha, s.r_beta, s.r_delta, s.ramp_alpha, s.ramp_beta, s.ramp_delta, s.s_mu]
+    def density(s, c):
+        """the local densities (B, V, NS) of a state c (B, M)"""
+        cs = c.view(c.shape[0], s.NS, s.V)
+        rho = cs if s.inv_v is None else cs * s.inv_v.to(cs.dtype)[None, None, :]
+        return rho.transpose(1, 2)
 
-    def _load_from_state_dict(s, sd, prefix, *args, **kw):
-        """weights of the earlier tanh-only family load with the ramp units switched off (amplitude softplus(-40))"""
-        if s.residual and prefix + 'r_alpha' in sd and prefix + 'ramp_alpha' not in sd:
-            sd[prefix + 'ramp_alpha'] = torch.full_like(s.ramp_alpha, -40.0)
-            sd[prefix + 'ramp_beta'] = s.ramp_beta.detach().clone()
-            sd[prefix + 'ramp_delta'] = s.ramp_delta.detach().clone()
-        super()._load_from_state_dict(sd, prefix, *args, **kw)
+    def G(s, x):
+        """G_theta at densities x (..., NS), (..., 1)"""
+        return _linear(Fn.softplus(_linear(Fn.silu(_linear(x, s.l1)), s.l2)) ** 2, s.l3)
 
-    def _density(s, cs):
-        """the density the correction sees: c / V per site (site_volume), c itself without a site volume"""
-        return cs if s.inv_v is None else cs * s.inv_v.to(cs.dtype)[None, None, :]
+    def grad_G(s, x):
+        """grad G_theta at densities x (..., NS), (..., NS)"""
+        z1 = _linear(x, s.l1)
+        p1 = torch.sigmoid(z1)
+        z2 = _linear(Fn.silu(z1), s.l2)
+        d2 = 2 * Fn.softplus(z2) * torch.sigmoid(z2)
+        v = (d2 * s.l3.weight.to(x.dtype)) @ s.l2.weight.to(x.dtype)
+        return (v * (p1 + z1 * p1 * (1 - p1))) @ s.l1.weight.to(x.dtype)
 
-    def _res_parts(s, cs):
-        """per-unit pieces of the tanh units for densities cs (B, NS, V): amplitude (NS, J), slope (NS, J), argument (B, NS, V, J)"""
-        al, be = Fn.softplus(s.r_alpha).to(cs.dtype), Fn.softplus(s.r_beta).to(cs.dtype) / s.RS
-        x = be[None, :, None, :] * cs[..., None] + s.r_delta.to(cs.dtype)[None, :, None, :]
-        return al / al.shape[-1], be, x
-
-    def _ramp_parts(s, cs):
-        """the same pieces for the ramp units"""
-        al, be = Fn.softplus(s.ramp_alpha).to(cs.dtype), Fn.softplus(s.ramp_beta).to(cs.dtype) / s.RS
-        x = be[None, :, None, :] * cs[..., None] + s.ramp_delta.to(cs.dtype)[None, :, None, :]
-        return al / al.shape[-1], be, x
-
-    def residual_mu(s, cs):
-        """the ungated correction r(c / V) (B, NS, V)"""
-        return s.residual_of_density(s._density(cs))
-
-    def residual_of_density(s, cs):
-        """r at densities cs (B, NS, V)"""
-        al, _, x = s._res_parts(cs)
-        ap, _, xp = s._ramp_parts(cs)
-        r = (al[None, :, None, :] * torch.tanh(x)).sum(-1) + (ap[None, :, None, :] * smooth_ramp(xp)).sum(-1)
-        if s.residual_anchor:
-            r = r - s._r0(cs.dtype)[None, :, None]
-        return r
-
-    def _r0(s, dt):
-        """r(0) per species (NS,)"""
-        al = Fn.softplus(s.r_alpha).to(dt) / s.r_alpha.shape[-1]
-        ap = Fn.softplus(s.ramp_alpha).to(dt) / s.ramp_alpha.shape[-1]
-        return (al * torch.tanh(s.r_delta.to(dt))).sum(-1) + (ap * smooth_ramp(s.ramp_delta.to(dt))).sum(-1)
-
-    def _residual_G(s, c):
-        """int_0^c s_mu r(c' / V) dc' per site and species, summed, (B,)"""
-        cs = s._density(c)
-        al, be, x = s._res_parts(cs)
-        x0 = s.r_delta.to(cs.dtype)[None, :, None, :]
-        lc = lambda z: z.abs() + Fn.softplus(-2 * z.abs()) - math.log(2.0)          # log cosh
-        G = ((al / be)[None, :, None, :] * (lc(x) - lc(x0))).sum(-1)               # (B, NS, V)
-        ap, bp, xp = s._ramp_parts(cs)
-        xp0 = s.ramp_delta.to(cs.dtype)[None, :, None, :]
-        G = G + ((ap / bp)[None, :, None, :] * (smooth_ramp_integral(xp) - smooth_ramp_integral(xp0))).sum(-1)
-        if s.residual_anchor:
-            G = G - s._r0(cs.dtype)[None, :, None] * cs
-        if s.inv_v is not None:
-            G = G / s.inv_v.to(cs.dtype)[None, None, :]
-        return (s.s_mu.to(cs.dtype)[None, :, None] * G).sum((1, 2))
+    def excess_potential(s, x):
+        """the excess potential at densities x (..., NS)"""
+        return s.grad_G(x) - s.grad_G(torch.zeros_like(x))
 
     def potential(s, feats):
         U = feats['U']
@@ -217,65 +169,76 @@ class FreeEnergy(nn.Module):
         return Um / feats['T'][:, None]
 
     def correction(s, c, ctx):
-        cs = c.view(c.shape[0], s.NS, s.V)
-        out = torch.zeros_like(cs)
-        if s.residual:
-            out = out + s.s_mu.to(c.dtype)[None, :, None] * s.residual_mu(cs)
-        return out.reshape(c.shape)
+        """the excess potential at the state c, (B, M)"""
+        if not s.excess:
+            return torch.zeros_like(c)
+        return s.excess_potential(s.density(c)).transpose(1, 2).reshape(c.shape)
 
     def phi(s, c, ctx):
         return ctx['Ufull'] + s.correction(c, ctx)
 
     def value(s, c, ctx):
         F = (c * (torch.log(c) - 1 + ctx['Ufull'])).sum(-1)
-        if s.residual:
-            F = F + s._residual_G(c.view(c.shape[0], s.NS, s.V))
+        if s.excess:
+            x = s.density(c)
+            x0 = torch.zeros_like(x)
+            g = (s.G(x) - s.G(x0))[..., 0] - (s.grad_G(x0) * x).sum(-1)
+            if s.inv_v is not None:
+                g = g / s.inv_v.to(c.dtype)[None]
+            F = F + g.sum(-1)
         return F
 
 
 # ------------------------------------------------------------------------------------------ mobility
 class Mobility(nn.Module):
-    """k_h = k_ref * T^p * exp(kappa_h), symmetric in the two directions.  kappa_h = core + s_k * r_theta(features):
-      core     one log rate per hyperedge type (core='type') or per hyperedge (core='edge'), zero at initialisation;
-      r_theta  an MLP of the orientation-invariant hyperedge features, gated by s_k, which starts at zero.
-               table=True drops it (log k is the core table alone).
-    descriptors=True: the MLP is g_theta of the class one-hot and the local descriptors (64 hidden units, no gate, the last
-    layer starts at zero), as on porous media.
-    p = 1 is the Einstein relation, p = 0 keeps k independent of temperature.  chem_prefactor=True: chemostatted
-    reactants and products also multiply k by their mass-action factor exp(<nu+ + nu-, log c_chem> / 2)."""
-    rho_dependent = False
+    """k_h = T w_e chem_h exp(core_c(h) + g(class one-hot, xi_h, log cbar_h)), symmetric in the two directions.
+      core     one log rate per hyperedge class, zero at initialisation (log omega);
+      g        one MLP (64 hidden units) with a zero last layer; material=False drops it (constant k per class).  Its inputs:
+               feats['edge_sym'] (the class one-hot and the local descriptors, where they exist) and log cbar_h, the mean over
+               the cells h touches of the local density vector of all species.  cbar_h does not read a parameter.
+      T        the temperature (k is proportional to T);  w_e  the mesh edge weight hg.meta['edge_weight'] (default 1);
+      chem_h   the chemostat mass-action factor exp(<nu+ + nu-, log c_chem> / 2)."""
 
-    def __init__(s, n_edge_feats, hidden=32, k_ref=1.0, T_exponent=1.0, hg=None, table=False, chem_prefactor=True,
-                 core='type', residual=None, descriptors=False):
+    def __init__(s, n_edge_feats, hg, material=True, hidden=64):
         super().__init__()
-        assert core in ('type', 'edge') and hg is not None
-        s.chem_prefactor, s.core_kind = chem_prefactor, core
-        n_core = hg.H if core == 'edge' else int(hg.meta['typ'].max()) + 1
-        s.core = nn.Parameter(torch.zeros(n_core))
-        s.residual = MLP(n_edge_feats, hidden, 1) if (residual if residual is not None else not table) else None
-        s.s_k = nn.Parameter(torch.zeros(())) if s.residual is not None else None
-        if descriptors:                                # g_theta of the local descriptors, the last layer starts at zero
-            s.residual, s.s_k = MLP(n_edge_feats, 64, 1, last='zero'), None
-        s.register_buffer('k_ref', torch.as_tensor(k_ref, dtype=torch.get_default_dtype()))
-        s.p = T_exponent
-        s.hg = hg
+        s.hg, s.NS, s.V = hg, hg.n_species, hg.V
+        s.core = nn.Parameter(torch.zeros(int(hg.meta['typ'].max()) + 1))
+        s.net = MLP(n_edge_feats + s.NS, hidden, 1, last='zero') if material else None
+        odd = np.asarray(hg.meta['odd'])
+        site = np.asarray(hg.meta.get('site', np.full(hg.H, -1)))
+        tail = np.where(odd, np.asarray(hg.meta['et']), site) if odd.any() else site
+        head = np.where(odd, np.asarray(hg.meta['eh']), site) if odd.any() else site
+        s.register_buffer('tail', torch.as_tensor(tail, dtype=torch.long), persistent=False)
+        s.register_buffer('head', torch.as_tensor(head, dtype=torch.long), persistent=False)
+        s.register_buffer('typ', torch.as_tensor(np.asarray(hg.meta['typ']), dtype=torch.long), persistent=False)
+        _site_volume(s, hg)
+        w = hg.meta.get('edge_weight')
+        s.register_buffer('w', None if w is None else torch.as_tensor(np.asarray(w), dtype=torch.get_default_dtype()), persistent=False)
 
-    def log_k(s, feats):
-        """kappa (B, H), without k_ref, T and the chemostat factor"""
+    @property
+    def rho_dependent(s):
+        return s.net is not None
+
+    def log_cbar(s, c):
+        """log cbar_h (B, H, NS) of a state c (B, M)"""
+        cs = c.view(c.shape[0], s.NS, s.V)
+        rho = cs if s.inv_v is None else cs * s.inv_v.to(cs.dtype)[None, None, :]
+        return torch.log(0.5 * (rho[:, :, s.tail] + rho[:, :, s.head])).transpose(1, 2)
+
+    def state_term(s, x, c):
+        """g (B, H) at the features x (B, H, F) and the state c (B, M)"""
+        u = s.log_cbar(c)
+        return _mlp(s.net, torch.cat([x.to(u.dtype).expand(u.shape[0], -1, -1), u], -1)).squeeze(-1)
+
+    def base(s, feats):
+        """the part of k that does not depend on the state (B, H)"""
         x = feats['edge_sym']
-        core = s.core.to(x.dtype)
-        kap = (core[s.hg.on(x.device, x.dtype)['typ']] if s.core_kind == 'type' else core)[None].expand(x.shape[0], -1)
-        if s.residual is not None:
-            g = s.residual(x.to(s.residual.net[0].weight.dtype)).squeeze(-1).to(x.dtype)
-            kap = kap + (g if s.s_k is None else s.s_k.to(x.dtype) * g)
-        return kap
-
-    def forward(s, feats, hg=None, c=None):
-        k = s.k_ref.to(feats['edge_sym'].dtype) * torch.exp(s.log_k(feats))
-        if s.p:
-            k = k * feats['T'][:, None] ** s.p
-        hg = hg or s.hg
-        if s.chem_prefactor and hg is not None and feats.get('chem_logc') is not None and 'chem_Np' in hg.meta:
+        dt = x.dtype
+        k = torch.exp(s.core.to(dt)[s.typ])[None] * feats['T'].to(dt)[:, None]
+        if s.w is not None:
+            k = k * s.w.to(dt)[None]
+        hg = s.hg
+        if feats.get('chem_logc') is not None and 'chem_Np' in hg.meta:
             # chemostats are mass-action species with known activity: besides the force they carry the symmetric
             # factor exp(<nu+ + nu-, log c_chem> / 2), so that a ~ c_ATP and b ~ c_ADP c_Pi exactly
             lc = feats['chem_logc']
@@ -284,6 +247,11 @@ class Mobility(nn.Module):
             Ysum = torch.as_tensor((hg.meta['chem_Np'] + hg.meta['chem_Nm']).toarray(), dtype=lc.dtype, device=lc.device)
             k = k * torch.exp(0.5 * lcv @ Ysum.T)
         return k
+
+    def forward(s, feats, c):
+        """k (B, H) at the state c"""
+        k = s.base(feats)
+        return k * torch.exp(s.state_term(feats['edge_sym'], c)) if s.rho_dependent else k
 
 
 # ------------------------------------------------------------------------------------------ drive
@@ -342,7 +310,7 @@ class Drive(nn.Module):
 # ------------------------------------------------------------------------------------------ the model
 class MasterEquation(nn.Module):
     """MasterEquation(hg, free_energy, kinetics, drive, featurizer, step); MasterEquation.from_parts(hg, ...) builds the
-    default parts.  kinetics is the mobility k (Mobility or a task-specific module with the same interface)."""
+    default parts.  kinetics is the mobility k."""
 
     def __init__(s, hg, free_energy, kinetics, drive, featurizer_fn=None, step=None):
         super().__init__()
@@ -354,16 +322,12 @@ class MasterEquation(nn.Module):
         s.knobs = dict(T=None, drive_scale=1.0)
 
     @classmethod
-    def from_parts(cls, hg, hidden=32, k_ref=1.0, T_exponent=1.0, harmonic=True, featurizer=None, step=None,
-              learn_mu0=False, learn_chem_mu0=False, kinetics_table=False, chem_prefactor=True, kinetics_core='type',
-              activity_correction=False, rho_scale=1.0, chem_mu0_known=None, activity_anchor=False,
-              kinetics_descriptors=False):
-        """kinetics_table=True: log k is the core table alone; kinetics_core='edge': one log rate per hyperedge;
-        activity_correction=True: the learned activity correction of FreeEnergy."""
+    def from_parts(cls, hg, harmonic=False, featurizer=None, step=None, learn_mu0=True, learn_chem_mu0=False, chem_mu0_known=None,
+                   excess=True, material=True):
+        """the default parts.  excess: G_theta;  material: g_theta"""
         feat = featurizer or globals()['featurizer'](hg)
-        kin = Mobility(feat.n_edge_sym, hidden, k_ref=k_ref, T_exponent=T_exponent, hg=hg, table=kinetics_table,
-                       chem_prefactor=chem_prefactor, core=kinetics_core, descriptors=kinetics_descriptors)
-        fe = FreeEnergy(hg, learn_mu0, residual=activity_correction, rho_scale=rho_scale, residual_anchor=activity_anchor)
+        kin = Mobility(feat.n_edge_sym, hg, material=material)
+        fe = FreeEnergy(hg, learn_mu0, excess=excess)
         dr = Drive(hg, harmonic, learn_chem_mu0, chem_mu0_known)
         return cls(hg, fe, kin, dr, feat, step)
 
@@ -392,7 +356,7 @@ class MasterEquation(nn.Module):
             feats['T'] = torch.full_like(feats['T'], float(s.knobs['T']))
         ctx = Context(feats=feats)
         ctx['Ufull'] = s.free_energy.potential(feats)
-        ctx['k'] = None if s.kinetics.rho_dependent else s.kinetics(feats)
+        ctx['k'] = s.kinetics.base(feats)
         ctx['A'] = s.drive(feats) * s.knobs['drive_scale']
         return ctx
 
@@ -411,7 +375,9 @@ class MasterEquation(nn.Module):
         ctx = s.context(drive)
         y = torch.log(c) + s.free_energy.correction(c, ctx)
         phi = ctx['Ufull']
-        k = ctx['k'] if ctx['k'] is not None else s.kinetics(ctx['feats'], s.hg, c)
+        k = ctx['k']
+        if s.kinetics.rho_dependent:
+            k = k * torch.exp(s.kinetics.state_term(ctx['feats']['edge_sym'], c))
         A = ctx['A']
         dot = s.hg.dot
         u, v = y + 0.5 * phi, 0.5 * phi

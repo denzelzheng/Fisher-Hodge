@@ -13,8 +13,8 @@ and .log; evaluate and law write runs/<variant>/evaluated/.  tables reads result
 writes results/<variant>/.  gifs takes the Neural Chart from checkpoints/ and the baselines from --weights (default
 runs/<variant>/).  tables and gifs run on both variants unless --variant is given.
 
---variant porous_media_crowding uses the crowded mobility M / (1 + rhobar / 2).  Model keys: chart, chart-no-state,
-chart-const-k, chart-learned-drive, oracle, oracle-no-crowding, ude, flux_gnn, bsms, fno, generic_fno, helmfluid,
+--variant porous_media_crowding uses the crowded mobility M / (1 + rhobar / 2).  Model keys: chart, chart-const-k, chart-no-excess, chart-zero-init, chart-reversible,
+oracle, oracle-no-crowding, ude, flux_gnn, bsms, fno, generic_fno, helmfluid,
 persistence.  The settings of the reported runs are in RUN_SETTINGS.
 """
 import argparse
@@ -26,7 +26,7 @@ from benchmarks.common import CHECKPOINTS, ROOT
 # the integrator settings of the reported runs (neuralchart.fast); models without an entry use their own update
 RUN_SETTINGS = {
     **{m: dict(control='sample_err', rtol=0.3, precision='fp32') for m in
-       ('chart', 'chart-no-state', 'chart-const-k', 'chart-learned-drive', 'oracle', 'oracle-no-crowding', 'flux_gnn')},
+       ('chart', 'chart-const-k', 'chart-no-excess', 'chart-zero-init', 'chart-reversible', 'oracle', 'oracle-no-crowding', 'flux_gnn')},
     'ude': dict(control='err_only', rtol=1e-3, precision='fp32'),
 }
 

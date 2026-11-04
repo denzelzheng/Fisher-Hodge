@@ -232,6 +232,16 @@ def pc_log_constants(hg, drive):
     return lk + 0.5 * dU + 0.5 * A, lk - 0.5 * dU - 0.5 * A
 
 
+def pc_true_log_k(hg, drive, c):
+    """phosphorylation networks: the log of the true symmetric rate constant per hyperedge at the state c (B, H)"""
+    typ = torch.as_tensor(hg.meta['typ'])
+    lk = torch.tensor([math.log(PC_K1), 0.5 * math.log(PC_K2 * PC_K2R), math.log(PC_D), math.log(PC_D)], dtype=torch.float64)[typ]
+    lk = lk[None].expand(c.shape[0], -1)
+    if drive.get('logm') is not None:
+        lk = lk + drive['logm'].double().cpu()
+    return lk
+
+
 def true_rates(hg, drive, c):
     """one-way rates of the reference model (mass action in the activity), float64 on the CPU; drive: the condition
     dict (or the (log a, log b) tensor of the Schloegl models)"""

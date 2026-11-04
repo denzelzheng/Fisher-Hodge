@@ -47,24 +47,31 @@ def lngamma_metrics(model, norm, ood_max):
 
 
 @torch.no_grad()
-def k_law(model, sd, hg):
-    """the learned symmetric rate constant against the true one on the media of a test set, per hyperedge class and over
-    all hyperedges: Pearson and Spearman r of log k, relative L2 error of k, median log ratio (learned / true)"""
+def k_law(model, sd, hg, every=20):
+    """the learned symmetric rate constant against the true one on the test states (the reference states of the set, every
+    `every` steps), per hyperedge class and over all hyperedges: Pearson and Spearman r of log k, relative L2 error of k,
+    median log ratio (learned / true)"""
     from scipy.stats import spearmanr
     dev = next(iter(model.parameters())).device
-    drive = {k: v.to(dev).to(next_dtype(model)) for k, v in sd['drive'].items()}
+    dt = next_dtype(model)
+    drive = {k: v.to(dev).to(dt) for k, v in sd['drive'].items()}
     ctx = model.prepare(drive)
-    k = ctx['k'] if ctx['k'] is not None else model.kinetics(ctx['feats'])
     typ = torch.as_tensor(hg.meta['typ'])
-    lt = torch.tensor([math.log(TR.PC_K1), 0.5 * math.log(TR.PC_K2 * TR.PC_K2R), math.log(TR.PC_D), math.log(TR.PC_D)],
-                      dtype=torch.float64)[typ] + sd['drive']['logm'].double().cpu()
-    lm = torch.log(k).double().cpu()
+    lm, lt = [], []
+    for t in range(0, sd['c'].shape[1], every):
+        c = sd['c'][:, t].to(dev).to(dt)
+        k = ctx['k']
+        if model.kinetics.rho_dependent:
+            k = k * torch.exp(model.kinetics.state_term(ctx['feats']['edge_sym'], c))
+        lm.append(torch.log(k).double().cpu())
+        lt.append(TR.pc_true_log_k(hg, sd['drive'], c.double().cpu()))
+    lm, lt = torch.cat(lm), torch.cat(lt)
     out = {}
     for name, mask in (('all', torch.ones_like(typ, dtype=torch.bool)), ('R1', typ == 0), ('R2', typ == 1), ('transport X', typ == 2),
                        ('transport Xp', typ == 3)):
         a, b = lm[:, mask].reshape(-1).numpy(), lt[:, mask].reshape(-1).numpy()
-        out[name] = dict(pearson_logk=float(np.corrcoef(a, b)[0, 1]) if a.std() > 0 else 0.0,
-                         spearman_logk=float(spearmanr(a, b).statistic) if a.std() > 0 else 0.0,
+        out[name] = dict(pearson_logk=float(np.corrcoef(a, b)[0, 1]) if a.std() > 1e-12 and b.std() > 1e-12 else 0.0,
+                         spearman_logk=float(spearmanr(a, b).statistic) if a.std() > 1e-12 and b.std() > 1e-12 else 0.0,
                          relerr_k=float(np.linalg.norm(np.exp(a) - np.exp(b)) / np.linalg.norm(np.exp(b))),
                          median_logratio=float(np.median(a - b)), std_log_true=float(b.std()))
     return out
@@ -196,7 +203,7 @@ def eval_set(name, model, sd, n, log, snap, sname):
         at, bt = TR.true_rates(hg, lab, Yc[:, 0])
         ct = TR.model_cycle_affinity((torch.log(at) - torch.log(bt)).double(), V).numpy()
         m['cycle_affinity'] = dict(model_mean=float(ca.mean()), true_mean=float(ct.mean()), mae=float(np.abs(ca - ct).mean()))
-    if C.hetero() and name.startswith('chart'):
+    if C.is_pc() and name.startswith('chart'):
         m['k_law'] = k_law(model, sd, hg)
     idx = list(range(min(4, B)))
     snap[f'R_{sname}'] = R[idx].numpy().astype(np.float32)

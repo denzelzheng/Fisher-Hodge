@@ -1,19 +1,17 @@
-"""The Neural Chart: one model class, one configuration per benchmark, one fit.
+"""The Neural Chart: one model class and one fit on every benchmark.  Only the hypergraph, the inputs, the data and the
+numerics (rtol, integrator theta, trainer budget) differ per task.
 
-    a_h, b_h = k_h eps_h exp(+- f_h / 2)              (eps_h = exp(<nu+ + nu-, y> / 2), y = log c + ln gamma(c) the log activity)
-    f   the force from the chemical potential and the drive: mu = log c + U / T + mu0_theta / T + ln gamma_theta(c),
-        with the conditions (temperature, drive, chemostat levels) entering only through U / T, the drive and the
-        chemostat log-activities.  ln gamma_theta = s_mu r(c) is the learned activity correction on every benchmark, one
-        family with fixed hyperparameters and s_mu = 0 at initialisation (the ablation chart-ideal removes it).  On the reaction networks the standard potentials mu0_theta are learned (the
-        variant chart-given-mu0 takes them from thermochemical data); porous media has no mu0.
-    log k_h = log omega_c(h) + g_theta(xi_h) + s * m(log s_h)     (times fixed geometric and physical prefactors)
+    a_h, b_h = k_h eps_h exp(+- f_h / 2)              (eps_h = exp(<nu+ + nu-, y> / 2), y = log c + dG(c))
+    f   the force, <nu+ - nu-, y + (U + mu0_theta) / T> + A; the conditions (temperature, drive, chemostat levels) enter only
+        through U / T, the drive and the chemostat log-activities
+    dG(c) = grad G_theta(c / V) - grad G_theta(0)    the excess potential; G_theta, the excess free energy, is one scalar MLP per
+                                                     site over all local species
+    log k_h = log omega_c(h) + g_theta(class one-hot, xi_h, log cbar_h)    (times T and the mesh weight)
         omega_c   one positive constant per hyperedge class
-        g_theta   an MLP of the local material descriptors xi; its last layer is zero at initialisation (absent
-                  without descriptors)
-        s * m     m non-decreasing with linear tails, s = 0 at initialisation (absent without state features,
-                  e.g. the log of the mean edge density in porous media)
-    Fit: at initialisation k is linear in omega, so omega gets its closed-form NNLS estimate (variable projected when
-    mu carries a learned activity correction); then every parameter is refined on rollouts (neuralchart.fit).
+        g_theta   one MLP with a zero last layer; xi_h the local descriptors where they exist, cbar_h the mean of the local
+                  density vector over the cells h touches
+    Fit: at initialisation g = 0 and G = 0, so the rates are linear in omega: omega gets its closed-form NNLS estimate; then
+    every parameter is refined on rollouts (neuralchart.fit).
 
     from neuralchart import NeuralChart, chart_config, fit_chart
     cfg = chart_config('brusselator', 'chart')
@@ -42,112 +40,70 @@ BUILDERS = dict(porous_media='benchmarks.porous_media.models', brusselator='benc
 @dataclasses.dataclass(frozen=True)
 class ChartConfig:
     """one Neural Chart.
-    mu0          'learned' (the default of the reaction networks) or 'given' (thermochemical data, an oracle-type input;
-                 porous media has no standard potentials and uses 'given', i.e. none)
-    drive        'fixed' (the physical drive), 'off' (A = 0: the reversible ablation) or 'learned_scale' (a learned
-                 global drive scale)
-    descriptors  g_theta(xi) in log k, where the benchmark has local descriptors;  state: s * m(log state) in log k (needs
-                 descriptors; only the mobility of porous media implements it)
-    kappa        'learned', 'true' (the true k: oracle) or 'true_material' (porous media with crowding: the true
-                 material mobility without the crowding factor)
+    mu0          'learned' or 'given' (thermochemical data, an oracle-type input)
+    drive        'fixed' (the physical drive) or 'off' (A = 0: the reversible ablation)
+    kappa        'learned' (omega and g_theta), 'constant' (omega alone), 'true' (the true k: oracle) or 'true_material' (porous
+                 media with crowding: the true material mobility without the crowding factor)
     init         'nnls' (closed-form omega) or 'one' (omega = 1: the ablation without convex initialisation)
-    activity     'learned' (mu = log c + mu0 + ln gamma_theta(c), the default of every benchmark), 'ideal' (ln gamma = 0)
-                 or 'true' (the generator's ln gamma, oracle of the crowded Schloegl models only)
-    varpro       the closed-form step is variable projected (no effect without a learned state function)
+    excess       'learned' (G_theta), 'none' (no excess free energy) or 'true' (the generator's, oracle only)
     fast, control, rtol, precision: the integrator (neuralchart.fast)"""
     task: str
-    mu0: str = 'given'
+    mu0: str = 'learned'
     drive: str = 'fixed'
-    descriptors: bool = False
-    state: bool = False
     kappa: str = 'learned'
     init: str = 'nnls'
     train: bool = True
     fast: bool = True
     control: str = 'sample_err'
-    rtol: float = 5e-5
+    rtol: float = 1e-4
     precision: Optional[str] = 'fp32'
-    activity: str = 'learned'
-    varpro: bool = True
+    excess: str = 'learned'
+    varpro: bool = False
 
     def __post_init__(s):
-        assert s.task in TASKS and s.mu0 in ('given', 'learned') and s.drive in ('fixed', 'off', 'learned_scale')
-        assert s.activity in ('ideal', 'learned', 'true') and (s.activity != 'true' or s.task in REACTION_TASKS)
-        assert s.kappa in ('learned', 'true', 'true_material') and s.init in ('nnls', 'one')
-        assert s.descriptors or not s.state, 'the state term needs the descriptor model'
-        assert s.task == 'porous_media' or s.kappa != 'true_material'
+        assert s.task in TASKS and s.mu0 in ('given', 'learned') and s.drive in ('fixed', 'off')
+        assert s.excess in ('none', 'learned', 'true') and s.kappa in ('learned', 'constant', 'true', 'true_material')
+        assert s.init in ('nnls', 'one')
 
     def replace(s, **kw):
         return dataclasses.replace(s, **kw)
 
 
-_PM = ChartConfig(task='porous_media', descriptors=True, state=True, rtol=0.3)
-_BR = ChartConfig(task='brusselator', mu0='learned', rtol=5e-5)
-_C5 = ChartConfig(task='schlogl_nonideal', mu0='learned', rtol=1e-4)
-
-
-def _nonideal(base):
-    return {
+def _ablations(base, oracle_excess='none', given=True):
+    out = {
         'chart': base,
-        'chart-ideal': base.replace(activity='ideal'),
-        'chart-given-mu0': base.replace(mu0='given'),
+        'chart-const-k': base.replace(kappa='constant'),
+        'chart-no-excess': base.replace(excess='none'),
         'chart-zero-init': base.replace(init='one'),
         'chart-reversible': base.replace(drive='off'),
-        'chart-no-varpro': base.replace(varpro=False),
-        'oracle': base.replace(mu0='given', activity='true', kappa='true', train=False),
+        'oracle': base.replace(mu0='given', excess=oracle_excess, kappa='true', train=False),
     }
+    if given:
+        out['chart-given-mu0'] = base.replace(mu0='given')
+    return out
 
 
-def _reaction(task, descriptors=False):
-    base = ChartConfig(task=task, mu0='learned', rtol=1e-4, descriptors=descriptors)
-    return {
-        'chart': base,
-        **({'chart-const-k': base.replace(descriptors=False)} if descriptors else {}),
-        'chart-ideal': base.replace(activity='ideal'),
-        'chart-given-mu0': base.replace(mu0='given'),
-        'chart-zero-init': base.replace(init='one'),
-        'chart-reversible': base.replace(drive='off'),
-        'oracle': base.replace(mu0='given', activity='ideal', kappa='true', descriptors=False, train=False),
-    }
-
-
-# the method and its ablations, per task (porous_media covers both variants, with and without crowding)
+# the method and its ablations, per task (porous_media covers both variants, with and without crowding).  Porous media has one
+# species and transport only, so mu0 has no effect there: no given-mu0 ablation.  The rtol is calibrated per benchmark.
 CONFIGS = {
-    'porous_media': {
-        'chart': _PM,
-        'chart-ideal': _PM.replace(activity='ideal'),
-        'chart-no-state': _PM.replace(state=False),
-        'chart-const-k': _PM.replace(descriptors=False, state=False),
-        'chart-learned-drive': _PM.replace(drive='learned_scale'),
-        'oracle': _PM.replace(descriptors=False, state=False, kappa='true', activity='ideal', train=False),
-        'oracle-no-crowding': _PM.replace(descriptors=False, state=False, kappa='true_material', activity='ideal', train=False),
-    },
-    'brusselator': {
-        'chart': _BR,
-        'chart-ideal': _BR.replace(activity='ideal'),
-        'chart-given-mu0': _BR.replace(mu0='given'),
-        'chart-zero-init': _BR.replace(init='one'),
-        'chart-reversible': _BR.replace(drive='off'),
-        'oracle': _BR.replace(mu0='given', activity='ideal', kappa='true', train=False),
-    },
-    'schlogl_nonideal': _nonideal(_C5),
-    'schlogl_nonideal_strong': _nonideal(_C5.replace(task='schlogl_nonideal_strong')),
-    'schlogl': _reaction('schlogl'),
-    'phosphorylation_cycle': _reaction('phosphorylation_cycle'),
-    'phosphorylation_heterogeneous': _reaction('phosphorylation_heterogeneous', descriptors=True),
-    'mapk_cascade': _reaction('mapk_cascade'),
+    'porous_media': {**_ablations(ChartConfig(task='porous_media', rtol=0.3), given=False),
+                     'oracle-no-crowding': ChartConfig(task='porous_media', rtol=0.3, mu0='given', excess='none', kappa='true_material', train=False)},
+    'brusselator': _ablations(ChartConfig(task='brusselator', rtol=5e-5)),
+    'schlogl': _ablations(ChartConfig(task='schlogl')),
+    'schlogl_nonideal': _ablations(ChartConfig(task='schlogl_nonideal'), oracle_excess='true'),
+    'schlogl_nonideal_strong': _ablations(ChartConfig(task='schlogl_nonideal_strong'), oracle_excess='true'),
+    'phosphorylation_cycle': _ablations(ChartConfig(task='phosphorylation_cycle')),
+    'phosphorylation_heterogeneous': _ablations(ChartConfig(task='phosphorylation_heterogeneous')),
+    'mapk_cascade': _ablations(ChartConfig(task='mapk_cascade')),
 }
 
-# what each ablation removes (README and tables)
+# what each ablation removes (tables)
 ABLATIONS = {
-    'chart-no-state': 'the state input s * m(log state) of the mobility',
-    'chart-const-k': 'the material network g_theta: one constant omega for all edges',
+    'chart-const-k': 'g_theta: one constant omega per hyperedge class',
     'chart-given-mu0': 'nothing: it adds the standard potentials from thermochemical data (oracle-type information)',
     'chart-zero-init': 'the closed-form NNLS start: omega starts at 1',
     'chart-reversible': 'the drive: A = 0, so the model is reversible',
-    'chart-learned-drive': 'the fixed drive scale: a global scale of the drive is learned',
-    'chart-ideal': 'the activity correction: ln gamma = 0',
-    'chart-no-varpro': 'the variable projection: ideal NNLS start, then rollout refinement',
+    'chart-no-excess': 'the excess free energy G_theta',
     'flux_gnn': 'the chart: a graph network gives the one-way rates, with no chemical potential, force or symmetric mobility',
     'oracle': 'nothing learned: the true rates in the Neural Chart class',
     'oracle-no-crowding': 'nothing learned: the true material mobility without the crowding factor',

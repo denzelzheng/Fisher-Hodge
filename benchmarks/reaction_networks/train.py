@@ -9,8 +9,8 @@ import numpy as np
 import torch
 
 from neuralchart import chart, fast
-from neuralchart.diagnostics import LDB_RULE, activity_summary, relerr_traj
-from neuralchart.fit import apply_activity_decision, fit_chart, fit_linear, rollout, take
+from neuralchart.diagnostics import LDB_RULE, relerr_traj
+from neuralchart.fit import chart_summary, fit_chart, fit_linear, rollout, take
 from ..common import check_gpu
 from . import config as C
 from . import truth as TR
@@ -198,8 +198,6 @@ def run_train(name, seed=0, iters=None, device='cuda', lr=None, resume=False):
     if is_chart:
         if resume:
             fitted = dict(torch.load(ckpt, weights_only=False)['pre_info'] or {})
-            if 'varpro' in fitted:
-                apply_activity_decision(model, fitted['varpro'])
         else:                                     # the closed-form step (variable-projected NNLS) ...
             fitted = fit_chart(model, tr, C.DT, 0, seed, log=log)
         if model.config.train and iters > 0:      # ... then the rollout refinement
@@ -236,9 +234,7 @@ def run_train(name, seed=0, iters=None, device='cuda', lr=None, resume=False):
     if is_chart:
         extra = dict(log_k=model.kinetics.core.detach().cpu().tolist(), mu0=model.free_energy.mu0.detach().cpu().tolist(),
                      chem_mu0=model.drive.chem_mu0.detach().cpu().tolist(), log_k_true=true_log_k())
-        if getattr(model.free_energy, 'residual', False):
-            extra['s_mu'] = model.free_energy.s_mu.detach().cpu().tolist()
-            extra['activity'] = activity_summary(model.free_energy, tr['c'])
+        extra['summary'] = chart_summary(model, tr)
         if C.nonideal():
             high = torch.load(os.path.join(C.DATA, f'{C.ood_set()}.pt'))
             extra['lngamma'] = lngamma_metrics(model, norm, float(high['c'].max()))
@@ -273,7 +269,7 @@ def check():
         at, bt = TR.true_rates(hg, lab, c)
         print(f'{s}: oracle one-way rates against the reference: largest relative error '
               f'{float(((a - at).abs() / at).max()):.2e} {float(((b - bt).abs() / bt).max()):.2e}', flush=True)
-    m = build('chart-ideal' if C.nonideal() else 'chart', C.N_TRAIN, norm)
+    m = build('chart-no-excess', C.N_TRAIN, norm)
     fit_linear(m, dict(train=load_set('train')), C.DT)
     print('NNLS log k', np.round(m.kinetics.core.numpy(), 5).tolist(), 'true', np.round(true_log_k(), 5).tolist(), flush=True)
 

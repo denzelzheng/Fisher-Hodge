@@ -7,7 +7,7 @@ import pytest
 import torch
 
 from neuralchart import chart
-from neuralchart.fit import fit_linear, fit_varpro, state_function_parameters
+from neuralchart.fit import fit_linear, fit_varpro
 from benchmarks.common import CHECKPOINTS
 from benchmarks.reaction_networks import config as C
 from benchmarks.reaction_networks import truth as TR
@@ -109,17 +109,6 @@ def test_closed_form_step_with_learned_potentials_fits_the_rates():
     assert float(((a - at).abs() / at).max()) < 1e-3 and float(((b - bt).abs() / bt).max()) < 1e-3
 
 
-def test_rejected_activity_term_is_frozen():
-    from neuralchart.fit import apply_activity_decision
-    C.configure('schlogl')
-    m = build_chart(chart.CONFIGS['schlogl']['chart'])
-    apply_activity_decision(m, dict(kept=False))
-    assert not any(p.requires_grad for p in state_function_parameters(m)) and float(m.free_energy.s_mu.abs().max()) == 0
-    m = build_chart(chart.CONFIGS['schlogl']['chart'])
-    apply_activity_decision(m, dict(kept=True))
-    assert all(p.requires_grad for p in state_function_parameters(m))
-
-
 def test_heterogeneous_medium():
     """the descriptors enter only through g_theta, which starts at zero, and k does not read the conditions; the medium
     is reproducible and the law is the documented one on a constant map"""
@@ -132,13 +121,14 @@ def test_heterogeneous_medium():
     typ = torch.as_tensor(m.hg.meta['typ'])
     for t in range(4):
         assert float(k[:, typ == t].std()) < 1e-12                 # g = 0 at initialisation: one constant per class
-    assert m.kinetics.residual is not None and build_chart(cfg['chart-const-k']).kinetics.residual is None
+    assert m.kinetics.net is not None and build_chart(cfg['chart-const-k']).kinetics.net is None
     with torch.no_grad():
-        for p in m.kinetics.residual.parameters():
+        for p in m.kinetics.net.parameters():
             p.add_(0.1 * torch.randn(p.shape, generator=g, dtype=p.dtype))
-    k1 = m.prepare(dr)['k']
+    c = random_state(m.hg, 3, g)
+    k1 = m.kinetics(m.prepare(dr)['feats'], c)
     dr2 = dict(dr, dG=dr['dG'] + 1.0, U=dr['U'] * 0.5)
-    assert torch.allclose(m.prepare(dr2)['k'], k1)                  # conditions do not enter k
+    assert torch.allclose(m.kinetics(m.prepare(dr2)['feats'], c), k1)                  # conditions do not enter k
     n, P = C.N_TRAIN, TR.PIXELS
     logm = TR.medium_log_factors(np.zeros((n * P, n * P)), TR.hg_of(n), n)
     tm = np.asarray(TR.hg_of(n).meta['typ'])
@@ -151,12 +141,10 @@ def test_variable_projection_runs():
     tr = _noiseless_schlogl(4, 20)
     C.configure('schlogl_nonideal')
     m = build_chart(chart.CONFIGS['schlogl_nonideal']['chart'])
-    params = state_function_parameters(m)
+    params = m.free_energy.excess_parameters()
     assert params
-    out = fit_varpro(m, dict(train=tr), C.DT, params, max_iters=3, log=lambda *a: None, gate=m.free_energy.s_mu)
+    out = fit_varpro(m, dict(train=tr), C.DT, params, max_iters=3, log=lambda *a: None)
     assert out['iters'] == 3 and math.isfinite(out['residual_end'])
-    ls = out['gate_line_search']
-    assert ls['gate'] >= 0 and ls['residual'] <= ls['residual_start']
 
 
 @pytest.mark.slow

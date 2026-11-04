@@ -6,19 +6,19 @@ physics    local-detailed-balance violations, samples with sigma < 0, negative c
 ablations  the Neural Chart variants and what each one removes
 law        the learned mobility against the true mobility at the reference states (Neural Chart)
 training   parameters, training time, final training loss
-activity   the learned gate s_mu and the largest |ln gamma| of the activity correction over the training densities
+excess     the largest |grad G| and |g_theta| over the training states
 """
 import json
 import os
 
 from neuralchart.chart import ABLATIONS
-from benchmarks.common import LABELS, OWN_FLUX, RESULTS, activity_table, load_runs, write_table, fmt, param_cell
+from benchmarks.common import LABELS, OWN_FLUX, RESULTS, excess_table, load_runs, write_table, fmt, param_cell
 from .test_sets import COLUMNS, LABEL
 
 MODELS = {
-    'porous_media': ['chart', 'chart-ideal', 'chart-no-state', 'chart-const-k', 'chart-learned-drive', 'flux_gnn', 'ude', 'bsms',
+    'porous_media': ['chart', 'chart-const-k', 'chart-no-excess', 'chart-zero-init', 'chart-reversible', 'flux_gnn', 'ude', 'bsms',
                      'fno', 'generic_fno', 'helmfluid', 'persistence'],
-    'porous_media_crowding': ['chart', 'chart-ideal', 'chart-no-state', 'flux_gnn', 'ude', 'bsms', 'fno',
+    'porous_media_crowding': ['chart', 'chart-const-k', 'chart-no-excess', 'chart-zero-init', 'chart-reversible', 'flux_gnn', 'ude', 'bsms', 'fno',
                               'generic_fno', 'helmfluid', 'persistence'],
 }
 LAW_SETS = [('training_conditions', 'unseen media, 32×32 grid'), ('low_porosity', 'unseen low-porosity media'),
@@ -78,7 +78,7 @@ def write_tables(variant, models=None, runs_dir=None, out=None):
             rows.append([LABELS[m], 'full model' if m == 'chart' else ABLATIONS[m]] +
                         [(_set(r, s) or {}).get('err_10T') for s in COLUMNS])
     write_table(os.path.join(out, 'ablations'), ['Method', 'what it removes'] + cols, rows)
-    activity_table(runs, abl, os.path.join(out, 'activity'))
+    excess_table(runs, abl, os.path.join(out, 'excess'))
     r = runs.get('chart')
     if r:
         rows = []

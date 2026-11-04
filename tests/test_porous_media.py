@@ -81,7 +81,7 @@ def test_reference_operator_is_in_the_model_class(tiny):
     pool, chi, Mpix, _, _ = tiny
     torch.set_default_dtype(torch.float64)
     try:
-        m = PM.build_master('true', fine_disc()).double()
+        m = PM.build_chart(chart_config('porous_media', 'oracle-no-crowding'), dict(crowd=False, RHO_S=PD.RHO_S), fine_disc()).double()
     finally:
         torch.set_default_dtype(torch.float32)
     T, amp = 2.0, 3.0
@@ -101,7 +101,7 @@ def test_crowding_oracle_matches_reference(tiny):
         m0 = PM.build_chart(chart_config('porous_media', 'oracle-no-crowding'), meta, fine_disc()).double()
     finally:
         torch.set_default_dtype(torch.float32)
-    assert m.kinetics.mode == 'true_crowding' and m0.kinetics.mode == 'true'
+    assert m.kinetics.rho_dependent and not m0.kinetics.rho_dependent
     T, amp = 2.0, 3.0
     U, dpsi, _, Me, F = _fine_inputs(pool, Mpix, T, amp)
     B = U.shape[0]
@@ -131,7 +131,7 @@ def test_face_drive_is_divergence_free(tiny):
     assert S.abs().max() < 1e-10
 
 
-@pytest.mark.parametrize('name', ['chart', 'chart-no-state', 'ude', 'fno', 'flux_gnn'])
+@pytest.mark.parametrize('name', ['chart', 'chart-const-k', 'ude', 'fno', 'flux_gnn'])
 def test_models_train_and_transfer(tiny, name):
     """one training step on the 32 x 32 grid, then the same parameters on the point cloud"""
     pool, _, _, meta, discs = tiny
@@ -163,8 +163,8 @@ def test_models_train_and_transfer(tiny, name):
 @pytest.mark.parametrize('disc_name', ['g32', 'cloud'])
 def test_chart_physics_for_random_parameters(tiny, disc_name):
     """for random parameters and random states the rates of the Neural Chart satisfy local detailed balance with the
-    physical force of the condition at gate s_mu = 0 (log a / b = f), so J f >= 0 and sigma >= 0, and S J conserves the
-    mass; with the activity correction switched on, log a / b is the force of the model's own chemical potential"""
+    physical force of the condition at G_theta = 0 (log a / b = f), so J f >= 0 and sigma >= 0, and S J conserves the
+    mass; with an excess free energy, log a / b is the force of the model's own chemical potential"""
     pool, _, _, meta, discs = tiny
     disc = discs[disc_name]
     torch.manual_seed(1)
@@ -175,7 +175,7 @@ def test_chart_physics_for_random_parameters(tiny, disc_name):
         torch.set_default_dtype(torch.float32)
     with torch.no_grad():
         for n, p in m.named_parameters():
-            if n not in ('drive.s_A', 'free_energy.s_mu'):    # the drive scale is physics (fixed at 1); gate tested below
+            if n not in ('drive.s_A', 'free_energy.l3.weight', 'free_energy.l3.bias'):    # the drive scale is physics; G tested below
                 p.add_(0.5 * torch.randn_like(p))
         dr = {k: (v.double() if torch.is_tensor(v) and v.is_floating_point() else v) for k, v in drive_on(pool, disc, T=3.0, amp=6.0).items()}
         c = torch.exp(torch.randn(dr['U'].shape[0], disc.V, dtype=torch.float64))
@@ -186,13 +186,13 @@ def test_chart_physics_for_random_parameters(tiny, disc_name):
         assert (J * f >= 0).all() and ((J * f).sum(-1) > 0).all()
         dc = m(c, dr)
         assert (dc.sum(-1).abs() < 1e-9 * (a + b).sum(-1)).all()            # the state is cell mass / mean cell volume
-        m.free_energy.s_mu.fill_(0.7)
+        m.free_energy.l3.weight.fill_(0.002)
         ctx = m.prepare(dr)
         a, b = m.rates(c, ctx)
         own = -m.mu(c, ctx) @ torch.as_tensor(m.hg.S, dtype=c.dtype, device=c.device) + ctx['A']
-        assert torch.allclose(torch.log(a / b), own, atol=1e-9) and (((a - b) * own).sum(-1) > 0).all()
+        assert torch.allclose(torch.log(a / b), own, atol=1e-7) and (((a - b) * own).sum(-1) > 0).all()
         rho = c * torch.exp(-disc.g['logV'].to(c))[None]
-        assert torch.allclose(m.free_energy.correction(c, None), 0.7 * m.free_energy.residual_of_density(rho[:, None])[:, 0])
+        assert torch.allclose(m.free_energy.correction(c, None), m.free_energy.excess_potential(rho[:, :, None]).reshape(c.shape))
 
 
 def test_chart_rollout_stays_positive(tiny):

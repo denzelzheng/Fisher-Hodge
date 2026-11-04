@@ -9,6 +9,7 @@ Physics (sampled every 10 steps of the 10T rollout):
   * the fraction of negative cell values (every model).
 The edge statistics need the model's own edge flux.  For models without one they are reported as N/A.
 """
+import math
 import time
 
 import numpy as np
@@ -18,7 +19,7 @@ from neuralchart import fast
 from neuralchart.chart import NeuralChart
 from neuralchart.diagnostics import ldb_violation, relerr_traj
 from neuralchart.fit import rollout
-from .data import DT, RHO_S
+from .data import D, DT, RHO_S
 from .models import rebind
 from .test_sets import TEST_SETS
 
@@ -66,7 +67,7 @@ def k_metrics(model, sd, disc):
     idx = torch.as_tensor(first, device=sd['c'].device)
     drive = {k: v[idx] for k, v in sd['drive'].items() if torch.is_tensor(v) and v.shape[0] == len(med)}
     feats = model.featurizer(drive)
-    gh = torch.exp(model.kinetics.kappa(feats)).double().cpu().numpy().ravel()
+    gh = torch.exp(model.kinetics.core.double()[model.kinetics.typ] - math.log(D))[None].expand(feats['edge_sym'].shape[:2]).cpu().numpy().ravel()
     gt = disc.mtrue[sd['pool']][torch.as_tensor(med[first])].double().cpu().numpy().ravel()
     eps = (0.5 * (drive['ein'][..., 0] + 1)).double().cpu().numpy().ravel()
     lh, lt = np.log(gh), np.log(gt)
@@ -81,19 +82,21 @@ def k_metrics(model, sd, disc):
 @torch.no_grad()
 def k_metrics_state(model, sd, disc, crowd, every=20):
     """learned against true edge mobility at the same states: the reference densities of every test trajectory, sampled
-    every `every` steps over 10T.  Learned: exp(kappa(xi_e) + s m(log rhobar_e)) (the material part only for a model
-    without a state term).  True: the edge-averaged mobility M_e, divided by (1 + rhobar_e / RHO_S) under crowding,
-    with rhobar_e the mean density of the two cells on the same reference state."""
+    every `every` steps over 10T.  Learned: omega exp(g(class, xi_e, log rhobar_e)) / D.  True: the edge-averaged mobility M_e,
+    divided by (1 + rhobar_e / RHO_S) under crowding, with rhobar_e the mean density of the two cells on the same reference
+    state."""
     kin = model.kinetics
     feats = model.featurizer(sd['drive'])
-    kap = kin.kappa(feats).double()                                          # (N, H)
-    gt0 = disc.mtrue[sd['pool']][sd['med'].to(disc.mtrue[sd['pool']].device)].double().to(kap.device)
-    C = sd['c'][:, ::every].double().to(kap.device)                           # (N, S, n)
+    x = feats['edge_sym']
+    gt0 = disc.mtrue[sd['pool']][sd['med'].to(disc.mtrue[sd['pool']].device)].double().to(x.device)
+    C = sd['c'][:, ::every].double().to(x.device)                             # (N, S, n)
     rho = C * feats['invV'].double()[None, None]
     rbar = 0.5 * (rho[..., feats['tail']] + rho[..., feats['head']])          # (N, S, H)
-    lh = kap[:, None].expand_as(rbar).clone()
-    if getattr(kin, 'mode', '') == 'material_state':
-        lh = lh + kin.state_branch(torch.log(rbar.clamp_min(kin.RHO_FLOOR)))
+    core = kin.core.double()[kin.typ] - math.log(D)
+    lh = core[None, None].expand_as(rbar).clone()
+    if kin.rho_dependent:
+        for t in range(C.shape[1]):
+            lh[:, t] = lh[:, t] + kin.state_term(x.double(), C[:, t])
     gt = gt0[:, None] / (1 + rbar / RHO_S) if crowd else gt0[:, None].expand_as(rbar)
     gh, gt = torch.exp(lh).cpu().numpy().ravel(), gt.cpu().numpy().ravel()
     eps = (0.5 * (feats['ein'][..., 0] + 1)).double()[:, None].expand_as(rbar).cpu().numpy().ravel()
