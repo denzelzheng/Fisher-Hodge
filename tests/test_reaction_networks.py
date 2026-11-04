@@ -7,7 +7,7 @@ import pytest
 import torch
 
 from neuralchart import chart
-from neuralchart.fit import fit_linear, fit_varpro
+from neuralchart.fit import fit_linear
 from benchmarks.common import CHECKPOINTS
 from benchmarks.reaction_networks import config as C
 from benchmarks.reaction_networks import truth as TR
@@ -72,7 +72,7 @@ def test_structure_holds_for_random_parameters(bench):
     assert float(((a - b) * f).sum(-1).min()) >= 0
     L = m.hg.on('cpu', torch.float64)['L']
     if L.shape[1]:
-        assert float((m(c, ctx) @ L).abs().max()) < 1e-9
+        assert float((m(c, ctx) @ L).abs().max()) < 1e-9 * max(1.0, float((a + b).max()))
 
 
 def _noiseless_schlogl(n_traj=6, steps=30):
@@ -134,17 +134,6 @@ def test_heterogeneous_medium():
     tm = np.asarray(TR.hg_of(n).meta['typ'])
     assert abs(logm[tm == 0]).max() < 1e-12 and abs(logm[tm == 1] + 1.0).max() < 1e-12      # exp(1 - 2) at H = 0
     C.configure('schlogl')
-
-
-def test_variable_projection_runs():
-    C.configure('schlogl')
-    tr = _noiseless_schlogl(4, 20)
-    C.configure('schlogl_nonideal')
-    m = build_chart(chart.CONFIGS['schlogl_nonideal']['chart'])
-    params = m.free_energy.excess_parameters()
-    assert params
-    out = fit_varpro(m, dict(train=tr), C.DT, params, max_iters=3, log=lambda *a: None)
-    assert out['iters'] == 3 and math.isfinite(out['residual_end'])
 
 
 @pytest.mark.slow

@@ -58,7 +58,6 @@ class ChartConfig:
     rtol: float = 1e-4
     precision: Optional[str] = 'fp32'
     excess: str = 'learned'
-    varpro: bool = False
 
     def __post_init__(s):
         assert s.task in TASKS and s.mu0 in ('given', 'learned') and s.drive in ('fixed', 'off')

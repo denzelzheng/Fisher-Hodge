@@ -10,7 +10,7 @@ import torch
 
 from neuralchart import fast
 from neuralchart.chart import NeuralChart, fit_chart
-from neuralchart.fit import take, rollout, fit_linear
+from neuralchart.fit import chart_summary, take, rollout, fit_linear
 from benchmarks.common import check_gpu
 from .config import (DT, W_TRAIN, N_TRAIN, H_GRID, STEP, MAXSUB_TRAIN, MAXSUB_EVAL, ITERS, LR, BATCH, KMIN, KMAX, BUDGET_S,
                      RUNS)
@@ -28,12 +28,19 @@ def set_max_sub(model, k):
             st['max_sub'] = k
 
 
+def _save_ckpt(path, state):
+    tmp = path + '.tmp'
+    torch.save(state, tmp)
+    os.replace(tmp, path)                          # a killed job leaves the previous complete checkpoint
+
+
 def train_budget(model, tr, iters, seed, dt, batch=8, lr=1e-3, kmin=4, kmax=8, log=print, budget_s=BUDGET_S,
-                 eta_min=1e-5, elapsed0=0.0):
+                 eta_min=1e-5, elapsed0=0.0, ckpt=None, resume=False):
     """neuralchart.fit.train (same sampling, loss, Adam, gradient clip) with a wall-clock budget: the cosine learning
     rate follows the progress p = max(step / iters, elapsed / budget_s), and training stops at p = 1.  A model that
     keeps step / iters >= elapsed / budget_s throughout gets exactly the step-count cosine.  Also records the largest
-    number of substeps per sampling interval in every step."""
+    number of substeps per sampling interval in every step.  ckpt: a checkpoint written every 100 steps; resume=True
+    continues exactly from it."""
     rng = np.random.default_rng(10_000 + seed)
     C = tr['c']; ntr = C.shape[0]
     window = C.shape[1] - 1
@@ -43,6 +50,16 @@ def train_budget(model, tr, iters, seed, dt, batch=8, lr=1e-3, kmin=4, kmax=8, l
     t0 = time.time() - elapsed0
     model.train()
     it, p, trunc = 0, 0.0, False
+    st0 = getattr(getattr(model, '_fast', None), 'stepper', None)
+    if resume:
+        ck = torch.load(ckpt, map_location=next(iter(model.parameters())).device, weights_only=False)
+        model.load_state_dict(ck['model']); opt.load_state_dict(ck['opt'])
+        rng.bit_generator.state = ck['rng']
+        it, hist, subs, smax, nskip = ck['it'], ck['hist'], ck['subs'], ck['smax'], ck['nskip']
+        t0 = time.time() - ck['elapsed']
+        if st0 is not None:
+            st0.cap_hits = ck.get('cap_hits', 0)
+        log(f'resumed from {ckpt}: step {it}, elapsed {ck["elapsed"]:.0f}s')
     while it < iters:
         p = max(it / iters, (time.time() - t0) / budget_s)
         if p >= 1.0:
@@ -75,6 +92,9 @@ def train_budget(model, tr, iters, seed, dt, batch=8, lr=1e-3, kmin=4, kmax=8, l
                 f'(max {max(smax[-100:])}) lr {opt.param_groups[0]["lr"]:.2e} p {p:.3f} skipped {nskip} t {time.time() - t0:.0f}s'
                 + fast.cap_report(model))
         it += 1
+        if ckpt is not None and it % 100 == 0:
+            _save_ckpt(ckpt, dict(model=model.state_dict(), opt=opt.state_dict(), rng=rng.bit_generator.state, it=it, hist=hist, subs=subs,
+                                  smax=smax, nskip=nskip, elapsed=time.time() - t0, cap_hits=st0.cap_hits if st0 is not None else 0))
     el = time.time() - t0
     log(f'training ended: {it} steps, {el:.0f}s, truncated by the budget: {trunc}, final loss {np.mean(hist[-100:]) if hist else float("nan"):.4e}')
     return dict(train_time_s=el, final_train_loss=float(np.mean(hist[-100:])) if hist else None, train_nskip=nskip,
@@ -173,7 +193,8 @@ def accelerate(model, kw):
     return model
 
 
-def run_train(name, seed=0, iters=ITERS, device='cuda', lr=LR, fast_kw=None, data=None, out=None, ckpt_dir=None, budget_s=None):
+def run_train(name, seed=0, iters=ITERS, device='cuda', lr=LR, fast_kw=None, data=None, out=None, ckpt_dir=None, budget_s=None,
+              resume=False):
     """train and evaluate one model; writes <out>/<name>.json, .log and the rollout snapshots <out>/snapshots/<name>.npz
     (out defaults to runs/brusselator) and the checkpoint <ckpt_dir>/<name>.pt (default: out)"""
     out = out or RUNS
@@ -187,7 +208,9 @@ def run_train(name, seed=0, iters=ITERS, device='cuda', lr=LR, fast_kw=None, dat
         tr['c'] = tr['c'].float()
         tr['drive'] = {k: v.float() for k, v in tr['drive'].items()}
     os.makedirs(out, exist_ok=True); os.makedirs(ckpt_dir, exist_ok=True)
-    logf = open(os.path.join(out, name + '.log'), 'w')
+    ckf = os.path.join(out, name + '.ckpt.pt')
+    resume = bool(resume and os.path.exists(ckf))
+    logf = open(os.path.join(out, name + '.log'), 'a' if resume else 'w')
 
     def log(*a):
         s = ' '.join(str(x) for x in a); print(s, flush=True); logf.write(s + '\n'); logf.flush()
@@ -210,8 +233,12 @@ def run_train(name, seed=0, iters=ITERS, device='cuda', lr=LR, fast_kw=None, dat
     elif is_chart:
         after = (lambda m: log(f'NNLS log k {m.kinetics.core.detach().cpu().numpy().round(4).tolist()} '
                                f'true {np.round(true_log_k(), 4).tolist()}')) if model.config.mu0 == 'given' else None
-        info = fit_chart(model, tr, DT, iters, seed, log=log, trainer=train_budget, after_linear=after,
-                         batch=BATCH, lr=lr, kmin=KMIN, kmax=KMAX, budget_s=budget_s or BUDGET_S)
+        kw = dict(batch=BATCH, lr=lr, kmin=KMIN, kmax=KMAX, budget_s=budget_s or BUDGET_S, ckpt=ckf if model.config.train else None)
+        if resume:
+            info = train_budget(model, tr, iters, seed, DT, log=log, resume=True, **kw)
+            info['summary'] = chart_summary(model, tr)
+        else:
+            info = fit_chart(model, tr, DT, iters, seed, log=log, trainer=train_budget, after_linear=after, **kw)
         trained = model.config.train
     elif name != 'persistence':
         info = {}
@@ -231,6 +258,8 @@ def run_train(name, seed=0, iters=ITERS, device='cuda', lr=LR, fast_kw=None, dat
     if res.get('fast') is not None:
         res['fast']['capped_DT'] = capped_train
     write_result(out, name, res)
+    if os.path.exists(ckf):
+        os.remove(ckf)
     log('done')
     return res
 

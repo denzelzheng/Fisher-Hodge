@@ -11,9 +11,6 @@ channels whose log K is the same function of theta into classes r and integrate 
 with kappa_r >= 0 the factor by which class r has to change.  This is a non-negative least-squares problem (NNLS),
 convex, so its optimum is global (fit_linear).  The optimum is mapped back to theta by least squares on log kappa.
 
-Variable projection (fit_varpro).  omega is the NNLS optimum at every value of the free energy G_theta, and G_theta descends
-the projected derivative residual.
-
 Rollout refinement (train).  Every parameter is then refined on multi-step rollouts: K in [kmin, kmax] steps from a
 random start inside the training window, batch 8, Adam with a cosine schedule, gradient clip 1.
 """
@@ -215,65 +212,6 @@ def fit_linear(model, data, dt, rule='simpson', floor=1e-6, batch=16, log=print)
     return info
 
 
-def _projected_residual_backward(model, tr, dt, batch=16):
-    """the relative derivative residual of fit_linear (Simpson rule, the same weights) at the current parameters, as
-    a differentiable function of every parameter; backpropagates it (batch by batch) and returns its value"""
-    C = tr['c']
-    B, T1, M = C.shape
-    hg = model.hg
-    yy = 0.0
-    for s0 in range(0, B, batch):
-        Cb = C[s0:s0 + batch].double()
-        om = 1.0 / torch.linalg.vector_norm(Cb[:, 2:], dim=-1)
-        yy += float((((Cb[:, 2:] - Cb[:, :-2]) * om[..., None]) ** 2).sum())
-    tot = 0.0
-    for s0 in range(0, B, batch):
-        idx = torch.arange(s0, min(B, s0 + batch), device=C.device)
-        ctx = model.prepare(_take(tr['drive'], idx))
-        Cb = C[idx]
-        J = torch.stack([(lambda ab: ab[0] - ab[1])(model.rates(Cb[:, t], ctx)) for t in range(T1)], 1).double()
-        I = dt / 3 * (J[:, :-2] + 4 * J[:, 1:-1] + J[:, 2:])
-        pred = hg.apply_S(I.reshape(-1, hg.H)).reshape(len(idx), T1 - 2, M)
-        Cd = Cb.double()
-        om = 1.0 / torch.linalg.vector_norm(Cd[:, 2:], dim=-1)
-        loss = ((((Cd[:, 2:] - Cd[:, :-2]) - pred) * om[..., None]) ** 2).sum() / yy
-        loss.backward()
-        tot += float(loss.detach())
-    return tot
-
-
-def fit_varpro(model, data, dt, params, max_iters=2000, lr=1e-2, window=100, min_gain=0.05, batch=16, log=print):
-    """variable-projected closed-form fit.  The linear parameters (the log-rate core, given or learned potentials) are
-    the NNLS optimum (fit_linear) at the current value of the nonlinear state-function parameters `params` (the free energy
-    G_theta); `params` descend the projected derivative residual (Adam, lr, clip 1; by the envelope theorem the gradient at
-    fixed optimal linear parameters is the gradient of the projected residual).  Fixed stopping rule: the projected
-    residual improved by less than min_gain (relative) over the last `window` iterations, or max_iters."""
-    tr = data['train'] if 'train' in data else data
-    t0 = time.time()
-    quiet = lambda *a: None
-    opt = torch.optim.Adam(params, lr=lr)
-    hist, it = [], 0
-    while True:
-        fit_linear(model, tr, dt, log=quiet)                      # omega: the NNLS optimum at the current state functions
-        opt.zero_grad(set_to_none=True)
-        with torch.enable_grad():
-            hist.append(_projected_residual_backward(model, tr, dt, batch))
-        if it % 50 == 0:
-            log(f'varpro it {it:4d}: projected derivative residual {hist[-1]:.4e} t {time.time() - t0:.0f}s')
-        stop = (it >= window and hist[-1] > (1 - min_gain) * hist[-1 - window]) or it >= max_iters or not math.isfinite(hist[-1])
-        if stop:
-            break
-        torch.nn.utils.clip_grad_norm_(params, 1.0)
-        opt.step()
-        it += 1
-    for p in model.parameters():
-        p.grad = None
-    info = fit_linear(model, tr, dt, log=log)                     # final omega at the final state functions
-    out = dict(linear_fit=info, iters=it, residual_start=hist[0], residual_end=hist[-1], time_s=time.time() - t0, curve=hist[::10])
-    log(f'varpro: {it} iterations, projected derivative residual {hist[0]:.4e} -> {hist[-1]:.4e}, {out["time_s"]:.0f}s')
-    return out
-
-
 # ------------------------------------------------------------------------------------------ rollout training
 def take(drive, idx):
     return {k: v[idx] for k, v in drive.items()}
@@ -384,11 +322,6 @@ def fit_chart(model, tr, dt, iters, seed=0, log=print, trainer=None, after_linea
     if cfg.init == 'nnls':
         assert model.linear_parameters(), 'no linear parameters for the closed-form step'
         info['linear_fit'] = fit_linear(model, dict(train=tr), dt, log=log)
-        params = model.free_energy.excess_parameters() if cfg.varpro else []
-        if params:
-            info['varpro'] = fit_varpro(model, dict(train=tr), dt, params, log=log)
-            info['varpro'].pop('linear_fit', None)
-            train_kw = dict(train_kw, elapsed0=info['varpro']['time_s'])
         if after_linear is not None:
             after_linear(model)
     if iters > 0:

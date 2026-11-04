@@ -82,6 +82,7 @@ def main(argv=None):
     p.add_argument('--seed', type=int, default=0)
     p.add_argument('--iters', type=int, default=ITERS)
     p.add_argument('--budget_h', type=float, default=None, help='train: wall-clock budget of the training in hours (default 12)')
+    p.add_argument('--resume', action='store_true', help='train: continue from the last checkpoint of the run')
     p.add_argument('--lr', type=float, default=LR)
     p.add_argument('--device', default='cuda')
     p.add_argument('--sets', nargs='*', default=list(GEN), help='generate: the sets to compute')
@@ -105,7 +106,7 @@ def main(argv=None):
     elif a.cmd == 'train':
         from .training import run_train
         run_train(a.model, a.seed, a.iters, a.device, a.lr, fkw, data=a.data, out=a.out, ckpt_dir=a.checkpoint_dir,
-                  budget_s=None if a.budget_h is None else a.budget_h * 3600)
+                  budget_s=None if a.budget_h is None else a.budget_h * 3600, resume=a.resume)
     elif a.cmd == 'evaluate':
         cmd_evaluate(a, fkw)
     elif a.cmd == 'tables':

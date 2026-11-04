@@ -202,7 +202,7 @@ def run_train(name, seed=0, iters=None, device='cuda', lr=None, resume=False):
             fitted = fit_chart(model, tr, C.DT, 0, seed, log=log)
         if model.config.train and iters > 0:      # ... then the rollout refinement
             fitted.update(train_budget(model, tr, iters, seed, C.DT, batch=C.BATCH, lr=lr, kmin=C.KMIN, kmax=C.KMAX, log=log,
-                                       elapsed0=fitted.get('varpro', {}).get('time_s', 0.0), ckpt=ckpt, resume=resume,
+                                       ckpt=ckpt, resume=resume,
                                        pre_info=dict(fitted)))
         info = fitted if model.config.train else info
     elif name == 'bsms':
