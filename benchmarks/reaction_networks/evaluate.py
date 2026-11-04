@@ -46,12 +46,20 @@ def lngamma_metrics(model, norm, ood_max):
                 table=dict(x=xt.tolist(), model=lngamma_curve(model, xt).tolist(), true=TR.lng_np(xt, TR.PHI).tolist()))
 
 
+def _law(a, b):
+    """learned a against true b (log k or an excess potential), flattened numpy"""
+    from scipy.stats import spearmanr
+    ok = a.std() > 1e-12 and b.std() > 1e-12
+    return dict(pearson=float(np.corrcoef(a, b)[0, 1]) if ok else None, spearman=float(spearmanr(a, b).statistic) if ok else None,
+                rmse=float(np.sqrt(np.mean((a - b) ** 2))), slope=float(np.polyfit(b, a, 1)[0]) if ok else None,
+                median_diff=float(np.median(a - b)), std_true=float(b.std()), max_abs=float(np.abs(a).max()))
+
+
 @torch.no_grad()
 def k_law(model, sd, hg, every=20):
-    """the learned symmetric rate constant against the true one on the test states (the reference states of the set, every
-    `every` steps), per hyperedge class and over all hyperedges: Pearson and Spearman r of log k, relative L2 error of k,
-    median log ratio (learned / true)"""
-    from scipy.stats import spearmanr
+    """the learned symmetric rate constant against the true one on the reference states of a test set, over all hyperedges and per
+    class on the phosphorylation networks"""
+    from .models import true_log_k
     dev = next(iter(model.parameters())).device
     dt = next_dtype(model)
     drive = {k: v.to(dev).to(dt) for k, v in sd['drive'].items()}
@@ -64,36 +72,32 @@ def k_law(model, sd, hg, every=20):
         if model.kinetics.rho_dependent:
             k = k * torch.exp(model.kinetics.state_term(ctx['feats']['edge_sym'], c))
         lm.append(torch.log(k).double().cpu())
-        lt.append(TR.pc_true_log_k(hg, sd['drive'], c.double().cpu()))
+        lt.append(TR.pc_true_log_k(hg, sd['drive'], c.double().cpu()) if C.is_pc() else
+                  torch.as_tensor(true_log_k(), dtype=torch.float64)[typ][None].expand(c.shape[0], -1))
     lm, lt = torch.cat(lm), torch.cat(lt)
-    out = {}
-    for name, mask in (('all', torch.ones_like(typ, dtype=torch.bool)), ('R1', typ == 0), ('R2', typ == 1), ('transport X', typ == 2),
-                       ('transport Xp', typ == 3)):
-        a, b = lm[:, mask].reshape(-1).numpy(), lt[:, mask].reshape(-1).numpy()
-        out[name] = dict(pearson_logk=float(np.corrcoef(a, b)[0, 1]) if a.std() > 1e-12 and b.std() > 1e-12 else 0.0,
-                         spearman_logk=float(spearmanr(a, b).statistic) if a.std() > 1e-12 and b.std() > 1e-12 else 0.0,
-                         relerr_k=float(np.linalg.norm(np.exp(a) - np.exp(b)) / np.linalg.norm(np.exp(b))),
-                         median_logratio=float(np.median(a - b)), std_log_true=float(b.std()))
-    return out
+    groups = [('all', torch.ones_like(typ, dtype=torch.bool))]
+    if C.is_pc():
+        groups += [('R1', typ == 0), ('R2', typ == 1), ('transport X', typ == 2), ('transport Xp', typ == 3)]
+    return {n: _law(lm[:, mk].reshape(-1).numpy(), lt[:, mk].reshape(-1).numpy()) for n, mk in groups}
 
 
 @torch.no_grad()
 def excess_law(model, sd, every=20):
-    """interacting phosphorylation cycle: the learned excess potential against the true one on the reference test states, per
-    species: Pearson r, RMSE, slope (learned against true), and the standard deviation of the true one"""
+    """the learned excess potential against the true one on the reference states of a test set, overall and per species"""
     dev = next(iter(model.parameters())).device
     dt = next_dtype(model)
     fe = model.free_energy
     L, Tt = [], []
     for t in range(0, sd['c'].shape[1], every):
         c = sd['c'][:, t].to(dev).to(dt)
-        L.append(fe.correction(c, None).double().cpu()); Tt.append(TR.pc_excess(c.double().cpu()))
-    L, Tt = torch.cat(L).chunk(3, -1), torch.cat(Tt).chunk(3, -1)
-    out = {}
-    for name, a, b in zip(('X', 'Xp', 'E'), L, Tt):
-        a, b = a.reshape(-1).numpy(), b.reshape(-1).numpy()
-        out[name] = dict(pearson=float(np.corrcoef(a, b)[0, 1]) if a.std() > 1e-12 else 0.0, rmse=float(np.sqrt(np.mean((a - b) ** 2))),
-                         slope=float(np.polyfit(b, a, 1)[0]), std_true=float(b.std()))
+        L.append(fe.correction(c, None).double().cpu())
+        cd = c.double().cpu()
+        Tt.append(TR.pc_excess(cd) if C.interacting() else TR.lng_t(cd, TR.PHI) if C.nonideal() else torch.zeros_like(cd))
+    L, Tt = torch.cat(L), torch.cat(Tt)
+    out = dict(all=_law(L.reshape(-1).numpy(), Tt.reshape(-1).numpy()))
+    if C.is_pc():
+        for name, a, b in zip(('X', 'Xp', 'E'), L.chunk(3, -1), Tt.chunk(3, -1)):
+            out[name] = _law(a.reshape(-1).numpy(), b.reshape(-1).numpy())
     return out
 
 
@@ -223,10 +227,10 @@ def eval_set(name, model, sd, n, log, snap, sname):
         at, bt = TR.true_rates(hg, lab, Yc[:, 0])
         ct = TR.model_cycle_affinity((torch.log(at) - torch.log(bt)).double(), V).numpy()
         m['cycle_affinity'] = dict(model_mean=float(ca.mean()), true_mean=float(ct.mean()), mae=float(np.abs(ca - ct).mean()))
-    if C.is_pc() and name.startswith('chart'):
-        m['k_law'] = k_law(model, sd, hg)
-        if C.interacting():
-            m['excess_law'] = excess_law(model, sd)
+    if name.startswith('chart'):
+        if C.is_pc() or C.SYSTEM == 'mapk_cascade':
+            m['k_law'] = k_law(model, sd, hg)
+        m['excess_law'] = excess_law(model, sd)
     idx = list(range(min(4, B)))
     snap[f'R_{sname}'] = R[idx].numpy().astype(np.float32)
     if sname == 'planar_fronts':             # front speed against b across the Maxwell point (a = 3)

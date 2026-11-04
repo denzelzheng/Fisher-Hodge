@@ -233,7 +233,7 @@ def run_train(name, seed=0, iters=None, device='cuda', lr=None, resume=False):
     extra = {}
     if is_chart:
         extra = dict(log_k=model.kinetics.core.detach().cpu().tolist(), mu0=model.free_energy.mu0.detach().cpu().tolist(),
-                     chem_mu0=model.drive.chem_mu0.detach().cpu().tolist(), log_k_true=true_log_k())
+                     chem_mu0=model.drive.chem_mu0_value().detach().cpu().tolist(), log_k_true=true_log_k())
         extra['summary'] = chart_summary(model, tr)
         if C.nonideal():
             high = torch.load(os.path.join(C.DATA, f'{C.ood_set()}.pt'))

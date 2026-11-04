@@ -274,7 +274,7 @@ class Drive(nn.Module):
             s.register_buffer('mu0_p', torch.as_tensor(np.linalg.pinv(Cm) @ cv, dtype=torch.get_default_dtype()))
             N = scipy.linalg.null_space(Cm)
             s.register_buffer('mu0_N', torch.as_tensor(N, dtype=torch.get_default_dtype()))
-            s.chem_mu0_free = nn.Parameter(torch.zeros(N.shape[1]))
+            s.chem_mu0_free = nn.Parameter(torch.zeros(N.shape[1])) if N.shape[1] else None
         Hm = hg.meta.get('harmonic') if harmonic else None
         if Hm is not None and Hm.shape[1]:
             s.register_buffer('Hm', torch.as_tensor(Hm, dtype=torch.get_default_dtype()))
@@ -304,7 +304,7 @@ class Drive(nn.Module):
         """the learned chemostat standard potentials (None when they are not learned)"""
         if s.chem_mu0_free is not None:
             return s.mu0_p + s.mu0_N @ s.chem_mu0_free
-        return s.chem_mu0
+        return s.mu0_p if hasattr(s, 'mu0_p') else s.chem_mu0
 
 
 # ------------------------------------------------------------------------------------------ the model

@@ -108,21 +108,21 @@ class TrueMediumMobility(Mobility):
         return TR.pc_state_logk(s.hg, c)
 
 
-def _base(hg, cls, excess, material, featurizer):
+def _base(hg, cls, excess, material, featurizer, known=None):
     with default_dtype(torch.float64):
         m = cls.from_parts(hg, harmonic=False, step=dict(C.STEP), learn_mu0=True, learn_chem_mu0=True, featurizer=featurizer,
-                           excess=excess == 'learned', material=material)
+                           excess=excess == 'learned', material=material, chem_mu0_known=known)
     m = m.double()
     m.step = dict(C.STEP)
     return m
 
 
-def base_model(n, excess='none', material=False):
+def base_model(n, excess='none', material=False, known=None):
     """the Neural Chart on the n x n grid of the benchmark; the inputs (featurizer) are all that differs"""
     hg = TR.hg_of(n)
     feat = (TR.mapk_featurizer(hg, False) if C.SYSTEM == 'mapk_cascade' else pc_featurizer(hg, C.hetero()) if C.is_pc()
             else chem_featurizer(hg))
-    return _base(hg, chart.NeuralChart, excess, material, feat)
+    return _base(hg, chart.NeuralChart, excess, material, feat, known)
 
 
 def _pc_ref_state(hg):
@@ -164,7 +164,15 @@ def set_true(m):
     return m
 
 
-_TRUE_LOGK = {}
+_TRUE_LOGK, _CHEM_MU0 = {}, {}
+
+
+def known_chem_mu0():
+    """the standard free energies of the chemostats, from the reference model: (C, v) of Drive, every chemostat known"""
+    if C.SYSTEM not in _CHEM_MU0:
+        _CHEM_MU0[C.SYSTEM] = set_true(base_model(4)).drive.chem_mu0.detach().cpu().numpy()
+    v = _CHEM_MU0[C.SYSTEM]
+    return np.eye(len(v)), v
 
 
 def true_log_k():
@@ -181,7 +189,8 @@ def build_chart(cfg, n=None, norm=None):
     assert cfg.task in chart.REACTION_TASKS and cfg.kappa in ('learned', 'constant', 'true')
     if cfg.task != C.SYSTEM:
         C.configure(cfg.task)
-    m = base_model(n, 'learned' if cfg.excess == 'learned' else 'none', cfg.kappa == 'learned')
+    known = known_chem_mu0() if cfg.chem_mu0 == 'known' and cfg.kappa != 'true' and cfg.mu0 != 'given' else None
+    m = base_model(n, 'learned' if cfg.excess == 'learned' else 'none', cfg.kappa == 'learned', known)
     if cfg.kappa == 'true' or cfg.mu0 == 'given':
         set_true(m)
     if cfg.kappa != 'true' and cfg.mu0 == 'given':

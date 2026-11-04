@@ -44,6 +44,7 @@ class ChartConfig:
     kappa        'learned' (omega and g_theta), 'constant' (omega alone), 'true' (the true k: oracle) or 'true_material' (porous
                  media with crowding: the true material mobility without the crowding factor)
     init         'nnls' (closed-form omega) or 'one' (omega = 1: the ablation without convex initialisation)
+    chem_mu0     'known' (the standard free energies of the chemostats are an input; internal species stay learned) or 'learned'
     excess       'learned' (G_theta), 'none' (no excess free energy) or 'true' (the generator's, oracle only)
     fast, control, rtol, precision: the integrator (neuralchart.fast)"""
     task: str
@@ -57,6 +58,7 @@ class ChartConfig:
     rtol: float = 1e-4
     precision: Optional[str] = 'fp32'
     excess: str = 'learned'
+    chem_mu0: str = 'known'
 
     def __post_init__(s):
         assert s.task in TASKS and s.mu0 in ('given', 'learned') and s.drive in ('fixed', 'off')
@@ -78,6 +80,7 @@ def _ablations(base, oracle_excess='none', given=True):
     }
     if given:
         out['chart-given-mu0'] = base.replace(mu0='given')
+        out['chart-learned-chem-mu0'] = base.replace(chem_mu0='learned')
     return out
 
 
@@ -104,6 +107,7 @@ ABLATIONS = {
     'chart-zero-init': 'the closed-form NNLS start: omega starts at 1',
     'chart-reversible': 'the drive: A = 0, so the model is reversible',
     'chart-no-excess': 'the excess free energy G_theta',
+    'chart-learned-chem-mu0': 'the known standard free energies of the chemostats: they are learned',
     'flux_gnn': 'the chart: a graph network gives the one-way rates, with no chemical potential, force or symmetric mobility',
     'oracle': 'nothing learned: the true rates in the Neural Chart class',
     'oracle-no-crowding': 'nothing learned: the true material mobility without the crowding factor',

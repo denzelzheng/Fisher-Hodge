@@ -93,8 +93,8 @@ def k_law_table(R, models, stem):
         S = (R.get(m) or {}).get('sets', {})
         for s, lab in _cols():
             for cl, g in ((S.get(s) or {}).get('k_law') or {}).items():
-                rows.append([LABELS[m], lab, cl, g['pearson_logk'], g['spearman_logk'], g['relerr_k'], f'{g["median_logratio"]:+.2f}', g['std_log_true']])
-    return write_table(stem, ['Method', 'test set', 'hyperedges', 'Pearson r of log k', 'Spearman r of log k', 'relative L2 error of k',
+                rows.append([LABELS[m], lab, cl, g['pearson'], g['spearman'], g['rmse'], f'{g["median_diff"]:+.2f}', g['std_true']])
+    return write_table(stem, ['Method', 'test set', 'hyperedges', 'Pearson r of log k', 'Spearman r of log k', 'RMSE of log k',
                               'median log ratio (learned / true)', 'standard deviation of the true log k'], rows)
 
 
@@ -155,9 +155,10 @@ def make_tables(runs=None):
         lngamma_curve_table(R, os.path.join(out, 'activity_coefficient_curve'))
     if C.SYSTEM == 'mapk_cascade':
         mapk_table(R, MAIN + ABLATIONS[2:-1], os.path.join(out, 'conservation_and_output'))
-    if C.hetero() or C.saturating() or C.interacting():
+    if C.is_pc() or C.SYSTEM == 'mapk_cascade':
         k_law_table(R, ['chart', 'chart-given-mu0', 'chart-const-k'], os.path.join(out, 'law'))
-    if C.interacting():
+    excess_law_table_on = True
+    if excess_law_table_on:
         excess_law_table(R, ['chart', 'chart-given-mu0', 'chart-const-k'], os.path.join(out, 'excess_law'))
     if C.SYSTEM == 'schlogl':
         front_table(R, MAIN + ABLATIONS[2:-1], os.path.join(out, 'fronts'))
