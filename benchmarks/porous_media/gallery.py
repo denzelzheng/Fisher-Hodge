@@ -13,7 +13,7 @@ solution, summed over the fine pixel faces that separate two cells of the discre
 flagged.
 
   medium_and_law.png   an unseen medium: the pore map, the true mobility, and the learned mobility of the Neural Chart
-                       on the 32 x 32 grid and on the point cloud (same parameters, no retraining).
+                       on the 16 x 16 grid and on the point cloud (same parameters, no retraining).
 
     python -m neuralchart.run --task porous_media --cmd gifs --track     # the animations
     python -m neuralchart.run --task porous_media --cmd figures          # medium_and_law.png
@@ -45,7 +45,7 @@ SCENES = {
 }
 TITLE = dict(porous_media='Porous media', porous_media_crowding='Porous media with crowding')
 SCENE_TITLE = dict(training_conditions='training conditions', drive_x8='drive ×8', temperature_x4='temperature ×4',
-                   point_cloud='point cloud of 1024 cells (no retraining)')
+                   point_cloud='point cloud of 256 cells (no retraining)')
 # the three animations shown in the README (assets/); the others go to results/porous_media/gallery/
 README_PICKS = ('porous_media_track_drive_x8', 'porous_media_entropy_drive_x8', 'porous_media_track_point_cloud')
 
@@ -126,7 +126,7 @@ def model_scene(variant, name, data, key, j, device, frames, weights=None):
     meta = data['meta']
     sd = data[key]
     disc = data['discs'][sd['disc']]
-    m = load_trained(variant, name, meta, data['discs']['g32'], disc, device, weights)
+    m = load_trained(variant, name, meta, data['discs']['g16'], disc, device, weights)
     dr = {k: v[j:j + 1] for k, v in sd['drive'].items()}
     R, _, _ = rollout(m, dr, sd['c'][j:j + 1, 0], T_TEST, DT)
     ctx = m.prepare(dr)
@@ -169,7 +169,7 @@ class Cells:
             from scipy.spatial import cKDTree
             s.tree = cKDTree(g['pts'].cpu().numpy(), boxsize=1.0)
             lab = g['lab'].cpu().numpy().reshape(RASTER, RASTER)
-            f = RASTER // 128
+            f = RASTER // NF
             s.lab = lab[f // 2::f, f // 2::f]
 
     def cell(s, x):
@@ -380,7 +380,7 @@ def make_gallery(device='cuda', data_dir=None, weights=None, variants=('porous_m
 # ------------------------------------------------------------------------------------------ the constitutive law
 @torch.no_grad()
 def medium_and_law(path=None, data_dir=None, j=0):
-    """the pore map, the true mobility and the learned mobility of the Neural Chart on an unseen medium, on the 32 x 32
+    """the pore map, the true mobility and the learned mobility of the Neural Chart on an unseen medium, on the 16 x 16
     grid and on the point cloud (no retraining).  Cell values are geometric means over the edges of a cell; the
     learned mobility omega exp(g) / D is taken at the uniform density 1."""
     import matplotlib
@@ -398,7 +398,7 @@ def medium_and_law(path=None, data_dir=None, j=0):
     Mpix = meta['Mpix']['test'][med].double().mean(0).numpy()            # mean of the x and y pixel mobilities
     norm = mcolors.LogNorm(vmin=1e-3, vmax=10)
     rows = []
-    for key, lab in (('training_conditions', '32×32 grid'), ('point_cloud', 'point cloud')):
+    for key, lab in (('training_conditions', '16×16 grid'), ('point_cloud', 'point cloud')):
         sd = data[key]; disc = data['discs'][sd['disc']]
         m = base.on(disc.hg())
         feats = m.featurizer({k: v[j:j + 1] for k, v in sd['drive'].items()})
@@ -423,7 +423,7 @@ def medium_and_law(path=None, data_dir=None, j=0):
         if disc.g['kind'] != 'grid':
             P = disc.g['pts'].numpy()
             ax.scatter(P[:, 0], P[:, 1], s=1.2, c=TRACER, linewidths=0)
-            ax.set_title('pore map and the 1024 points', fontsize=10)
+            ax.set_title('pore map and the 256 points', fontsize=10)
             lab_img = Cells(disc).lab
             edge = (lab_img != np.roll(lab_img, 1, 0)) | (lab_img != np.roll(lab_img, 1, 1))
             axs[i, 1].imshow(np.where(edge, 0.0, 1.0), cmap='gray', vmin=0, vmax=1, origin='lower', extent=ext,
@@ -441,7 +441,7 @@ def medium_and_law(path=None, data_dir=None, j=0):
             ax.set_xticks([]); ax.set_yticks([])
     cax = fig.add_axes([0.915, 0.15, 0.015, 0.65])
     fig.colorbar(im, cax=cax, label='mobility (geometric mean over the edges of a cell)')
-    fig.suptitle('Learned and true mobility of an unseen medium.  The Neural Chart is trained on the 32×32 grid and '
+    fig.suptitle('Learned and true mobility of an unseen medium.  The Neural Chart is trained on the 16×16 grid and '
                  'used on the point cloud with the same parameters.', fontsize=11)
     fig.savefig(path)
     plt.close(fig)

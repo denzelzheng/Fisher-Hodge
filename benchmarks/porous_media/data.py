@@ -4,16 +4,16 @@ Physics.  The density rho obeys a heterogeneous Fokker-Planck equation with a di
 
     d_t rho = div( M(x) [ T grad rho + rho grad U - amp rho F ] ),   F = (d_y psi, -d_x psi).
 
-M(x) is diagonal and comes from a local effective-medium rule on a 128 x 128 pore map.  In a Gaussian window of 6 fine
+M(x) is diagonal and comes from a local effective-medium rule on a 64 x 64 pore map.  In a Gaussian window of 6 fine
 pixels, eps(x) is the porosity and tau_x(x) the fraction of horizontally connected pore pairs divided by eps.  Then
 M_x(x) = C eps^3 / ((1 - eps)^2 + 0.3) * (0.05 + 0.95 tau_x^2) + 1e-4, and M_y likewise.  C normalises the mean edge
-mobility of the training media to 1.  D = 0.02 sets the time scale.  With crowding the mobility is
+mobility of the training media to 1.  D = 0.08 sets the time scale.  With crowding the mobility is
 M / (1 + rhobar / rho_s), rho_s = 2, where rhobar is the mean density of the two cells of a face.
 
-Reference.  Finite volumes on the 128 x 128 pixels (square-root approximation, harmonic mean of M on every pixel face,
+Reference.  Finite volumes on the 64 x 64 pixels (square-root approximation, harmonic mean of M on every pixel face,
 the drive as the exact flux of psi through the face), RK4 in float64, saved every DT = 0.05.  The fine density is
-projected (cell averages) onto the evaluation discretisations: the 32 x 32 training grid, a 64 x 64 grid and the
-Voronoi cells of a random point cloud of 1024 points.  U, psi and rho_0 are sums of periodic Gaussians, stored as
+projected (cell averages) onto the evaluation discretisations: the 16 x 16 training grid, a 32 x 32 grid and the
+Voronoi cells of a random point cloud of 256 points.  U, psi and rho_0 are sums of periodic Gaussians, stored as
 their parameters so that they can be evaluated at any point.
 
 Model inputs.  A discretisation is any point set with Voronoi cells.  The state is c_i = cell mass / mean cell
@@ -32,19 +32,19 @@ import torch
 
 from .test_sets import CONDITIONS, GENERATED, SET_NAME
 
-N, NF = 32, 128                          # training grid, fine (reference) grid
-D = 0.02
+N, NF = 16, 64                           # training grid, fine (reference) grid
+D = 0.08
 KREF = D * N * N
 DT, T_TRAIN, T_TEST = 0.05, 20, 200
 T_TRAIN_DATA, N_RELAX = 100, 16          # training trajectories hold 5 time units; 16 undriven relaxation runs
 RHO_S = 2.0                              # crowding density
 KC_DELTA, M_FLOOR = 0.3, 1e-4
 SIG_T, SIG_M, SIG_M2 = 6.0, 2.0, 6.0     # Gaussian windows (fine pixels): truth, model descriptors
-POT_ID = dict(K=(3, 5), a=(1.0, 3.0), s=(0.08, 0.16))
-PSI_ID = dict(K=(3, 5), a=(1.5, 4.0), s=(0.08, 0.16))
-IC_ID = dict(n=(1, 3), sig=(0.05, 0.10))
+POT_ID = dict(K=(1, 2), a=(1.0, 3.0), s=(0.16, 0.32))
+PSI_ID = dict(K=(1, 2), a=(1.5, 4.0), s=(0.16, 0.32))
+IC_ID = dict(n=(1, 2), sig=(0.10, 0.20))
 POR_TRAIN, POR_LOW, ELL = (0.3, 0.7), (0.15, 0.3), (2.0, 10.0)
-CLOUD_N, CLOUD_RMIN, CLOUD_SEED, RASTER = 1024, 0.45 / 32, 4242, 512
+CLOUD_N, CLOUD_RMIN, CLOUD_SEED, RASTER = 256, 0.45 / 16, 4242, 256
 VARIANTS = ('porous_media', 'porous_media_crowding')
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -291,7 +291,7 @@ def cloud_geom(dev='cpu', V=CLOUD_N, rmin=CLOUD_RMIN, seed=CLOUD_SEED):
 
 
 def geometry(name, dev='cpu'):
-    return grid_geom(32, dev) if name == 'g32' else grid_geom(64, dev) if name == 'g64' else cloud_geom(dev)
+    return grid_geom(16, dev) if name == 'g16' else grid_geom(32, dev) if name == 'g32' else cloud_geom(dev)
 
 
 def projector(geom):
@@ -362,8 +362,8 @@ def simulate(rho0, Me, U, dpsi, T, amp, crowd, nsteps, projs, ns=None):
     return [torch.stack(o, 1) for o in outs], ref_flux(rho, kk, phi, A, crowd)[1], rho, ns
 
 
-def coarse_flux32(J):
-    """fine face fluxes (B, 2, NF, NF) -> fluxes through the 32 x 32 cell faces in the model's units (B, 2 * 32^2)"""
+def coarse_flux(J):
+    """fine face fluxes (B, 2, NF, NF) -> fluxes through the 16 x 16 cell faces in the model's units (B, 2 * N^2)"""
     B, f = J.shape[0], NF // N
     Jh = J[:, 0].reshape(B, N, f, N, f)[..., f - 1].sum(2) / f ** 2
     Jv = J[:, 1].reshape(B, N, f, N, f)[:, :, f - 1].sum(-1) / f ** 2
@@ -409,14 +409,14 @@ def generate(variant, device='cuda', data_dir=None, conds=None):
     os.makedirs(ddir, exist_ok=True)
     crowd = variant == 'porous_media_crowding'
     t0 = time.time()
-    pools = dict(train=make_pool(7001, 64, 4, POR_TRAIN), test=make_pool(7002, 16, 4, POR_TRAIN), low=make_pool(7003, 16, 4, POR_LOW))
+    pools = dict(train=make_pool(7001, 32, 1, POR_TRAIN), test=make_pool(7002, 16, 4, POR_TRAIN), low=make_pool(7003, 16, 4, POR_LOW))
     chi = {k: torch.as_tensor(v['pore'], dtype=torch.float64, device=device) for k, v in pools.items()}
     Mraw = {k: truth_mobility_raw(v) for k, v in chi.items()}
     C = 1.0 / float(fine_edge_mobility(Mraw['train']).mean())
     Mpix = {k: C * v + M_FLOOR for k, v in Mraw.items()}
     Mface = {k: fine_edge_mobility(v) for k, v in Mpix.items()}
     desc = {k: descriptor_fields(v) for k, v in chi.items()}
-    geoms = {g: geometry(g, device) for g in ('g32', 'g64', 'cloud')}
+    geoms = {g: geometry(g, device) for g in ('g16', 'g32', 'cloud')}
     projs = {g: projector(geoms[g]) for g in geoms}
     info = dict(variant=variant, C=C, D=D, DT=DT, RHO_S=RHO_S, crowd=crowd, KC_DELTA=KC_DELTA, M_FLOOR=M_FLOOR,
                 sig=dict(truth=SIG_T, model=SIG_M, model2=SIG_M2), cond={k: (v['T'], v['amp']) for k, v in CONDITIONS.items()},
@@ -429,11 +429,11 @@ def generate(variant, device='cuda', data_dir=None, conds=None):
                              porosity_min=float(pools[k]['pmed'].min()), porosity_max=float(pools[k]['pmed'].max()))
     fin = {k: fine_inputs(v, device) for k, v in pools.items()}
     ntr = len(pools['train']['med'])
-    sets = dict(train=('train', 1.0, 1.0, T_TRAIN_DATA, ['g32'], None),
-                relax=('train', 1.0, 0.0, T_TRAIN_DATA, ['g32'], np.arange(0, ntr, ntr // N_RELAX)))   # one per 4th medium, no drive
+    sets = dict(train=('train', 1.0, 1.0, T_TRAIN_DATA, ['g16'], None),
+                relax=('train', 1.0, 0.0, T_TRAIN_DATA, ['g16'], np.arange(0, ntr, ntr // N_RELAX)))   # every second medium, no drive
     for s in (conds or GENERATED):
         cd = CONDITIONS[s]
-        sets[s] = (cd['pool'], cd['T'], cd['amp'], T_TEST, ['g32', 'g64', 'cloud'] if s == 'training_conditions' else ['g32'], None)
+        sets[s] = (cd['pool'], cd['T'], cd['amp'], T_TEST, ['g16', 'g32', 'cloud'] if s == 'training_conditions' else ['g16'], None)
     data = dict(meta=dict(info, pools={k: dict(pore=torch.as_tensor(v['pore']), pmed=v['pmed'].tolist()) for k, v in pools.items()},
                           desc={k: v.float().cpu() for k, v in desc.items()}, Mpix={k: v.float().cpu() for k, v in Mpix.items()}))
     torch.save(data['meta'], os.path.join(ddir, 'meta.pt'))
@@ -452,16 +452,16 @@ def generate(variant, device='cuda', data_dir=None, conds=None):
         rec = dict(ns_per_DT=ns, sim_time_s=time.time() - t1, min_rho=float(Rs[0].min()),
                    mass_drift=float((Rs[0].mean(-1) - Rs[0][:, :1].mean(-1)).abs().max()))
         if s == 'training_conditions':
-            R2, _, _, _ = simulate(r0[:8], Mface[pool][med[:8]], U[:8], dpsi[:8], Tt[:8], At[:8], crowd, nst, [projs['g32']], ns=2 * ns)
+            R2, _, _, _ = simulate(r0[:8], Mface[pool][med[:8]], U[:8], dpsi[:8], Tt[:8], At[:8], crowd, nst, [projs['g16']], ns=2 * ns)
             rec['dt_halving_relerr_end_max'] = float((torch.linalg.vector_norm(Rs[0][:8, -1] - R2[0][:, -1], dim=-1)
                                                       / torch.linalg.vector_norm(R2[0][:, -1], dim=-1)).max())
         base = dict(Upar=torch.as_tensor(p['Upar']).float(), Ppar=torch.as_tensor(p['Ppar']).float(), med=med.cpu(), pool=pool,
                     T=Tt.float().cpu(), amp=At.float().cpu())
         for g, R in zip(discs, Rs):
-            name = s if g == 'g32' else SET_NAME[g]
+            name = s if g == 'g16' else SET_NAME[g]
             data[name] = dict(base, rho=R.float().cpu(), disc=g)
-            if g == 'g32':
-                data[name]['J_end'] = coarse_flux32(J).float().cpu()
+            if g == 'g16':
+                data[name]['J_end'] = coarse_flux(J).float().cpu()
             torch.save(data[name], os.path.join(ddir, f'{name}.tmp')); os.replace(os.path.join(ddir, f'{name}.tmp'), os.path.join(ddir, f'{name}.pt'))
         data['meta'][f'sim_{s}'] = rec
         torch.save(data['meta'], os.path.join(ddir, 'meta.pt'))
@@ -565,4 +565,4 @@ def training_set(data, window, relax=False):
     c = torch.cat([p['c'][:, :window + 1] for p in parts])
     drive = {k: torch.cat([p['drive'][k] for p in parts]) for k in data['train']['drive']}
     med = torch.cat([p['med'] for p in parts])
-    return dict(c=c, drive=drive, med=med, pool='train', disc='g32', J_end=None)
+    return dict(c=c, drive=drive, med=med, pool='train', disc='g16', J_end=None)

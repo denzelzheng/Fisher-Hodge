@@ -241,11 +241,11 @@ class SpectralConv2d(nn.Module):
 
 
 class FNO(nn.Module):
-    """FNO (Li et al. 2021; width 32, 12 modes, 4 layers) with two state channels: the residual next-step map
+    """FNO (Li et al. 2021; width 32, 6 modes, 4 layers) with two state channels: the residual next-step map
     c_{t+DT} = c_t + FNO([x, y, z_a, z_b]) on any n x n grid of the training spacing"""
     name = 'fno'
 
-    def __init__(s, norm, width=32, modes=12, layers=4):
+    def __init__(s, norm, width=32, modes=6, layers=4):
         super().__init__()
         s.norm = norm
         s.lift = nn.Conv2d(4, width, 1)

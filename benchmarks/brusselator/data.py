@@ -89,7 +89,7 @@ def make_traj(args):
     a, b = sample_ab(rng, kind)
     V = n * n
     xc, yc = a, b / a
-    homog = (i % 2 == 0) if kind == 'train' else (i < count // 2 and kind != 'grid64')
+    homog = (i % 2 == 0) if kind == 'train' else (i < count // 2 and kind != 'grid32')
     if homog:
         z0 = np.array([xc * np.exp(0.4 * rng.standard_normal()), yc * np.exp(0.4 * rng.standard_normal())])
         if kind == 'train':

@@ -16,13 +16,13 @@ from benchmarks.common import LABELS, OWN_FLUX, RESULTS, excess_table, load_runs
 from .test_sets import COLUMNS, LABEL
 
 MODELS = {
-    'porous_media': ['chart', 'chart-const-k', 'chart-no-excess', 'chart-zero-init', 'chart-reversible', 'flux_gnn', 'ude', 'bsms',
+    'porous_media': ['chart', 'chart-const-k', 'chart-no-excess', 'chart-zero-init', 'chart-no-projection', 'chart-reversible', 'flux_gnn', 'ude', 'bsms',
                      'fno', 'generic_fno', 'helmfluid', 'persistence'],
-    'porous_media_crowding': ['chart', 'chart-const-k', 'chart-no-excess', 'chart-zero-init', 'chart-reversible', 'flux_gnn', 'ude', 'bsms', 'fno',
+    'porous_media_crowding': ['chart', 'chart-const-k', 'chart-no-excess', 'chart-zero-init', 'chart-no-projection', 'chart-reversible', 'flux_gnn', 'ude', 'bsms', 'fno',
                               'generic_fno', 'helmfluid', 'persistence'],
 }
-LAW_SETS = [('training_conditions', 'unseen media, 32×32 grid'), ('low_porosity', 'unseen low-porosity media'),
-            ('grid64', 'unseen media, 64×64 grid'), ('point_cloud', 'unseen media, point cloud')]
+LAW_SETS = [('training_conditions', 'unseen media, 16×16 grid'), ('low_porosity', 'unseen low-porosity media'),
+            ('grid32', 'unseen media, 32×32 grid'), ('point_cloud', 'unseen media, point cloud')]
 
 
 def _set(r, s):

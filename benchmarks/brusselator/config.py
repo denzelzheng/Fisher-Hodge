@@ -5,7 +5,7 @@ Physics (the reference, never shown to the models).  Four reactions at every sit
 Every reverse rate is eps = 1e-3 (times the chemostatted product, d = e = 1), so all affinities are finite.  The
 chemostats A, B, D, E are held fixed; a and b are the conditions.  X and Y diffuse with D_X = 0.4 and D_Y = 3.6
 (transport rate D / h^2).  The Turing wavelength at a = 1 is lambda_c = 2 pi (D_X D_Y)^(1/4) = 6.88.  The training
-grid is 32 x 32 with spacing h = 4 lambda_c / 32 = 0.860, and the 64 x 64 test grid keeps h.  The homogeneous state
+grid is 16 x 16 with spacing h = 2 lambda_c / 16 = 0.860, and the 32 x 32 test grid keeps h.  The homogeneous state
 loses stability at the Hopf line b = 1 + a^2, and stationary patterns appear above the Turing threshold
 b_T = (1 + a sqrt(D_X / D_Y))^2.  The reference solution uses DOP853 (rtol 1e-10, atol 1e-12) in float64, sampled
 every DT = 0.2.
@@ -25,10 +25,10 @@ RESULTS = os.path.join(ROOT, 'results', 'brusselator')
 CHECKPOINTS = os.path.join(ROOT, 'checkpoints', 'brusselator')      # the shipped Neural Chart checkpoints
 RUNS = os.path.join(ROOT, 'runs', 'brusselator')                    # outputs of neuralchart.run
 
-DT, W_TRAIN, T_TEST, N_TRAIN, T_STEPS = 0.2, 50, 200, 32, 20      # T = 20 sampling steps, 10T = 200
+DT, W_TRAIN, T_TEST, N_TRAIN, T_STEPS = 0.2, 50, 200, 16, 20      # T = 20 sampling steps, 10T = 200
 KF, EPS, DIFF = (1.0, 1.0, 1.0, 1.0), 1e-3, (0.4, 3.6)
 LAMBDA_C = 2 * math.pi * (DIFF[0] * DIFF[1]) ** 0.25                # Turing wavelength at a = 1
-H_GRID = 4 * LAMBDA_C / N_TRAIN                                    # grid spacing (32 x 32 holds 4 wavelengths)
+H_GRID = 2 * LAMBDA_C / N_TRAIN                                    # grid spacing (16 x 16 holds 2 wavelengths at a = 1)
 SPECIES = ['X', 'Y', 'A', 'B', 'D', 'E']
 CHEM = ['A', 'B', 'D', 'E']
 REACTIONS = [({'A': 1}, {'X': 1}), ({'X': 2, 'Y': 1}, {'X': 3}), ({'B': 1, 'X': 1}, {'Y': 1, 'D': 1}), ({'X': 1}, {'E': 1})]

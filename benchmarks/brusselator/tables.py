@@ -12,10 +12,10 @@ from neuralchart.chart import ABLATIONS
 from .config import RESULTS
 from .test_sets import TEST_SETS, LABELS as SET_LABELS
 
-MODELS = ['chart', 'chart-given-mu0', 'chart-learned-chem-mu0', 'chart-const-k', 'chart-no-excess', 'chart-zero-init', 'chart-reversible', 'flux_gnn',
+MODELS = ['chart', 'chart-given-mu0', 'chart-learned-chem-mu0', 'chart-const-k', 'chart-no-excess', 'chart-zero-init', 'chart-no-projection', 'chart-reversible', 'flux_gnn',
           'crnn_mass_action', 'crnn_features', 'ude', 'bsms', 'fno', 'generic_fno', 'persistence']
 MAIN = ['chart', 'chart-given-mu0', 'flux_gnn', 'crnn_mass_action', 'crnn_features', 'ude', 'bsms', 'fno', 'generic_fno', 'persistence']
-ABLATION_MODELS = ['chart', 'chart-given-mu0', 'chart-learned-chem-mu0', 'chart-const-k', 'chart-no-excess', 'chart-zero-init', 'chart-reversible', 'flux_gnn']
+ABLATION_MODELS = ['chart', 'chart-given-mu0', 'chart-learned-chem-mu0', 'chart-const-k', 'chart-no-excess', 'chart-zero-init', 'chart-no-projection', 'chart-reversible', 'flux_gnn']
 
 
 def _set(r, s):
@@ -64,7 +64,7 @@ def ablation_table(R):
 
 
 def oscillation_table(R, models):
-    sets = [s for s in TEST_SETS if s != 'grid64']
+    sets = [s for s in TEST_SETS if s != 'grid32']
     header = ['Method', 'quantity'] + [SET_LABELS[s] for s in sets]
     qs = [('10T error, homogeneous starts', lambda x: x.get('err_10T_homog')),
           ('period error', lambda x: (x.get('lc') or {}).get('period_err')),

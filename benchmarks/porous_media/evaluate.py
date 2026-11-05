@@ -19,7 +19,7 @@ from neuralchart.diagnostics import ldb_violation, relerr_traj
 from .data import D, DT, RHO_S
 
 PHYS_EVERY = 10
-K_SETS = ('training_conditions', 'low_porosity', 'grid64', 'point_cloud')     # sets of the learned-law table
+K_SETS = ('training_conditions', 'low_porosity', 'grid32', 'point_cloud')     # sets of the learned-law table
 
 
 def rollout_metrics(R, Y, dens=None):

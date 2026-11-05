@@ -6,7 +6,7 @@ Flux-GNN           neuralchart.baselines.FluxGNN with the black-box inputs below
 FNO                residual next-step map on n x n grids
 BSMS-GNN           neuralchart.baselines.bsms_gnn on the cells of any discretisation
 GENERIC-FNO        neuralchart.baselines.generic_fno as a next-step map on n x n grids
-HelmFluid          neuralchart.baselines.helmfluid as a next-step map on the 32 x 32 grid
+HelmFluid          neuralchart.baselines.helmfluid as a next-step map on the 16 x 16 grid
 Persistence        u(t) = u(0)
 BSMS-GNN, GENERIC-FNO and HelmFluid have their own training loops (benchmarks/porous_media/fitters.py).
 Black-box node inputs (node_cond): U and amp * psi (z-scored with training-set scalars), T, amp, 6 local descriptors.
@@ -100,7 +100,7 @@ class SpectralConv2d(nn.Module):
 class FNO2d(nn.Module):
     """standard FNO (Li et al. 2021): 1x1 lift, 4 x [spectral conv + 1x1 conv, GELU except after the last], 1x1
     projection to 128 and to 1."""
-    def __init__(s, cin, width=32, modes=12, layers=4):
+    def __init__(s, cin, width=32, modes=6, layers=4):
         super().__init__()
         s.lift = nn.Conv2d(cin, width, 1)
         s.spec = nn.ModuleList([SpectralConv2d(width, width, modes, modes) for _ in range(layers)])
@@ -319,7 +319,7 @@ class GenericFNOMap(nn.Module):
 
 class HelmFluidMap(nn.Module):
     """HelmFluid_2D_corr_potential (neuralchart.baselines.helmfluid, the settings of its scripts/Navier_Stokes_HelmFluid.sh, NC condition
-    channels) as an autoregressive map on the 32 x 32 grid: the context of a rollout holds the last T_in frames, padded with rho_0"""
+    channels) as an autoregressive map on the 16 x 16 grid: the context of a rollout holds the last T_in frames, padded with rho_0"""
     name = 'helmfluid'
 
     def __init__(s, norm):
@@ -405,7 +405,7 @@ def rebind(model_name, model, meta, disc, device):
     if model_name in ('fno', 'generic_fno'):
         return model if disc.g['kind'] == 'grid' else None
     if model_name == 'helmfluid':
-        return model if disc.name == 'g32' else None
+        return model if disc.name == 'g16' else None
     if model_name == 'persistence':
         return model
     if model_name == 'bsms':
@@ -436,7 +436,7 @@ def load_weights(model, name, path, device):
     return model
 
 
-def load_trained(variant, name, meta, g32, disc, device, weights=None):
+def load_trained(variant, name, meta, g16, disc, device, weights=None):
     """a trained model in its evaluation configuration on the discretisation disc: a Neural Chart from <weights>/<name>.pt or
     checkpoints/<variant>/<name>.pt, a baseline from <weights>/<name>.pt (weights default: runs/<variant>)"""
     f = os.path.join(weights or os.path.join(ROOT, 'runs', variant), name + '.pt')
@@ -444,5 +444,5 @@ def load_trained(variant, name, meta, g32, disc, device, weights=None):
         if not os.path.exists(f):
             f = os.path.join(CHECKPOINTS, variant, name + '.pt')
         return NeuralChart.load(f, map_location=device).to(device).on(disc.hg()).accelerate()
-    m = load_weights(build(name, meta, g32).to(device), name, f, device).eval()
+    m = load_weights(build(name, meta, g16).to(device), name, f, device).eval()
     return accelerate(rebind(name, m, meta, disc, device), name)

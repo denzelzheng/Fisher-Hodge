@@ -1,36 +1,36 @@
 """Training and test sets.  a and b are drawn uniformly in the ranges below.  A homogeneous start is the exact
 well-mixed solution copied to every site (the limit-cycle test); a spatial start is a random smooth field around the
-fixed point (a, b / a) (the pattern test).  The 64 x 64 set has the spacing of the training grid.
+fixed point (a, b / a) (the pattern test).  The 32 x 32 set has the spacing of the training grid.
 
     key         label                                       count  steps  grid  a, b
-    train       -                                           64     50     32    a 0.9-1.1, b 2.3-3.0
-    training    training conditions                         32     200    32    a 0.9-1.1, b 2.3-3.0
-    b_high      b 3.2-3.7                                   32     200    32    a 0.9-1.1, b 3.2-3.7
-    b_far       b 4.0-4.6                                   32     200    32    a 0.9-1.1, b 4.0-4.6
-    a_high      a 1.3-1.5, b 1.15-1.5 x (1 + a^2)           32     200    32    both chemostats outside training
-    turing      Turing regime (below the Hopf line)         32     200    32    a 1.8-2.2, b 3.4-3.9
-    grid64      64 x 64 grid                                16     200    64    a 0.9-1.1, b 2.3-3.0
+    train       -                                           64     50     16    a 0.9-1.1, b 2.3-3.0
+    training    training conditions                         32     200    16    a 0.9-1.1, b 2.3-3.0
+    b_high      b 3.2-3.7                                   32     200    16    a 0.9-1.1, b 3.2-3.7
+    b_far       b 4.0-4.6                                   32     200    16    a 0.9-1.1, b 4.0-4.6
+    a_high      a 1.3-1.5, b 1.15-1.5 x (1 + a^2)           32     200    16    both chemostats outside training
+    turing      Turing regime (below the Hopf line)         32     200    16    a 1.8-2.2, b 3.4-3.9
+    grid32      32 x 32 grid                                16     200    32    a 0.9-1.1, b 2.3-3.0
 In 'train' every even trajectory starts from a point of a well-mixed burn-in with 0.5 % noise per site and every
-odd one from a random smooth field.  In the 32 x 32 test sets the first half starts homogeneous and the second half
+odd one from a random smooth field.  In the 16 x 16 test sets the first half starts homogeneous and the second half
 spatial.  In the Turing set a, b lie below the Hopf line by at least 0.3 and above the Turing threshold by at least
-0.3, so homogeneous starts decay and spatial starts form stationary patterns.  'grid64' has spatial starts only.
+0.3, so homogeneous starts decay and spatial starts form stationary patterns.  'grid32' has spatial starts only.
 """
 import math
 
 from .config import W_TRAIN, T_TEST, DIFF
 
 # (count, steps, grid size, seed); the seeds fix the random streams of the stored data
-GEN = dict(train=(64, W_TRAIN, 32, 1), training=(32, T_TEST, 32, 2), b_high=(32, T_TEST, 32, 3), b_far=(32, T_TEST, 32, 4),
-           a_high=(32, T_TEST, 32, 5), turing=(32, T_TEST, 32, 6), grid64=(16, T_TEST, 64, 7))
-TEST_SETS = ['training', 'b_high', 'b_far', 'a_high', 'turing', 'grid64']
+GEN = dict(train=(64, W_TRAIN, 16, 1), training=(32, T_TEST, 16, 2), b_high=(32, T_TEST, 16, 3), b_far=(32, T_TEST, 16, 4),
+           a_high=(32, T_TEST, 16, 5), turing=(32, T_TEST, 16, 6), grid32=(16, T_TEST, 32, 7))
+TEST_SETS = ['training', 'b_high', 'b_far', 'a_high', 'turing', 'grid32']
 LABELS = dict(training='training conditions', b_high='b 3.2–3.7', b_far='b 4.0–4.6',
               a_high='a 1.3–1.5 (a and b outside training)', turing='Turing regime (below the Hopf line)',
-              grid64='64×64 grid')
+              grid32='32×32 grid')
 
 
 def sample_ab(rng, kind):
     """the condition (a, b) of one trajectory of set `kind`"""
-    if kind in ('train', 'training', 'grid64'):
+    if kind in ('train', 'training', 'grid32'):
         return rng.uniform(0.9, 1.1), rng.uniform(2.3, 3.0)
     if kind == 'b_high':
         return rng.uniform(0.9, 1.1), rng.uniform(3.2, 3.7)

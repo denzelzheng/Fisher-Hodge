@@ -43,7 +43,7 @@ def phase_portraits(device, data_kw, weights, path):
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
     norm = train_norm(**data_kw)
-    sets = [s for s in TEST_SETS if s != 'grid64']          # the 64 x 64 set has spatial starts only
+    sets = [s for s in TEST_SETS if s != 'grid32']          # the 32 x 32 set has spatial starts only
     curves = {s: {} for s in sets}
     for s in sets:
         sd = load_set(s, device, **data_kw)

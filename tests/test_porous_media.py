@@ -22,7 +22,7 @@ def tiny():
     Mpix = PD.truth_mobility_raw(chi) + PD.M_FLOOR
     meta = dict(desc={'p': PD.descriptor_fields(chi).float()}, Mpix={'p': Mpix.float()},
                 pools={'p': dict(pmed=pool['pmed'].tolist())}, crowd=False, RHO_S=PD.RHO_S)
-    discs = {g: PD.Disc(g, meta, 'cpu') for g in ('g32', 'cloud')}
+    discs = {g: PD.Disc(g, meta, 'cpu') for g in ('g16', 'cloud')}
     return pool, chi, Mpix, meta, discs
 
 
@@ -50,10 +50,10 @@ def fine_disc():
 
 
 def test_geometry(tiny):
-    g = PD.grid_geom(32)
-    assert torch.allclose(g['w'], torch.full_like(g['w'], 1024.0))
+    g = PD.grid_geom(16)
+    assert torch.allclose(g['w'], torch.full_like(g["w"], 256.0))
     E = g['edges']                                            # horizontal edges first, then vertical edges
-    assert int(E[0, 0]) == 0 and int(E[0, 1]) == 1 and int(E[1024, 0]) == 0 and int(E[1024, 1]) == 32
+    assert int(E[0, 0]) == 0 and int(E[0, 1]) == 1 and int(E[256, 0]) == 0 and int(E[256, 1]) == 16
     c = tiny[4]['cloud'].g
     assert abs(float(c['area'].sum()) - 1) < 1e-9 and (c['w'] > 0).all()
     deg = torch.bincount(c['edges'].reshape(-1), minlength=PD.CLOUD_N)
@@ -63,7 +63,7 @@ def test_geometry(tiny):
 
 def test_projection_conserves_mass(tiny):
     r = torch.rand(3, PD.NF, PD.NF, dtype=torch.float64) + 0.1
-    for g in (PD.grid_geom(32), PD.grid_geom(64), tiny[4]['cloud'].g):
+    for g in (PD.grid_geom(16), PD.grid_geom(32), tiny[4]['cloud'].g):
         c = PD.projector(g)(r)
         assert torch.allclose(c.sum(-1) / c.shape[-1], r.mean((-1, -2)), rtol=1e-12)
 
@@ -116,7 +116,7 @@ def test_reference_conserves(tiny):
     Me = PD.fine_edge_mobility(Mpix)[torch.as_tensor(pool['med'])]
     one = torch.ones(U.shape[0], dtype=torch.float64)
     for crowd in (False, True):
-        Rs, J, rf, ns = PD.simulate(r0, Me, U, dpsi, one, one, crowd, 1, [PD.projector(discs['g32'].g)])
+        Rs, J, rf, ns = PD.simulate(r0, Me, U, dpsi, one, one, crowd, 1, [PD.projector(discs['g16'].g)])
         assert ns >= 1 and rf.min() > 0
         assert (rf.mean((-1, -2)) - r0.mean((-1, -2))).abs().max() < 1e-12
 
@@ -131,16 +131,16 @@ def test_face_drive_is_divergence_free(tiny):
 
 @pytest.mark.parametrize('name', ['chart', 'chart-const-k', 'ude', 'fno', 'flux_gnn'])
 def test_models_train_and_transfer(tiny, name):
-    """one training step on the 32 x 32 grid, then the same parameters on the point cloud"""
+    """one training step on the 16 x 16 grid, then the same parameters on the point cloud"""
     pool, _, _, meta, discs = tiny
     meta = dict(meta, norm=dict(U=(0.0, 1.0), psi=(0.0, 1.0), line=0.1))
     torch.manual_seed(0)
-    g32 = discs['g32']
+    g16 = discs['g16']
     chart = name in VARIANTS
-    m = chart_on(g32, name) if chart else PM.build(name, meta, g32)
-    dr = drive_on(pool, g32)
+    m = chart_on(g16, name) if chart else PM.build(name, meta, g16)
+    dr = drive_on(pool, g16)
     B = dr['U'].shape[0]
-    c0 = PD.projector(g32.g)(PD.fine_inputs(pool, 'cpu')[2]).float()
+    c0 = PD.projector(g16.g)(PD.fine_inputs(pool, 'cpu')[2]).float()
     tr = dict(c=c0[:, None].expand(B, PD.T_TRAIN + 1, -1).contiguous(), drive=dr)
     info = train(m, tr, 1, 0, PD.DT, batch=2, kmin=1, kmax=1, log=lambda *a: None)
     assert info['train_nskip'] == 0
@@ -161,7 +161,7 @@ def test_models_train_and_transfer(tiny, name):
     assert R2.shape == (B, 2, PD.CLOUD_N) and torch.isfinite(R2).all()
 
 
-@pytest.mark.parametrize('disc_name', ['g32', 'cloud'])
+@pytest.mark.parametrize('disc_name', ['g16', 'cloud'])
 def test_chart_physics_for_random_parameters(tiny, disc_name):
     """for random parameters and random states the rates of the Neural Chart satisfy local detailed balance with the
     physical force of the condition at G_theta = 0 (log a / b = f), so J f >= 0 and sigma >= 0, and S J conserves the
@@ -196,7 +196,7 @@ def test_chart_physics_for_random_parameters(tiny, disc_name):
 def test_chart_rollout_stays_positive(tiny):
     """a short rollout of the untrained Neural Chart under drive: positive densities, no LDB violation"""
     pool, _, _, meta, discs = tiny
-    disc = discs['g32']
+    disc = discs['g16']
     m = chart_on(disc)
     dr = drive_on(pool, disc, T=2.0, amp=4.0)
     c0 = PD.projector(disc.g)(PD.fine_inputs(pool, 'cpu')[2]).float()

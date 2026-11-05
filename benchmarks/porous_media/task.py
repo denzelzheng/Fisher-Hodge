@@ -64,14 +64,14 @@ class Task:
     def hypergraph(s, sd=None):
         if sd is not None:
             return sd['mesh'].hg()
-        return next((d['g32'] for d in s._discs.values() if 'g32' in d), None).hg() if any('g32' in d for d in s._discs.values()) else s._mesh('cpu').hg()
+        return next((d['g16'] for d in s._discs.values() if 'g16' in d), None).hg() if any('g16' in d for d in s._discs.values()) else s._mesh('cpu').hg()
 
     def _mesh(s, device):
         """the training grid"""
         d = s._discs.setdefault(str(device), {})
-        if 'g32' not in d:
-            d['g32'] = Disc('g32', s.meta, device)
-        return d['g32']
+        if 'g16' not in d:
+            d['g16'] = Disc('g16', s.meta, device)
+        return d['g16']
 
     def chemostats(s):
         return None
