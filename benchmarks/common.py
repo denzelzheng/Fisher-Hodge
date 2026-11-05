@@ -16,6 +16,7 @@ LABELS = {
     'chart-const-k': 'Neural Chart, constant mobility per class',
     'chart-given-mu0': 'Neural Chart, given standard potentials (oracle-type information)',
     'chart-zero-init': 'Neural Chart, no convex initialisation',
+    'chart-no-projection': 'Neural Chart, no variable projection',
     'chart-reversible': 'Neural Chart, reversible (no drive)',
     'chart-no-excess': 'Neural Chart, no excess free energy',
     'chart-learned-chem-mu0': 'Neural Chart, learned chemostat standard free energies',
@@ -32,7 +33,7 @@ LABELS = {
     'persistence': 'Persistence (u(t) = u(0))',
 }
 # models with their own edge (hyperedge) flux: the local-detailed-balance and entropy columns apply to them
-OWN_FLUX = ('chart', 'chart-const-k', 'chart-given-mu0', 'chart-zero-init', 'chart-reversible', 'chart-no-excess', 'chart-learned-chem-mu0', 'oracle', 'oracle-no-crowding', 'ude', 'flux_gnn',
+OWN_FLUX = ('chart', 'chart-const-k', 'chart-given-mu0', 'chart-zero-init', 'chart-no-projection', 'chart-reversible', 'chart-no-excess', 'chart-learned-chem-mu0', 'oracle', 'oracle-no-crowding', 'ude', 'flux_gnn',
             'crnn_mass_action', 'crnn_features')
 
 

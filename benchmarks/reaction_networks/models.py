@@ -161,7 +161,7 @@ def n_cond():
 
 def n_desc():
     """local descriptors per site and per hyperedge given to the baselines that can take them"""
-    return len(DESCRIPTORS) if C.hetero() else 0
+    return 3 if C.hetero() else 0
 
 
 def edge_potential(hg, drive):

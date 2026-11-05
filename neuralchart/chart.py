@@ -26,7 +26,7 @@ import numpy as np
 import torch
 
 from .data import Conditions, Trajectories
-from .fit import chart_summary, fit_linear, rollout, train
+from .fit import chart_summary, fit_linear, fit_varpro, rollout, train
 from .graphs import Hypergraph
 from .model import Context, Drive, FreeEnergy, MasterEquation, Mobility, featurizer
 
@@ -41,6 +41,7 @@ VARIANTS = {
     'chart-const-k': dict(material=False),
     'chart-no-excess': dict(excess=False),
     'chart-zero-init': dict(closed_form=False),
+    'chart-no-projection': dict(projection=False),
     'chart-reversible': dict(reversible=True),
     'chart-learned-chem-mu0': dict(chemostats=None),
     'chart-given-mu0': dict(mu0='known'),
@@ -49,6 +50,7 @@ ABLATIONS = {
     'chart-const-k': 'g_theta: one constant omega per hyperedge class',
     'chart-given-mu0': 'nothing: it adds the standard potentials of the internal species (oracle-type information)',
     'chart-zero-init': 'the closed-form NNLS start: omega starts at 1',
+    'chart-no-projection': 'the variable projection between the NNLS and the rollouts',
     'chart-reversible': 'the drive: A = 0, so the model is reversible',
     'chart-no-excess': 'the excess free energy G_theta',
     'chart-learned-chem-mu0': 'the known standard free energies of the chemostats: they are learned',
@@ -63,9 +65,9 @@ def _cond(c):
 class NeuralChart(MasterEquation):
     """chemostats   the known standard free energies of the chemostats (one per chemostat), or None to learn them
     descriptors  the number of local descriptors per hyperedge in Conditions['edge']
-    excess, material, closed_form, reversible, mu0   the ablations: no G_theta, no g_theta, no NNLS start, A = 0, known internal mu0"""
+    excess, material, closed_form, projection, reversible, mu0   the ablations: no G_theta, no g_theta, no NNLS start, no variable projection, A = 0, known internal mu0"""
 
-    def __init__(s, hypergraph, chemostats=None, descriptors=0, excess=True, material=True, closed_form=True, reversible=False, mu0=None):
+    def __init__(s, hypergraph, chemostats=None, descriptors=0, excess=True, material=True, closed_form=True, projection=True, reversible=False, mu0=None):
         old = torch.get_default_dtype()
         torch.set_default_dtype(torch.float64)
         try:
@@ -81,9 +83,10 @@ class NeuralChart(MasterEquation):
         finally:
             torch.set_default_dtype(old)
         s.drive.s_A.requires_grad_(False)                # the external force is known
-        s.args = dict(chemostats=chemostats, descriptors=descriptors, excess=excess, material=material, closed_form=closed_form,
+        s.args = dict(chemostats=chemostats, descriptors=descriptors, excess=excess, material=material, closed_form=closed_form, projection=projection,
                       reversible=reversible, mu0=mu0)
         s.closed_form = closed_form
+        s.projection = projection
         s.diagnostics = {}
         if reversible:
             s.knobs['drive_scale'] = 0.0
@@ -118,6 +121,10 @@ class NeuralChart(MasterEquation):
         info = {}
         if s.closed_form and not resume:
             info['linear_fit'] = fit_linear(s, dict(train=data), tr.dt, log=log)
+            if s.projection:
+                info['varpro'] = fit_varpro(s, data, tr.dt, log=log)
+                info['linear_fit_at_zero'] = info['linear_fit']
+                info['linear_fit'] = info['varpro']['linear_fit']
             s.diagnostics.update(s._design_report(info['linear_fit'], log))
         info.update(train(s, data, iters, seed, tr.dt, batch=BATCH, lr=lr, kmin=KMIN, kmax=KMAX, log=log, budget_s=BUDGET_H * 3600,
                           ckpt=checkpoint, resume=resume))

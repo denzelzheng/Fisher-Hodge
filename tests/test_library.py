@@ -97,3 +97,26 @@ def test_the_entropy_production_error_is_on_positive_times():
     assert t[0] > 0 and t == [5, 10, 15, 20]
     e, r = sigma_error(2 * torch.ones(3, 4), torch.ones(3, 4))
     assert torch.allclose(e, torch.ones(3)) and torch.allclose(r, 2 * torch.ones(3))
+
+
+def test_variable_projection_lowers_the_residual_and_leaves_an_exact_start():
+    from neuralchart.fit import fit_linear, fit_varpro
+    hg = network()
+    c, cond, dt = data(hg)
+    d = Trajectories(c, cond, dt=dt).as_dict()
+    chart = NeuralChart(hg, chemostats=[0.0, 0.0])
+    start = fit_linear(chart, d, dt, log=lambda *a: None)['residual_theta']
+    out = fit_varpro(chart, d, dt, steps=20, log=lambda *a: None)
+    assert out['residual_end'] <= 1.01 * max(start, 1e-5)
+    assert all(p.grad is None for p in chart.parameters())
+
+
+def test_no_projection_is_one_override():
+    from neuralchart import VARIANTS
+    assert VARIANTS['chart-no-projection'] == dict(projection=False)
+    hg = network()
+    c, cond, dt = data(hg)
+    chart = NeuralChart(hg, chemostats=[0.0, 0.0], projection=False)
+    info = chart.fit(Trajectories(c, cond, dt=dt), iters=1, log=lambda *a: None)
+    assert 'varpro' not in info and 'linear_fit' in info
+    assert NeuralChart(hg, chemostats=[0.0, 0.0]).projection

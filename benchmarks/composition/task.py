@@ -146,6 +146,8 @@ class Task:
         if name.startswith('composed'):
             h = Holder().to(device)
             h.chart = ComposedChart.load(weights, map_location=device).to(device)
+            h.modules_ab = (*h.chart.modules_fitted, h.chart.glue)
+            h.chart.accelerate()
             return h
         m = s.baseline(name, device)
         m.load_state_dict(torch.load(weights, map_location=device))

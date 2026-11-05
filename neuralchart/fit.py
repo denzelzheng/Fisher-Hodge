@@ -193,7 +193,9 @@ def fit_linear(model, data, dt, rule='simpson', floor=FLOOR, batch=16, log=print
     proj_err = float(np.abs(U[free] @ delta - tgt[free]).max()) if free.any() else 0.0
     nc = model.kinetics.core.numel()
     core = model.kinetics.core.detach().cpu().numpy().astype(np.float64)
-    low = np.log(floor * kap[free].max()) - core if free.any() else np.full(nc, -np.inf)
+    theta = torch.cat([p.detach().reshape(-1) for p in params]).cpu().numpy().astype(np.float64)
+    top = (kap[free] * np.exp(U[free] @ theta)).max() if free.any() else 1.0   # the largest fitted factor against unit rates
+    low = np.log(floor * top) - core if free.any() else np.full(nc, -np.inf)
     if proj_err > 1e-8 or (delta[:nc] < low).any():
         # the classes are coupled (fewer independent directions in theta than classes, e.g. a given standard
         # affinity): weight the projection by the curvature of the residual, G_rr kappa_r^2, so that classes the data
@@ -216,11 +218,73 @@ def fit_linear(model, data, dt, rule='simpson', floor=FLOOR, batch=16, log=print
         off += n
     info = dict(n_classes=int(R), n_free=int(free.sum()), n_params=int(U.shape[1]), rank=int(np.linalg.matrix_rank(U[free])),
                 residual_init=float(res(np.ones(R))), residual_nnls=float(res(kap)), residual_theta=float(res(k_eff)),
-                n_floored=int((kap[free] < zero).sum()), n_at_floor=int((delta[:nc] <= low + 1e-9).sum()), floor=float(floor * kap[free].max()) if free.any() else 0.0, projection_err=proj_err, kappa=kap.tolist(), time_s=time.time() - t0)
+                n_floored=int((kap[free] < zero).sum()), n_at_floor=int((delta[:nc] <= low + 1e-9).sum()), floor=float(floor * top), projection_err=proj_err, kappa=kap.tolist(), time_s=time.time() - t0)
     log(f'fit_linear: {R} classes ({info["n_free"]} seen, {info["n_floored"]} factors at zero, {info["n_at_floor"]} log rates at the floor), {U.shape[1]} parameters, '
         f'rank {info["rank"]}; relative derivative residual {info["residual_init"]:.3e} -> {info["residual_nnls"]:.3e} '
         f'(NNLS) -> {info["residual_theta"]:.3e} (theta, projection error {proj_err:.1e}); {info["time_s"]:.1f}s')
     return info
+
+
+# ------------------------------------------------------------------------------------------ variable projection
+VP_STEPS, VP_LR = 500, 1e-3
+
+
+def _projected_residual_backward(model, tr, dt, batch=16):
+    """the relative derivative residual of fit_linear at the current parameters as a function of every parameter, in FP32; backpropagates it,
+    batch by batch, and returns its value"""
+    C = tr['c'].float()
+    drive = {k: v.float() if torch.is_tensor(v) and torch.is_floating_point(v) else v for k, v in tr['drive'].items()}
+    B, T1, M = C.shape
+    hg = model.hg
+    yy = torch.zeros((), dtype=torch.float64, device=C.device)
+    for s0 in range(0, B, batch):
+        Cb = C[s0:s0 + batch]
+        om = 1.0 / torch.linalg.vector_norm(Cb[:, 2:], dim=-1)
+        yy += (((Cb[:, 2:] - Cb[:, :-2]) * om[..., None]) ** 2).sum().double()
+    tot = 0.0
+    for s0 in range(0, B, batch):
+        idx = torch.arange(s0, min(B, s0 + batch), device=C.device)
+        ctx = model.prepare(_take(drive, idx))
+        Cb = C[idx]
+        J = torch.stack([(lambda ab: ab[0] - ab[1])(model.rates(Cb[:, t], ctx)) for t in range(T1)], 1)
+        I = dt / 3 * (J[:, :-2] + 4 * J[:, 1:-1] + J[:, 2:])
+        pred = hg.apply_S(I.reshape(-1, hg.H)).reshape(len(idx), T1 - 2, M)
+        om = 1.0 / torch.linalg.vector_norm(Cb[:, 2:], dim=-1)
+        loss = ((((Cb[:, 2:] - Cb[:, :-2]) - pred) * om[..., None]) ** 2).sum().double() / yy
+        loss.backward()
+        tot += float(loss.detach())
+    return tot
+
+
+def fit_varpro(model, tr, dt, steps=VP_STEPS, lr=VP_LR, batch=16, log=print, trace=None):
+    """G_theta and g_theta descend the derivative residual jointly, with the linear parameters at their closed-form optimum (fit_linear) at every
+    step: by the envelope theorem the gradient at the optimal linear parameters is that of the projected residual.  Adam, a fixed number of
+    steps, gradient clip 1.  The networks train in FP32, the closed-form step stays in float64."""
+    params = list(model.free_energy.excess_parameters()) + (list(model.kinetics.net.parameters()) if model.kinetics.net is not None else [])
+    params = [p for p in params if p.requires_grad]
+    t0 = time.time()
+    quiet = lambda *a: None
+    info = fit_linear(model, tr, dt, log=quiet)
+    if not params:
+        return dict(linear_fit=info, steps=0, time_s=time.time() - t0)
+    opt = torch.optim.Adam(params, lr=lr)
+    hist = []
+    for it in range(steps):
+        fit_linear(model, tr, dt, log=quiet)
+        opt.zero_grad(set_to_none=True)
+        with torch.enable_grad():
+            hist.append(_projected_residual_backward(model, tr, dt, batch))
+        if it % 50 == 0:
+            log(f'varpro it {it:4d}: projected derivative residual {hist[-1]:.4e} t {time.time() - t0:.0f}s')
+            if trace is not None:
+                trace(it, hist[-1])
+        torch.nn.utils.clip_grad_norm_(params, 1.0)
+        opt.step()
+    for p in model.parameters():
+        p.grad = None
+    info = fit_linear(model, tr, dt, log=log)
+    log(f'varpro: {steps} steps, projected derivative residual {hist[0]:.4e} -> {info["residual_theta"]:.4e}, {time.time() - t0:.0f}s')
+    return dict(linear_fit=info, steps=steps, lr=lr, residual_start=hist[0], residual_end=info['residual_theta'], curve=hist[::10], time_s=time.time() - t0)
 
 
 # ------------------------------------------------------------------------------------------ rollout training

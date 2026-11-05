@@ -130,7 +130,7 @@ def maxwell_equal_area(model, a=3.0, blo=1.5, bhi=2.5):
 
     def area(b):
         lab = torch.tensor([[math.log(a), math.log(b)]], dtype=next_dtype(model), device=dev).repeat(len(xs), 1)
-        Rx = hg.apply_S(model.flux(c, dict(logab=lab)))[:, 0].double().cpu().numpy()
+        Rx = hg.apply_S(model.flux(c, TR.conditions(dict(logab=lab))))[:, 0].double().cpu().numpy()
         s = np.where(np.diff(np.sign(Rx)) != 0)[0]
         if len(s) < 3:
             return float('nan')

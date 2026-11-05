@@ -7,7 +7,7 @@ from ..common import RESULTS, LABELS, OWN_FLUX, excess_table, fmt, write_table
 from . import config as C
 
 MAIN = ['chart', 'chart-given-mu0', 'flux_gnn', 'crnn_mass_action', 'crnn_features', 'ude', 'fno', 'bsms', 'generic_fno', 'persistence']
-ABLATIONS = ['chart', 'chart-given-mu0', 'chart-learned-chem-mu0', 'chart-const-k', 'chart-no-excess', 'chart-zero-init', 'chart-reversible', 'flux_gnn']
+ABLATIONS = ['chart', 'chart-given-mu0', 'chart-learned-chem-mu0', 'chart-const-k', 'chart-no-excess', 'chart-zero-init', 'chart-no-projection', 'chart-reversible', 'flux_gnn']
 
 
 def _cols():

@@ -332,6 +332,7 @@ class ComposedChart(NeuralChart):
             m = NeuralChart(Hypergraph.from_dict(d[k]['hypergraph']), **d[k]['args'])
             m.load_state_dict(d[k]['state'])
             m.diagnostics = d[k]['diagnostics']
+            m.to(map_location)
             mods.append(m)
         c = compose_charts(mods[0], mods[1], d['glue'], quiet=True)
         c.kinetics.cross_on = c.free_energy.cross_on = d['cross_on']
