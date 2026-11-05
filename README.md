@@ -1,6 +1,6 @@
 # Neural Chart
 
-> **Status.** Version 2.0 is in progress on this branch. The fit now includes variable projection, and porous media and the Brusselator now run on 16×16 grids. [Results at a glance](#results-at-a-glance) shows the new runs of the five benchmarks that have finished. The sections on each benchmark, the composition tables, the animations, `checkpoints/` and `results/` still come from earlier runs and will be replaced.
+> **Status.** Version 2.0 is in progress on this branch. The fit now includes variable projection, and porous media and the Brusselator now run on 16×16 grids. [Results at a glance](#results-at-a-glance) shows the new runs of the six benchmarks that have finished. The sections on each benchmark, the composition tables, the animations, `checkpoints/` and `results/` still come from earlier runs and will be replaced.
 
 A reaction or transport hypergraph fixes the set of all rate laws on it that satisfy local detailed balance, and this set is a manifold, the thermodynamic manifold.
 Each step has two coordinates on it.
@@ -307,7 +307,7 @@ The best baseline is the most accurate baseline in that column. The variant of t
 | Porous media | in training | | | | |
 | Porous media with crowding | in training | | | | |
 | Non-ideal Schlögl model | **7.2e-04** | 2.6e-03 (FNO) | a 3.5–4.0, b 2.0–3.5 (higher concentrations) | **0.012** | 0.033 (FNO) |
-| Non-ideal Schlögl, strong crowding | in training | | | | |
+| Non-ideal Schlögl, strong crowding | **5.5e-04** | 0.015 (BSMS-GNN) | a 4.6–5.0, b 2.0–3.5 | **3.2e-03** | 7.0e-03 (BSMS-GNN) |
 | Phosphorylation cycle | **7.2e-06** | 5.2e-03 (CRNN, condition features) | stronger, finer potential U | **2.8e-05** | 0.011 (CRNN, condition features) |
 | Phosphorylation, heterogeneous media | **0.012** | 0.029 (CRNN, condition features) | stronger, finer potential U | **0.015** | 0.049 (CRNN, condition features) |
 | Phosphorylation, interactions | **2.8e-04** | 0.022 (UDE closure) | stronger, finer potential U | **0.014** | 0.149 (CRNN, condition features) |
@@ -315,10 +315,10 @@ The best baseline is the most accurate baseline in that column. The variant of t
 | Brusselator | in training | | | | |
 | MAPK cascade | in training | | | | |
 
-On these five benchmarks and every test set no step of the Neural Chart carries flux against its own force, no sample has negative entropy production, and no concentration becomes negative.
+On these six benchmarks and every test set no step of the Neural Chart carries flux against its own force, no sample has negative entropy production, and no concentration becomes negative.
 
-The Neural Chart is the most accurate on every test set of these five benchmarks.
-The baseline errors on these five benchmarks come from earlier runs on the same data.
+The Neural Chart is the most accurate on every test set of these six benchmarks.
+The baseline errors on these six benchmarks come from earlier runs on the same data.
 
 The baselines are:
 - the UDE closure, a free neural flux on the same graph
