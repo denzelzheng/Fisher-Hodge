@@ -6,10 +6,14 @@ learned) and Phi carries everything that physics fixes (log c, U / T, the force,
 excess potential).  So dc/dt = S (K+ Phi+ - K- Phi-) is linear in the one-way rate constants.  Group the one-way
 channels whose log K is the same function of theta into classes r and integrate over the training trajectories,
 
-    c(t + 2 dt) - c(t) = sum_r kappa_r S int_t^{t + 2 dt} Phi_r dt           (Simpson rule),
+    c(t + 4 dt) - c(t) = sum_r kappa_r S int_t^{t + 4 dt} Phi_r dt           (Boole's rule),
 
 with kappa_r >= 0 the factor by which class r has to change.  This is a non-negative least-squares problem (NNLS),
 convex, so its optimum is global (fit_linear).  The optimum is mapped back to theta by least squares on log kappa.
+
+Variable projection (fit_varpro).  G_theta and g_theta then descend the same residual, with kappa solved again at every step.  The residual
+also holds the error of the quadrature, which no parameter should fit.  The integrator measures that error for the current model: the same
+integral along the model's own path from the same start.  Variable projection stops when the rest of the residual is no larger than it.
 
 Rollout refinement (train).  Every parameter is then refined on multi-step rollouts: K in [kmin, kmax] steps from a
 random start inside the data, batch 8, Adam with a cosine schedule, gradient clip 1.
@@ -93,12 +97,26 @@ def class_structure(model, c_ref, drive_ref, decimals=6):
 
 
 @torch.no_grad()
-def assemble(model, tr, dt, rule='simpson', batch=16):
+def _rule(T1):
+    """Boole's rule over four sampling steps, or Simpson's over two when a trajectory is too short"""
+    return 'boole' if T1 >= 5 else 'simpson'
+
+
+def _boole(x, dt):
+    return 2 * dt / 45 * (7 * x[:, :-4] + 32 * x[:, 1:-3] + 12 * x[:, 2:-2] + 32 * x[:, 3:-1] + 7 * x[:, 4:])
+
+
+def _simpson(x, dt):
+    return dt / 3 * (x[:, :-2] + 4 * x[:, 1:-1] + x[:, 2:])
+
+
+def assemble(model, tr, dt, rule=None, batch=16):
     """the normal equations of the derivative fit in the class factors kappa (kappa = 1 is the current model):
     residual(kappa) = (yy - 2 kappa.h + kappa.G.kappa) / yy.  Returns a dict with params, U, rp, rm, fixed, G, h, yy."""
     C = tr['c']
     B, T1, M = C.shape
     assert T1 >= 3, 'need at least three samples per trajectory'
+    rule = rule or _rule(T1)
     hg = model.hg
     params, U, rp, rm = class_structure(model, C[:1, 0], _take(tr['drive'], slice(0, 1)))
     R = U.shape[0]
@@ -132,8 +150,11 @@ def assemble(model, tr, dt, rule='simpson', batch=16):
             Xo.index_add_(2, rp_t, Ap[:, None, :] * Wo[None]); Xo.index_add_(2, rm_t, -Am[:, None, :] * Wo[None])
             Xf, Yf = Xo.reshape(-1, R), (yo * wt[:, None]).reshape(-1)
             G += Xf.T @ Xf; h += Xf.T @ Yf; yy += (Yf ** 2).sum()
-        if rule == 'simpson':
-            quad = lambda x: dt / 3 * (x[:, :-2] + 4 * x[:, 1:-1] + x[:, 2:])
+        if rule == 'boole':
+            quad = lambda x: _boole(x, dt)
+            dC = Cb[:, 4:] - Cb[:, :-4]
+        elif rule == 'simpson':
+            quad = lambda x: _simpson(x, dt)
             dC = Cb[:, 2:] - Cb[:, :-2]
         elif rule == 'trapezoid':
             quad = lambda x: dt / 2 * (x[:, :-1] + x[:, 1:])
@@ -142,7 +163,7 @@ def assemble(model, tr, dt, rule='simpson', batch=16):
             raise ValueError(rule)
         Ip, Im = quad(a).reshape(-1, hg.H), quad(b).reshape(-1, hg.H)
         dC = dC.reshape(-1, M)
-        om = 1.0 / torch.linalg.vector_norm((Cb[:, 2:] if rule == 'simpson' else Cb[:, 1:]).reshape(-1, M), dim=-1)
+        om = 1.0 / torch.linalg.vector_norm(Cb[:, {'boole': 4, 'simpson': 2}.get(rule, 1):].reshape(-1, M), dim=-1)
         Ip, Im, dC = Ip * om[:, None], Im * om[:, None], dC * om[:, None]       # the relative error of the rollout loss
         if kp.any() or km.any():
             dC = dC - hg.apply_S(Ip * kp - Im * km)
@@ -173,7 +194,7 @@ FLOOR = 1e-3            # the lowest rate constant of a class in the closed-form
 
 
 @torch.no_grad()
-def fit_linear(model, data, dt, rule='simpson', floor=FLOOR, batch=16, log=print):
+def fit_linear(model, data, dt, rule=None, floor=FLOOR, batch=16, log=print):
     """set the linear parameters of model to the non-negative least-squares optimum on data (a training set dict
     with c (B, T+1, M) and drive, or a dict holding it under 'train').  dt: sampling interval.  The log rate of no class starts below
     log(floor * largest fitted factor): the optimum may have a factor at zero, and a class whose rate is that small has no gradient.
@@ -227,7 +248,7 @@ def fit_linear(model, data, dt, rule='simpson', floor=FLOOR, batch=16, log=print
 
 
 # ------------------------------------------------------------------------------------------ variable projection
-VP_STEPS, VP_LR = 500, 1e-3
+VP_STEPS, VP_LR, VP_CHECK = 500, 1e-3, 25
 
 
 def _projected_residual_backward(model, tr, dt, batch=16):
@@ -237,30 +258,60 @@ def _projected_residual_backward(model, tr, dt, batch=16):
     drive = {k: v.float() if torch.is_tensor(v) and torch.is_floating_point(v) else v for k, v in tr['drive'].items()}
     B, T1, M = C.shape
     hg = model.hg
+    w, quad = (4, _boole) if _rule(T1) == 'boole' else (2, _simpson)
     yy = torch.zeros((), dtype=torch.float64, device=C.device)
     for s0 in range(0, B, batch):
         Cb = C[s0:s0 + batch]
-        om = 1.0 / torch.linalg.vector_norm(Cb[:, 2:], dim=-1)
-        yy += (((Cb[:, 2:] - Cb[:, :-2]) * om[..., None]) ** 2).sum().double()
+        om = 1.0 / torch.linalg.vector_norm(Cb[:, w:], dim=-1)
+        yy += (((Cb[:, w:] - Cb[:, :-w]) * om[..., None]) ** 2).sum().double()
     tot = 0.0
     for s0 in range(0, B, batch):
         idx = torch.arange(s0, min(B, s0 + batch), device=C.device)
         ctx = model.prepare(_take(drive, idx))
         Cb = C[idx]
         J = torch.stack([(lambda ab: ab[0] - ab[1])(model.rates(Cb[:, t], ctx)) for t in range(T1)], 1)
-        I = dt / 3 * (J[:, :-2] + 4 * J[:, 1:-1] + J[:, 2:])
-        pred = hg.apply_S(I.reshape(-1, hg.H)).reshape(len(idx), T1 - 2, M)
-        om = 1.0 / torch.linalg.vector_norm(Cb[:, 2:], dim=-1)
-        loss = ((((Cb[:, 2:] - Cb[:, :-2]) - pred) * om[..., None]) ** 2).sum().double() / yy
+        pred = hg.apply_S(quad(J, dt).reshape(-1, hg.H)).reshape(len(idx), T1 - w, M)
+        om = 1.0 / torch.linalg.vector_norm(Cb[:, w:], dim=-1)
+        loss = ((((Cb[:, w:] - Cb[:, :-w]) - pred) * om[..., None]) ** 2).sum().double() / yy
         loss.backward()
         tot += float(loss.detach())
     return tot
 
 
+@torch.no_grad()
+def quadrature_check(model, tr, dt, batch=16):
+    """the relative derivative residual and the quadrature error in it, on windows that do not overlap.  The quadrature error compares the
+    integral along the data with the same integral along the model's own path from the same start, which the integrator computes."""
+    C = tr['c'].float()
+    drive = {k: v.float() if torch.is_tensor(v) and torch.is_floating_point(v) else v for k, v in tr['drive'].items()}
+    B, T1, M = C.shape
+    hg = model.hg
+    w, quad = (4, _boole) if _rule(T1) == 'boole' else (2, _simpson)
+    res = err = yy = 0.0
+    for s0 in range(0, B, batch):
+        idx = torch.arange(s0, min(B, s0 + batch), device=C.device)
+        ctx = model.prepare(_take(drive, idx))
+        Cb = C[idx]
+        J = torch.stack([(lambda ab: ab[0] - ab[1])(model.rates(Cb[:, t], ctx)) for t in range(T1)], 1)
+        I = quad(J, dt)
+        for t in range(0, T1 - w, w):
+            c = Cb[:, t]
+            for _ in range(w):
+                c, _n = model.advance(c, ctx, dt)
+            pred = hg.apply_S(I[:, t])
+            dC = Cb[:, t + w] - Cb[:, t]
+            om = 1.0 / torch.linalg.vector_norm(Cb[:, t + w], dim=-1)[:, None]
+            res += float(((pred - dC) * om).pow(2).sum())
+            err += float(((pred - (c - Cb[:, t])) * om).pow(2).sum())
+            yy += float((dC * om).pow(2).sum())
+    return res / yy, err / yy
+
+
 def fit_varpro(model, tr, dt, steps=VP_STEPS, lr=VP_LR, batch=16, log=print, trace=None):
     """G_theta and g_theta descend the derivative residual jointly, with the linear parameters at their closed-form optimum (fit_linear) at every
     step: by the envelope theorem the gradient at the optimal linear parameters is that of the projected residual.  Adam, a fixed number of
-    steps, gradient clip 1.  The networks train in FP32, the closed-form step stays in float64."""
+    steps at most, gradient clip 1.  The networks train in FP32, the closed-form step stays in float64.  The descent stops when the part of the
+    residual beyond the quadrature error is no larger than that error, the point past which it would fit the quadrature."""
     params = list(model.free_energy.excess_parameters()) + (list(model.kinetics.net.parameters()) if model.kinetics.net is not None else [])
     params = [p for p in params if p.requires_grad]
     t0 = time.time()
@@ -270,8 +321,15 @@ def fit_varpro(model, tr, dt, steps=VP_STEPS, lr=VP_LR, batch=16, log=print, tra
         return dict(linear_fit=info, steps=0, time_s=time.time() - t0)
     opt = torch.optim.Adam(params, lr=lr)
     hist = []
+    start, stopped = info['residual_theta'], None
     for it in range(steps):
         fit_linear(model, tr, dt, log=quiet)
+        if it % VP_CHECK == 0:
+            res, err = quadrature_check(model, tr, dt, batch)
+            if res <= 2 * err:
+                stopped = it
+                log(f'varpro it {it:4d}: residual {res:.4e}, quadrature error {err:.4e}: stops')
+                break
         opt.zero_grad(set_to_none=True)
         with torch.enable_grad():
             hist.append(_projected_residual_backward(model, tr, dt, batch))
@@ -284,8 +342,9 @@ def fit_varpro(model, tr, dt, steps=VP_STEPS, lr=VP_LR, batch=16, log=print, tra
     for p in model.parameters():
         p.grad = None
     info = fit_linear(model, tr, dt, log=log)
-    log(f'varpro: {steps} steps, projected derivative residual {hist[0]:.4e} -> {info["residual_theta"]:.4e}, {time.time() - t0:.0f}s')
-    return dict(linear_fit=info, steps=steps, lr=lr, residual_start=hist[0], residual_end=info['residual_theta'], curve=hist[::10], time_s=time.time() - t0)
+    done = len(hist)
+    log(f'varpro: {done} steps, projected derivative residual {start:.4e} -> {info["residual_theta"]:.4e}, {time.time() - t0:.0f}s')
+    return dict(linear_fit=info, steps=done, stopped_at=stopped, lr=lr, residual_start=start, residual_end=info['residual_theta'], curve=hist[::10], time_s=time.time() - t0)
 
 
 # ------------------------------------------------------------------------------------------ rollout training

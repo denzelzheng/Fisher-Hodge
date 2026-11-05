@@ -59,9 +59,9 @@ We therefore measure the entropy production against the truth and count the hype
 
 ## The fit
 
-1. **Closed-form start.** At initialisation $g_\theta=0$ and $G_\theta=0$. The rates are then linear in the one-way class factors $\kappa_r$, and the derivative fit $c(t+2\Delta t)-c(t)=\sum_r\kappa_rS\int\Phi_r\,dt$ (Simpson rule) is a non-negative least-squares problem. This problem is convex and its optimum is global.
+1. **Closed-form start.** At initialisation $g_\theta=0$ and $G_\theta=0$. The rates are then linear in the one-way class factors $\kappa_r$, and the derivative fit $c(t+4\Delta t)-c(t)=\sum_r\kappa_rS\int\Phi_r\,dt$ (Boole's rule) is a non-negative least-squares problem. This problem is convex and its optimum is global.
 2. **Back to the shared parameters.** The factors are mapped to $\omega$ and $\mu^0_\theta$ by least squares on $\log\kappa$. When classes are coupled, L-BFGS-B then minimises the residual over those parameters, which is not convex. The bound on each $\log\omega_c$ is $\log(10^{-3}\max_r\kappa_r)$ on every task, so that every class keeps a usable gradient.
-3. **Variable projection.** $G_\theta$ and $g_\theta$ are trained jointly on the derivative residual for 500 steps (Adam, learning rate $10^{-3}$, all trajectories). At each step the class factors are solved again by non-negative least squares for the current networks (`neuralchart.fit.fit_varpro`). This step is not convex.
+3. **Variable projection.** $G_\theta$ and $g_\theta$ are trained jointly on the derivative residual for at most 500 steps (Adam, learning rate $10^{-3}$, all trajectories). At each step the class factors are solved again by non-negative least squares for the current networks (`neuralchart.fit.fit_varpro`). The residual also holds the error of the quadrature. Every 25 steps the integrator measures that error for the current model, as the same integral along the model's own path from the same start. The step stops when the rest of the residual is no larger than that error. This step is not convex.
 4. **Rollouts.** Every parameter is trained on rollouts of 4 to 20 steps (`neuralchart.fit.train`). This step is not convex.
 
 Networks and integration use FP32. The least-squares problems use float64.
