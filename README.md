@@ -1,6 +1,6 @@
 # Neural Chart
 
-> **Status.** Version 2.0 is in progress on this branch. Four ablation runs are still training. The animations, `checkpoints/`, `results/` and the errors of the entropy production still come from earlier runs and will be replaced.
+> **Status.** Version 2.0 is in progress on this branch. The fit now includes variable projection, and porous media and the Brusselator now run on 16×16 grids. [Results at a glance](#results-at-a-glance) shows the new runs of the six benchmarks that have finished. The sections on each benchmark, the composition tables, the animations, `checkpoints/` and `results/` still come from earlier runs and will be replaced.
 
 A reaction or transport hypergraph fixes the set of all rate laws on it that satisfy local detailed balance, and this set is a manifold, the thermodynamic manifold.
 Each step has two coordinates on it.
@@ -159,7 +159,9 @@ In the benchmarks, eight times the training drive in porous media gives an error
 
 ### Optimization
 
-At initialisation both networks are zero, so every one-way rate is a class constant times a factor that the state and the conditions fix. The change of the state over a sampling interval is linear in the one-way class constants, and fitting it is a non-negative least-squares problem. This relaxation is convex and its optimum is global. The constants are then mapped back to the shared physical parameters, the class mobilities $\omega_c$ and the standard potentials, by least squares on their logarithms. When the classes are coupled through shared parameters, the code then minimises the residual over those parameters with L-BFGS, which is not convex. The rollout training that follows is not convex either. The start is exact only at $G_\theta=0$. Without it the same training ends 1000 to 2000 times less accurate on the ideal Schlögl model and the phosphorylation cycle, and 2 to 15 times less accurate on the MAPK cascade and the phosphorylation tasks with a learned law. Where the truth has a strong excess free energy the start gains little. On the non-ideal Schlögl model at higher concentrations the model without it is more accurate (see [How each part contributes](#how-each-part-contributes)).
+At initialisation both networks are zero, so every one-way rate is a class constant times a factor that the state and the conditions fix. The change of the state over a sampling interval is linear in the one-way class constants, and fitting it is a non-negative least-squares problem. This relaxation is convex and its optimum is global. The constants are then mapped back to the shared physical parameters, the class mobilities $\omega_c$ and the standard potentials, by least squares on their logarithms. When the classes are coupled through shared parameters, the code then minimises the residual over those parameters with L-BFGS, which is not convex.
+
+The convex problem holds only when both networks are zero. Variable projection then trains $G_\theta$ and $g_\theta$ jointly on the same residual for 500 steps. At each step the class constants are solved again by non-negative least squares for the current networks, so the networks and the constants do not compete for the same part of the rate. Rollout training follows. Neither of these two stages is convex. With variable projection the error on the non-ideal Schlögl model at 10T under training conditions falls from 6.1e-03 to 7.2e-04.
 
 ### Identifiability
 
@@ -280,7 +282,7 @@ The truth differs in what it asks of the chart.
 
 | Benchmark | Hypergraph | What the truth adds to one constant rate per class of steps | New conditions in the tests |
 |---|---|---|---|
-| Porous media | transport on a 32×32 mesh | a mobility from a hidden pore map, seen through 12 descriptors | temperature, drive, low-porosity media, finer grid, point cloud |
+| Porous media | transport on a 16×16 mesh | a mobility from a hidden pore map, seen through 12 descriptors | temperature, drive, low-porosity media, finer grid, point cloud |
 | Porous media with crowding | the same | a mobility that also falls with the local density | the same |
 | Non-ideal Schlögl model | $A+2X\rightleftharpoons3X$, $X\rightleftharpoons B$, diffusing $X$ | an excess free energy of $X$ | higher concentrations, larger grid |
 | Non-ideal Schlögl model, strong crowding | the same | the same excess free energy over a wider range | higher chemostat levels, larger grid |
@@ -303,22 +305,22 @@ The best baseline is the most accurate baseline in that column. The variant of t
 
 | Benchmark | training conditions: Neural Chart | best baseline | hardest new condition | Neural Chart | best baseline |
 |---|---|---|---|---|---|
-| Porous media | **0.065** | 0.077 (UDE closure) | drive ×8 | **0.394** | 0.811 (UDE closure) |
-| Porous media with crowding | **0.056** | 0.066 (UDE closure) | drive ×8 | **0.339** | 0.917 (UDE closure) |
-| Non-ideal Schlögl model | 6.1e-03 | **2.6e-03** (FNO) | a 3.5–4.0, b 2.0–3.5 (higher concentrations) | 0.082 | **0.033** (FNO) |
-| Non-ideal Schlögl, strong crowding | **4.8e-03** | 0.015 (BSMS-GNN) | a 4.6–5.0, b 2.0–3.5 | 0.018 | **7.0e-03** (BSMS-GNN) |
-| Phosphorylation cycle | **2.9e-06** | 5.2e-03 (CRNN, condition features) | stronger, finer potential U | **5.9e-06** | 0.011 (CRNN, condition features) |
-| Phosphorylation, heterogeneous media | **0.014** | 0.029 (CRNN, condition features) | drive ΔG 3–4 | **0.016** | 0.049 (UDE closure) |
-| Phosphorylation, interactions | **1.9e-03** | 0.022 (UDE closure) | stronger, finer potential U | **0.022** | 0.149 (CRNN, condition features) |
-| Phosphorylation, saturating rate | **7.2e-04** | 0.019 (FNO) | X and Xp at the start × 3 | **0.014** | 0.090 (UDE closure) |
-| Schlögl model | 2.2e-05 | **4.1e-06** (CRNN, mass action) | a 3.15–3.35, b 0.3–1.0 | 5.5e-05 | **3.7e-06** (CRNN, mass action) |
-| Brusselator | 4.4e-03 | **2.4e-03** (CRNN, mass action) | a 1.3–1.5 (a and b outside training) | 0.056 | **4.1e-03** (CRNN, mass action) |
-| MAPK cascade | **3.4e-03** | 8.1e-03 (CRNN, condition features) | ATP 3–5 | **9.5e-03** | 0.027 (CRNN, mass action) |
+| Porous media | in training | | | | |
+| Porous media with crowding | in training | | | | |
+| Non-ideal Schlögl model | **7.2e-04** | 2.6e-03 (FNO) | a 3.5–4.0, b 2.0–3.5 (higher concentrations) | **0.012** | 0.033 (FNO) |
+| Non-ideal Schlögl, strong crowding | in training | | | | |
+| Phosphorylation cycle | **7.2e-06** | 5.2e-03 (CRNN, condition features) | stronger, finer potential U | **2.8e-05** | 0.011 (CRNN, condition features) |
+| Phosphorylation, heterogeneous media | **0.012** | 0.029 (CRNN, condition features) | stronger, finer potential U | **0.015** | 0.049 (CRNN, condition features) |
+| Phosphorylation, interactions | **2.8e-04** | 0.022 (UDE closure) | stronger, finer potential U | **0.014** | 0.149 (CRNN, condition features) |
+| Phosphorylation, saturating rate | **4.4e-04** | 0.019 (FNO) | X and Xp at the start × 3 | **0.010** | 0.090 (UDE closure) |
+| Schlögl model | 1.8e-05 | **4.1e-06** (CRNN, mass action) | a 3.15–3.35, b 0.3–1.0 | 4.9e-05 | **3.7e-06** (CRNN, mass action) |
+| Brusselator | in training | | | | |
+| MAPK cascade | in training | | | | |
 
-On every benchmark and every test set no step of the Neural Chart carries flux against its own force, no sample has negative entropy production, and no concentration becomes negative.
+On these six benchmarks and every test set no step of the Neural Chart carries flux against its own force, no sample has negative entropy production, and no concentration becomes negative.
 
-The Neural Chart is the most accurate on eight of the eleven training columns and on seven of the eleven hardest columns.
-Baselines are more accurate on the ideal Schlögl model and on the Brusselator, where CRNN with mass action has exactly the right model class, and on the non-ideal Schlögl model, where FNO is ahead. BSMS-GNN is ahead at the highest chemostat levels of the strong-crowding task.
+The Neural Chart is the most accurate on every test set of five of the six benchmarks.
+The baseline errors on these six benchmarks come from earlier runs on the same data.
 
 The baselines are:
 - the UDE closure, a free neural flux on the same graph
