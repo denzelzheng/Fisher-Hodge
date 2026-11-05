@@ -77,7 +77,21 @@ def sample_schlogl(rng, kind, i, n=8):
     return a, b, y0
 
 
+def make_scene():
+    """the scene of the animations of the non-ideal models, outside the test sets: a stripe of the high state in the low state on the 16 x 16 grid
+    (half of the sites), a = 3, b = 2, the long-time uniform solutions as the two states.  Chosen from the reference data alone: of b = 1.0, 1.1,
+    ..., 3.2 at a = 3 this b has the largest minimum over the clip of the relative spatial std (0.417); the stripe collapses at every other b."""
+    n, a, b = 16, 3.0, 2.0
+    lo = TR.solve_schlogl(n, a, b, np.full(n * n, 0.2), 400)[-1].mean()
+    hi = TR.solve_schlogl(n, a, b, np.full(n * n, 2.5), 400)[-1].mean()
+    x0 = np.full((n, n), lo)
+    x0[:, n // 4:3 * n // 4] = hi
+    return dict(c=torch.tensor(TR.solve_schlogl(n, a, b, x0.ravel(), C.T_TEST))[None], logab=torch.tensor([[math.log(a), math.log(b)]], dtype=torch.float64), n=n)
+
+
 def make_set_schlogl(name):
+    if name == 'scene_stripe':
+        return make_scene()
     strong = C.SYSTEM == 'schlogl_nonideal_strong'
     if strong:
         count, nsteps, n, seed, ar, br = GEN_STRONG[name]

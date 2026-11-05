@@ -1,10 +1,10 @@
 """Comparison animations of the porous-media benchmark (assets/porous_media*.gif).
 
 Two scenes per variant, one test trajectory each:
-  drive ×8      an unseen medium under eight times the training drive: Reference | Neural Chart | Flux-GNN | the black
-                box with the lowest drive ×8 error (HelmFluid without crowding, GENERIC-FNO with crowding)
-  point cloud   the training conditions on a random point cloud of 256 cells: Reference | Neural Chart | Flux-GNN |
-                UDE closure (FNO-type models cannot run on a point cloud)
+  drive ×8      an unseen medium under eight times the training drive: Reference | Neural Chart | UDE closure | a black
+                box (HelmFluid without crowding, GENERIC-FNO with crowding)
+  point cloud   the training conditions on a random point cloud of 256 cells: Reference | Neural Chart | UDE closure |
+                BSMS-GNN (FNO-type models cannot run on a point cloud)
 Weights: <weights>/<model>.pt (default runs/<variant>/, the output of neuralchart.run); a Neural Chart variant not found there comes from
 checkpoints/.  Baseline weights are not shipped.  HelmFluid needs NEURALCHART_HELMFLUID (see THIRD_PARTY.md).
 """
@@ -22,10 +22,10 @@ from .models import load_trained
 # per variant: (test set, models after the reference, subtitle).  The last drive ×8 panel is the black box with the
 # lowest drive ×8 error in the main table: HelmFluid without crowding, GENERIC-FNO with crowding.
 SCENES = {
-    'porous_media': [('drive_x8', ['chart', 'flux_gnn', 'helmfluid'], 'unseen medium, drive ×8'),
-                     ('point_cloud', ['chart', 'flux_gnn', 'ude'], 'unseen medium, point cloud of 256 cells')],
-    'porous_media_crowding': [('drive_x8', ['chart', 'flux_gnn', 'generic_fno'], 'unseen medium, drive ×8'),
-                              ('point_cloud', ['chart', 'flux_gnn', 'ude'], 'unseen medium, point cloud of 256 cells')],
+    'porous_media': [('drive_x8', ['chart', 'ude', 'helmfluid'], 'unseen medium, drive ×8'),
+                     ('point_cloud', ['chart', 'ude', 'bsms'], 'unseen medium, point cloud of 256 cells')],
+    'porous_media_crowding': [('drive_x8', ['chart', 'ude', 'generic_fno'], 'unseen medium, drive ×8'),
+                              ('point_cloud', ['chart', 'ude', 'bsms'], 'unseen medium, point cloud of 256 cells')],
 }
 TITLE = dict(porous_media='Porous media', porous_media_crowding='Porous media with crowding')
 

@@ -19,26 +19,26 @@ from ..common import ROOT, CHECKPOINTS, LABELS
 from . import config as C
 from . import truth as TR
 from .data import load_set, train_norm
-from .models import FLOAT_MODELS, build_baseline, set_max_sub, accelerate
+from .models import FLOAT_MODELS, build_baseline, rebind, set_max_sub, accelerate
 
 # benchmark -> (test set, models after the reference, field, file name)
 SCENES = {
-    'schlogl': ('planar_fronts', ['chart', 'flux_gnn', 'fno'], 'X', 'schlogl_front.gif'),
-    'schlogl_nonideal': ('high_concentration', ['chart', 'fno', 'flux_gnn'], 'X', 'schlogl_nonideal_high_concentration.gif'),
-    'schlogl_nonideal_strong': ('high_a', ['chart', 'fno', 'flux_gnn'], 'X', 'schlogl_nonideal_strong_high_a.gif'),
-    'phosphorylation_cycle': ('strong_drive', ['chart', 'flux_gnn', 'fno'], 'Xp fraction', 'phosphorylation_cycle_strong_drive.gif'),
-    'phosphorylation_heterogeneous': ('strong_drive', ['chart', 'flux_gnn', 'fno'], 'Xp fraction', 'phosphorylation_heterogeneous_strong_drive.gif'),
-    'phosphorylation_interacting': ('high_concentration', ['chart', 'flux_gnn', 'fno'], 'Xp fraction', 'phosphorylation_interacting_high_concentration.gif'),
-    'phosphorylation_saturating': ('high_concentration', ['chart', 'flux_gnn', 'fno'], 'Xp fraction', 'phosphorylation_saturating_high_concentration.gif'),
-    'mapk_cascade': ('low_atp', ['chart', 'flux_gnn', 'fno'], 'state', 'mapk_cascade_low_atp.gif'),
+    'schlogl': ('planar_fronts', ['chart', 'crnn_mass_action', 'fno'], 'X', 'schlogl_front.gif'),
+    'schlogl_nonideal': ('scene_stripe', ['chart', 'fno', 'crnn_mass_action'], 'X', 'schlogl_nonideal_stripe.gif'),
+    'schlogl_nonideal_strong': ('scene_stripe', ['chart', 'fno', 'crnn_mass_action'], 'X', 'schlogl_nonideal_strong_stripe.gif'),
+    'phosphorylation_cycle': ('strong_drive', ['chart', 'crnn_mass_action', 'fno'], 'Xp fraction', 'phosphorylation_cycle_strong_drive.gif'),
+    'phosphorylation_heterogeneous': ('strong_drive', ['chart', 'crnn_mass_action', 'fno'], 'Xp fraction', 'phosphorylation_heterogeneous_strong_drive.gif'),
+    'phosphorylation_interacting': ('high_concentration', ['chart', 'crnn_mass_action', 'fno'], 'Xp fraction', 'phosphorylation_interacting_high_concentration.gif'),
+    'phosphorylation_saturating': ('high_concentration', ['chart', 'crnn_mass_action', 'fno'], 'Xp fraction', 'phosphorylation_saturating_high_concentration.gif'),
+    'mapk_cascade': ('low_atp', ['chart', 'crnn_mass_action', 'fno'], 'state', 'mapk_cascade_low_atp.gif'),
 }
 TRAJ = dict(schlogl=8, schlogl_nonideal=0, schlogl_nonideal_strong=0, phosphorylation_cycle=0, phosphorylation_heterogeneous=0,
             phosphorylation_interacting=0, phosphorylation_saturating=0,
             mapk_cascade=0)   # the README trajectories
 SUPTITLE = {
     'schlogl': 'Schlögl model, travelling front (a = 3, b = {b:.2f}): concentration of X',
-    'schlogl_nonideal': 'Non-ideal Schlögl model, a = {a:.2f}, b = {b:.2f} (outside the training range): concentration of X',
-    'schlogl_nonideal_strong': 'Schlögl model with strong crowding, a = {a:.2f}, b = {b:.2f} (training a 1.5–4.5): concentration of X',
+    'schlogl_nonideal': 'Non-ideal Schlögl model, a stripe outside the test sets, a = {a:.2f}, b = {b:.2f}: concentration of X',
+    'schlogl_nonideal_strong': 'Schlögl model with strong crowding, a stripe outside the test sets, a = {a:.2f}, b = {b:.2f}: concentration of X',
     'phosphorylation_cycle': 'Phosphorylation cycle, drive ΔG = {dG:.2f} (training 1–3): phosphorylated fraction Xp / (X + Xp)',
     'phosphorylation_heterogeneous': 'Phosphorylation cycle on an unseen medium, drive ΔG = {dG:.2f} (training 1–3): phosphorylated fraction Xp / (X + Xp)',
     'phosphorylation_interacting': 'Interacting phosphorylation cycle, X and Xp × 1.5 at the start, ΔG = {dG:.2f}: phosphorylated fraction Xp / (X + Xp)',
@@ -58,6 +58,18 @@ def field(R, n):
     else:
         f = R
     return np.asarray(f).reshape(-1, n, n)
+
+
+def on_grid(name, model, n, norm, device):
+    """the same trained parameters on the n x n grid of a scene"""
+    if n == C.N_TRAIN:
+        return model
+    if name in VARIANTS:
+        return model.on(TR.hg_of(n)).to(device).accelerate()
+    m_ = rebind(name, model, n, norm, device)
+    fast.copy_config(model, m_)
+    set_max_sub(m_, C.MAXSUB_EVAL)
+    return m_
 
 
 def load_model(name, norm, device, weights_dir):
@@ -94,7 +106,7 @@ def make_gif(benchmark, device='cuda', weights_dir=None, out=None, traj=None, st
     drive = {k: v[traj:traj + 1] for k, v in sd['drive'].items()}
     frames, titles = [field(Y[traj], n)], ['Reference']
     for m in models:
-        model = load_model(m, norm, device, weights_dir)
+        model = on_grid(m, load_model(m, norm, device, weights_dir), n, norm, device)
         dr = {k: v.float() for k, v in drive.items()} if m in FLOAT_MODELS else drive
         c0 = sd['c'][traj:traj + 1, 0]
         c0 = c0.float() if m in FLOAT_MODELS else c0.double()
@@ -129,9 +141,9 @@ def make_gif(benchmark, device='cuda', weights_dir=None, out=None, traj=None, st
 TRACK = {
     'schlogl': dict(set='high_a_low_b', traj=5, species='X', label='X', steps=range(0, 201, 4), speed=1,
                     condition='a = {a:.2f}, b = {b:.2f} (training a 2.85–3.10, b 1.0–3.2)'),
-    'schlogl_nonideal': dict(set='high_concentration', traj=0, species='X', label='X', steps=range(0, 61), speed=10,
+    'schlogl_nonideal': dict(set='scene_stripe', traj=0, species='X', label='X', steps=range(0, 61), speed=10,
                              condition='a = {a:.2f}, b = {b:.2f} (training a 2.85–3.10, b 1.0–3.2)'),
-    'schlogl_nonideal_strong': dict(set='high_a', traj=0, species='X', label='X', steps=range(0, 61), speed=10,
+    'schlogl_nonideal_strong': dict(set='scene_stripe', traj=0, species='X', label='X', steps=range(0, 61), speed=10,
                                     condition='a = {a:.2f}, b = {b:.2f} (training a 1.5–4.5, b 1.0–3.2)'),
     'phosphorylation_cycle': dict(set='strong_drive', traj=0, species='X', label='X', steps=range(0, 201, 4), speed=4,
                                   condition='drive ΔG = {dG:.2f} (training 1–3)'),
@@ -144,7 +156,7 @@ TRACK = {
     'mapk_cascade': dict(set='low_atp', traj=0, species=('Kp', 'Kpp'), label='phosphorylated MAPK (Kp + Kpp)',
                          steps=range(10, 61), speed=1, max_age=8, n_part=300, condition='ATP = {atp:.2f} (training 0.5–2)'),
 }
-TRACK_MODELS = ['chart', 'crnn_mass_action', 'flux_gnn', 'ude']
+TRACK_MODELS = ['chart', 'crnn_mass_action', 'ude']
 TRACK_TITLE = dict(schlogl='Schlögl model', schlogl_nonideal='Non-ideal Schlögl model',
                    schlogl_nonideal_strong='Schlögl model with strong crowding',
                    phosphorylation_cycle='Phosphorylation cycle', phosphorylation_heterogeneous='Phosphorylation cycle',
@@ -206,7 +218,7 @@ def make_track_gif(benchmark, device='cuda', weights_dir=None, out=None, traj=No
         if m not in VARIANTS and not os.path.exists(os.path.join(weights_dir or C.OUT, f'{m}.pt')):
             print(f'{benchmark}: no weights for {m}, panel left out', flush=True)
             continue
-        model = load_model(m, norm, device, weights_dir)
+        model = on_grid(m, load_model(m, norm, device, weights_dir), n, norm, device)
         dr = {k: v.float() for k, v in drive.items()} if m in FLOAT_MODELS else drive
         c0 = sd['c'][traj:traj + 1, 0]
         c0 = c0.float() if m in FLOAT_MODELS else c0.double()

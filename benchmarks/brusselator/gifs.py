@@ -22,9 +22,9 @@ ASSETS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.ab
 # forms in the first 8 time units, which are shown at every sampling step.  Trajectory 30 of the a 1.3-1.5 set is the
 # spatial start with the largest growth of spatial structure while it oscillates (0.40 -> 1.38).
 SCENES = [
-    ('brusselator_turing.gif', 'turing', 30, ['chart', 'flux_gnn', 'fno'], 'Turing regime',
+    ('brusselator_turing.gif', 'turing', 30, ['chart', 'crnn_mass_action', 'fno'], 'Turing regime',
      list(range(0, 40)) + list(range(40, 201, 5))),
-    ('brusselator_oscillation.gif', 'a_high', 30, ['chart', 'flux_gnn', 'fno'], 'Oscillations, a and b outside training',
+    ('brusselator_oscillation.gif', 'a_high', 30, ['chart', 'crnn_mass_action', 'fno'], 'Oscillations, a and b outside training',
      list(range(0, 201, 2))),
 ]
 TRAINING_RANGE = 'training a 0.9–1.1, b 2.3–3.0'
@@ -84,7 +84,7 @@ def make_gifs(device='cuda', data=None, weights=None, scenes=SCENES, panel_in=2.
 # from the transport flux J of every model with its own hyperedge flux (the reference: the true flux).  Trajectory 30
 # of the Turing set as in brusselator_turing.gif; the pattern forms in the first 8 time units.
 TRACK = dict(set='turing', traj=30, species='X', steps=list(range(0, 40, 2)) + list(range(40, 201, 10)), speed=1,
-             models=['chart', 'crnn_mass_action', 'flux_gnn', 'ude'], what='Turing regime')
+             models=['chart', 'crnn_mass_action', 'ude'], what='Turing regime')
 
 
 @torch.no_grad()

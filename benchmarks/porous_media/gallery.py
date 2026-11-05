@@ -8,7 +8,7 @@ two ways.
             (J f < -1e-6 (a + b) |f|, neuralchart.diagnostics).
   entropy   The local entropy production sigma_i (half of J_e f_e to each end of every edge, f the physical force of the
             test condition).  Cells with sigma < 0 and edges with flux against the force are magenta.
-Panels: Reference | Neural Chart | Flux-GNN | UDE closure.  The reference flux is the fine-grid flux of the reference
+Panels: Reference | Neural Chart | UDE closure.  The reference flux is the fine-grid flux of the reference
 solution, summed over the fine pixel faces that separate two cells of the discretisation.  The reference is never
 flagged.
 
@@ -37,7 +37,7 @@ from .test_sets import CONDITIONS
 
 MAGENTA = '#d81b60'                 # physics violation (the colour of negative values in the other animations)
 TRACER = '#56b4e9'                  # tracers in cells without a violation (Okabe-Ito sky blue)
-MODELS = ['chart', 'flux_gnn', 'ude']
+MODELS = ['chart', 'ude']
 STRIDE = 7                          # one frame every 7 steps of DT: 29 frames over 10 time units
 SCENES = {
     'porous_media': ['training_conditions', 'drive_x8', 'temperature_x4', 'point_cloud'],

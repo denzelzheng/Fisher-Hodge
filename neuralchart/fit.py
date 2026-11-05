@@ -191,8 +191,9 @@ def fit_linear(model, data, dt, rule='simpson', floor=FLOOR, batch=16, log=print
     tgt = np.log(np.maximum(kap, zero))
     delta, *_ = np.linalg.lstsq(U[free], tgt[free], rcond=1e-10)
     proj_err = float(np.abs(U[free] @ delta - tgt[free]).max()) if free.any() else 0.0
-    nc = model.kinetics.core.numel()
-    core = model.kinetics.core.detach().cpu().numpy().astype(np.float64)
+    log_rates = getattr(getattr(model, 'kinetics', None), 'core', None)       # the floor is on the class log rates of a chart; other models have none
+    nc = 0 if log_rates is None else log_rates.numel()
+    core = np.zeros(0) if log_rates is None else log_rates.detach().cpu().numpy().astype(np.float64)
     theta = torch.cat([p.detach().reshape(-1) for p in params]).cpu().numpy().astype(np.float64)
     top = (kap[free] * np.exp(U[free] @ theta)).max() if free.any() else 1.0   # the largest fitted factor against unit rates
     low = np.log(floor * top) - core if free.any() else np.full(nc, -np.inf)
