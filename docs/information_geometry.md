@@ -25,7 +25,7 @@ With $f$ and $\varepsilon$ fixed, the rates $a=k\varepsilon e^{f/2}$ and $b=k\va
 The set of laws reachable by varying $k\ge0$ is then a convex cone in the dual coordinates, and the equation-error fit is the Euclidean projection of the data onto the image of that cone.
 This projection is convex and has a global optimum (Theorem 0(iii)(c)).
 It uses the Euclidean metric of the equation error, so it is not a divergence projection.
-It also covers only this step. The mapping back to coupled parameters, the fit of the activity correction and the rollout training are not convex.
+It also covers only this step. The mapping back to coupled parameters and the rollout training are not convex.
 
 ## 3. What it says about dissipation and transfer
 

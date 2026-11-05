@@ -6,7 +6,7 @@
   <rect width="960" height="340" fill="#ffffff"/>
 
   <!-- left: the octant of material coordinates -->
-  <text x="235" y="28" text-anchor="middle" font-size="16" font-weight="bold" fill="#222">Library of candidates: a larger manifold</text>
+  <text x="235" y="28" text-anchor="middle" font-size="16" font-weight="bold" fill="#222">Candidate network: a larger manifold</text>
   <path d="M150 260 L150 70 L300 40 L300 180 Z" fill="#ebf8ff" stroke="#2b6cb0"/>
   <path d="M150 260 L300 180 L420 240 L270 320 Z" fill="#f0fff4" stroke="#2f855a"/>
   <g stroke="#444" stroke-width="1.5" fill="none">
@@ -39,5 +39,5 @@
     <text x="830" y="276">trajectory error 2e-5</text>
     <text x="830" y="296">entropy production 10.2 × truth</text>
   </g>
-  <text x="715" y="326" text-anchor="middle" font-size="12" fill="#555">phosphorylation cycle, hypergraph given (left) and library of candidates (right)</text>
+  <text x="715" y="326" text-anchor="middle" font-size="12" fill="#555">phosphorylation cycle, hypergraph given (left) and candidate network (right)</text>
 </svg>

@@ -1,91 +1,79 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 470" width="960" height="470" font-family="Helvetica, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 410" width="960" height="410" font-family="Helvetica, Arial, sans-serif">
   <defs>
     <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#444"/></marker>
   </defs>
-  <rect width="960" height="470" fill="#ffffff"/>
+  <rect width="960" height="410" fill="#ffffff"/>
   <style>
     .t{font-size:13px;fill:#222;text-anchor:middle}
     .s{font-size:11.5px;fill:#555;text-anchor:middle}
-    .h{font-size:15px;font-weight:bold;fill:#222}
+    .h{font-size:15px;font-weight:bold;fill:#222;text-anchor:middle}
     .in{fill:#edf2f7;stroke:#555}
     .kn{fill:#ebf8ff;stroke:#2b6cb0}
     .le{fill:#fffaf0;stroke:#c05621}
     .ou{fill:#f0fff4;stroke:#2f855a}
+    .box{fill:none;stroke:#999;stroke-dasharray:5 4}
     .l{stroke:#444;stroke-width:1.5;fill:none}
   </style>
 
-  <!-- Model -->
-  <text class="h" x="20" y="26">The model</text>
-  <rect class="in" x="20" y="42" width="165" height="52" rx="6"/>
-  <text class="t" x="102" y="63">state c, conditions θ</text>
-  <text class="s" x="102" y="81">hypergraph S</text>
-  <rect class="in" x="20" y="118" width="165" height="52" rx="6"/>
-  <text class="t" x="102" y="139">descriptors ξ</text>
-  <text class="s" x="102" y="157">local state c̄</text>
+  <text class="h" x="120" y="26">What you provide</text>
+  <rect class="in" x="20" y="44" width="200" height="60" rx="6"/>
+  <text class="t" x="120" y="68">hypergraph S</text>
+  <text class="s" x="120" y="87">reactions, mesh or point cloud</text>
+  <rect class="in" x="20" y="118" width="200" height="76" rx="6"/>
+  <text class="t" x="120" y="142">conditions θ</text>
+  <text class="s" x="120" y="161">T, potential U, drive, chemostat levels,</text>
+  <text class="s" x="120" y="177">chemostat standard free energies</text>
+  <rect class="in" x="20" y="208" width="200" height="60" rx="6"/>
+  <text class="t" x="120" y="232">trajectories c(t)</text>
+  <text class="s" x="120" y="251">descriptors ξ are optional</text>
 
-  <rect class="kn" x="235" y="42" width="190" height="52" rx="6"/>
-  <text class="t" x="330" y="63">known formulas</text>
-  <text class="s" x="330" y="81">driving coordinate f, factor ε</text>
-  <rect class="le" x="235" y="118" width="190" height="52" rx="6"/>
-  <text class="t" x="330" y="139">network</text>
-  <text class="s" x="330" y="157">material coordinate k(ξ, c̄)</text>
+  <text class="h" x="480" y="26">The Neural Chart library (the same for every task)</text>
+  <rect class="box" x="265" y="38" width="430" height="236" rx="8"/>
+  <rect class="le" x="285" y="52" width="185" height="64" rx="6"/>
+  <text class="t" x="377" y="76">excess free energy G_θ(c)</text>
+  <text class="s" x="377" y="96">network, gives y = log c + ∇G_θ</text>
+  <rect class="le" x="490" y="52" width="185" height="64" rx="6"/>
+  <text class="t" x="582" y="76">mobility g_θ(class, ξ, c̄)</text>
+  <text class="s" x="582" y="96">network, gives k, never reads θ</text>
+  <rect class="kn" x="285" y="136" width="390" height="56" rx="6"/>
+  <text class="t" x="480" y="158">known formulas on S: force f, factor ε</text>
+  <text class="s" x="480" y="177">a, b = k ε exp(±f/2), with μ⁰ learned for internal species</text>
+  <rect class="kn" x="285" y="208" width="390" height="52" rx="6"/>
+  <text class="t" x="480" y="229">chart.fit: convex start on class constants, then rollouts</text>
+  <text class="s" x="480" y="247">master equation ċ = S (a − b), positive adaptive integrator</text>
+  <path class="l" d="M377 116 L377 136" marker-end="url(#ar)"/>
+  <path class="l" d="M582 116 L582 136" marker-end="url(#ar)"/>
+  <path class="l" d="M480 192 L480 208" marker-end="url(#ar)"/>
 
-  <rect class="kn" x="475" y="80" width="190" height="52" rx="6"/>
-  <text class="t" x="570" y="101">rates of each step</text>
-  <text class="s" x="570" y="119">a, b = k ε e^(±f/2)</text>
+  <text class="h" x="840" y="26">What you get</text>
+  <rect class="ou" x="740" y="44" width="200" height="60" rx="6"/>
+  <text class="t" x="840" y="68">rollouts at new conditions</text>
+  <text class="s" x="840" y="87">no retraining</text>
+  <rect class="ou" x="740" y="118" width="200" height="76" rx="6"/>
+  <text class="t" x="840" y="142">physics of every step</text>
+  <text class="s" x="840" y="161">flux, force, mobility, excess potential,</text>
+  <text class="s" x="840" y="177">entropy production, cycle affinity</text>
+  <rect class="ou" x="740" y="208" width="200" height="60" rx="6"/>
+  <text class="t" x="840" y="232">compose(a, b)</text>
+  <text class="s" x="840" y="251">a chart of a larger system</text>
 
-  <rect class="ou" x="715" y="80" width="225" height="52" rx="6"/>
-  <text class="t" x="827" y="101">master equation ċ = S (a − b)</text>
-  <text class="s" x="827" y="119">positive adaptive integrator</text>
+  <path class="l" d="M220 74 L265 110" marker-end="url(#ar)"/>
+  <path class="l" d="M220 156 L265 156" marker-end="url(#ar)"/>
+  <path class="l" d="M220 238 L265 205" marker-end="url(#ar)"/>
+  <path class="l" d="M695 110 L740 74" marker-end="url(#ar)"/>
+  <path class="l" d="M695 156 L740 156" marker-end="url(#ar)"/>
+  <path class="l" d="M695 205 L740 238" marker-end="url(#ar)"/>
 
-  <path class="l" d="M185 68 L235 68" marker-end="url(#ar)"/>
-  <path class="l" d="M185 144 L235 144" marker-end="url(#ar)"/>
-  <path class="l" d="M425 68 L475 95" marker-end="url(#ar)"/>
-  <path class="l" d="M425 144 L475 117" marker-end="url(#ar)"/>
-  <path class="l" d="M665 106 L715 106" marker-end="url(#ar)"/>
-  <text class="s" x="330" y="190" style="fill:#2b6cb0">learned inputs of f and ε: standard potentials μ⁰, activity correction ln γ(c), which do not read θ</text>
-
-  <!-- Fit -->
-  <text class="h" x="20" y="232">The fit</text>
-  <rect class="kn" x="20" y="248" width="215" height="72" rx="6"/>
-  <text class="t" x="127" y="270">1. closed-form start</text>
-  <text class="s" x="127" y="289">non-negative least squares</text>
-  <text class="s" x="127" y="305">on one-way class constants (convex)</text>
-  <rect class="le" x="255" y="248" width="215" height="72" rx="6"/>
-  <text class="t" x="362" y="270">2. back to shared parameters</text>
-  <text class="s" x="362" y="289">least squares on the logarithms,</text>
-  <text class="s" x="362" y="305">L-BFGS if classes are coupled</text>
-  <rect class="le" x="490" y="248" width="215" height="72" rx="6"/>
-  <text class="t" x="597" y="270">3. variable projection</text>
-  <text class="s" x="597" y="289">ln γ descends the residual,</text>
-  <text class="s" x="597" y="305">with the constants at their optimum</text>
-  <rect class="le" x="725" y="248" width="215" height="72" rx="6"/>
-  <text class="t" x="832" y="270">4. rollout training</text>
-  <text class="s" x="832" y="289">all parameters on multi-step</text>
-  <text class="s" x="832" y="305">trajectories, Adam</text>
-  <path class="l" d="M235 284 L255 284" marker-end="url(#ar)"/>
-  <path class="l" d="M470 284 L490 284" marker-end="url(#ar)"/>
-  <path class="l" d="M705 284 L725 284" marker-end="url(#ar)"/>
-
-  <!-- Use -->
-  <text class="h" x="20" y="362">At a new condition</text>
-  <rect class="in" x="20" y="378" width="215" height="72" rx="6"/>
-  <text class="t" x="127" y="400">new θ′</text>
-  <text class="s" x="127" y="419">temperature, drive, potential,</text>
-  <text class="s" x="127" y="435">chemostat levels</text>
-  <rect class="kn" x="255" y="378" width="215" height="72" rx="6"/>
-  <text class="t" x="362" y="400">recompute f and ε</text>
-  <text class="s" x="362" y="419">by the same formulas,</text>
-  <text class="s" x="362" y="435">no learned parameter changes</text>
-  <rect class="ou" x="490" y="378" width="215" height="72" rx="6"/>
-  <text class="t" x="597" y="400">trajectory</text>
-  <text class="s" x="597" y="419">the same master equation</text>
-  <text class="s" x="597" y="435">at the new point of the manifold</text>
-  <rect class="ou" x="725" y="378" width="215" height="72" rx="6"/>
-  <text class="t" x="832" y="400">readouts</text>
-  <text class="s" x="832" y="419">flux of each step, cycle affinity,</text>
-  <text class="s" x="832" y="435">entropy production</text>
-  <path class="l" d="M235 414 L255 414" marker-end="url(#ar)"/>
-  <path class="l" d="M470 414 L490 414" marker-end="url(#ar)"/>
-  <path class="l" d="M705 414 L725 414" marker-end="url(#ar)"/>
+  <text class="h" x="480" y="312" style="font-size:14px">At a new condition θ′</text>
+  <rect class="in" x="120" y="326" width="210" height="60" rx="6"/>
+  <text class="t" x="225" y="350">new θ′</text>
+  <text class="s" x="225" y="369">temperature, drive, potential, chemostats</text>
+  <rect class="kn" x="375" y="326" width="210" height="60" rx="6"/>
+  <text class="t" x="480" y="350">recompute f and ε</text>
+  <text class="s" x="480" y="369">no learned parameter changes</text>
+  <rect class="ou" x="630" y="326" width="210" height="60" rx="6"/>
+  <text class="t" x="735" y="350">same k and G_θ</text>
+  <text class="s" x="735" y="369">a new point on the same manifold</text>
+  <path class="l" d="M330 356 L375 356" marker-end="url(#ar)"/>
+  <path class="l" d="M585 356 L630 356" marker-end="url(#ar)"/>
 </svg>

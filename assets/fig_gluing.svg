@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 330" width="960" height="330" font-family="Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#444"/></marker>
+  </defs>
+  <rect width="960" height="330" fill="#ffffff"/>
+  <style>
+    .t{font-size:13px;fill:#222;text-anchor:middle}
+    .s{font-size:11.5px;fill:#555;text-anchor:middle}
+    .h{font-size:15px;font-weight:bold;fill:#222;text-anchor:middle}
+    .a{fill:#ebf8ff;stroke:#2b6cb0}
+    .b{fill:#fffaf0;stroke:#c05621}
+    .y{fill:#f0fff4;stroke:#2f855a}
+    .l{stroke:#444;stroke-width:1.5;fill:none}
+  </style>
+  <text class="h" x="130" y="28">Module A</text>
+  <rect class="a" x="30" y="44" width="200" height="66" rx="6"/>
+  <text class="t" x="130" y="70">species X, Y</text>
+  <text class="s" x="130" y="90">fitted μ⁰, G_A, k_A</text>
+  <text class="h" x="130" y="150">Module B</text>
+  <rect class="b" x="30" y="166" width="200" height="66" rx="6"/>
+  <text class="t" x="130" y="192">species Y, Z</text>
+  <text class="s" x="130" y="212">fitted μ⁰, G_B, k_B</text>
+  <path class="l" d="M230 77 L305 130" marker-end="url(#ar)"/>
+  <path class="l" d="M230 199 L305 150" marker-end="url(#ar)"/>
+
+  <text class="h" x="470" y="28">Glue along the shared species Y</text>
+  <rect class="y" x="310" y="44" width="320" height="58" rx="6"/>
+  <text class="t" x="470" y="66">one potential field</text>
+  <text class="s" x="470" y="85">obstruction: one spurious affinity per new cycle</text>
+  <rect class="y" x="310" y="112" width="320" height="58" rx="6"/>
+  <text class="t" x="470" y="134">G = G_A + G_B − G_glue(y)</text>
+  <text class="s" x="470" y="153">exact if and only if ∂ₓ∂_z G = 0</text>
+  <rect class="y" x="310" y="180" width="320" height="58" rx="6"/>
+  <text class="t" x="470" y="202">each hyperedge keeps its module's mobility</text>
+  <text class="s" x="470" y="221">local detailed balance holds on every hyperedge</text>
+  <path class="l" d="M630 141 L705 141" marker-end="url(#ar)"/>
+
+  <text class="h" x="820" y="28">The composite chart</text>
+  <rect class="y" x="710" y="44" width="220" height="86" rx="6"/>
+  <text class="t" x="820" y="70">no retraining</text>
+  <text class="s" x="820" y="90">valid when the modules do not</text>
+  <text class="s" x="820" y="106">interact beyond Y</text>
+  <rect class="y" x="710" y="152" width="220" height="86" rx="6"/>
+  <text class="t" x="820" y="178">refine on composite data</text>
+  <text class="s" x="820" y="198">fits only G_cross(x,y,z) and</text>
+  <text class="s" x="820" y="214">g_cross(h,x,y,z)</text>
+  <text class="s" x="480" y="280">The cross terms vanish on the data of both modules, so no method can learn them from the modules alone.</text>
+  <text class="s" x="480" y="300">Reaction ⊕ transport and cycle ⊕ cycle are the two benchmarks of the main table.</text>
+</svg>

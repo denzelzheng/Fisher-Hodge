@@ -1,6 +1,6 @@
 # Theory of the Neural Chart
 
-The Neural Chart is a master equation on graphs and hypergraphs whose thermodynamic force is fixed by physics and whose mobility is learned. This document states the theory behind it: the setting, the design rule (Theorem 0) and its guarantees, results on observability, estimation limits, coarse graining and extrapolation, and a restatement of these results in information geometry. Each result has a statement, a proof or proof sketch, and a status line that separates known results from new ones.
+The Neural Chart is a master equation on graphs and hypergraphs whose force comes from a free energy and whose mobility is learned. This document states the theory behind it: the setting, the design rule (Theorem 0) and its guarantees, results on observability, estimation limits, coarse graining and extrapolation, and a restatement of these results in information geometry. Each result has a statement, a proof or proof sketch, and a status line that separates known results from new ones.
 
 **Contents**
 
@@ -23,19 +23,20 @@ The Neural Chart is a master equation on graphs and hypergraphs whose thermodyna
 The Neural Chart is a learned map onto the set $\mathfrak G(S)$ of rate laws that satisfy local detailed balance on a fixed graph (Theorem 0, formulation).
 The second law for every parameter value is Theorem 0(iii)(a).
 Conditions as coordinates is Theorem 0(iii)(b) and Proposition 4.
-The convex relaxation behind the closed-form start is Theorem 0(iii)(c). It covers the fit of the class factors at fixed force, and not the mapping back to coupled parameters, the activity correction or the rollout training.
+The convex relaxation behind the closed-form start is Theorem 0(iii)(c). It covers the fit of the class factors at the zero-initialised model, and not the mapping back to coupled parameters or the rollout training.
 Why the standard potentials are weakly determined on networks with nearly irreversible steps is the example after Theorem 0(iii)(d) and Theorem 2.
 Theorem 0(iv) shows what a model loses when its learned part reads the conditions or learns the force freely.
+When fitted charts can be joined along shared species is in [gluing.md](gluing.md).
 
 ## 0. Setting and notation
 
 There are $n$ state coordinates (species at sites) and $m$ hyperedges. Hyperedge $h$ has reactant and product vectors $\nu_h^+,\nu_h^-\in\mathbb{Z}_{\ge 0}^n$, and $S=\nu^--\nu^+\in\mathbb{R}^{n\times m}$. The rates are
 
-$$a_h=k_h\,e^{\langle\nu_h^+,\mu\rangle+A_h/2},\qquad b_h=k_h\,e^{\langle\nu_h^-,\mu\rangle-A_h/2},\qquad J=a-b,\qquad \dot c=SJ,$$
+$$a_h=k_h\,e^{\langle\nu_h^+,y\rangle+\frac12\langle\nu_h^+-\nu_h^-,\phi\rangle+A_h/2},\qquad b_h=k_h\,e^{\langle\nu_h^-,y\rangle-\frac12\langle\nu_h^+-\nu_h^-,\phi\rangle-A_h/2},\qquad J=a-b,\qquad \dot c=SJ,$$
 
-with $k_h>0$ and $\mu=\partial F/\partial c$. The edge force is $f_h=\log(a_h/b_h)=-\langle S_h,\mu\rangle+A_h$. With the logarithmic mean $\ell_h=\Lambda(a_h,b_h)=(a_h-b_h)/(\log a_h-\log b_h)$ the Onsager relation $J=\ell\odot f$ holds exactly, and $\sigma=\sum_h J_hf_h=\sum_h\ell_hf_h^2\ge 0$.
+with $k_h>0$. Here $y=\log c+\nabla G(c)$ is the state part of the chemical potential, with $G$ the excess free energy and $\nabla G(0)=0$, and $\phi=(U+\mu^0)/T$ is its potential part. The chemical potential is $\mu=y+\phi=\partial F/\partial c$, with the free energy $F(c)=\sum_sc_s(\log c_s-1)+\langle c,\phi\rangle+G(c)$. The edge force is $f_h=\log(a_h/b_h)=-\langle S_h,\mu\rangle+A_h$. With the logarithmic mean $\ell_h=\Lambda(a_h,b_h)=(a_h-b_h)/(\log a_h-\log b_h)$ the Onsager relation $J=\ell\odot f$ holds exactly, and $\sigma=\sum_h J_hf_h=\sum_h\ell_hf_h^2\ge 0$.
 
-**Gauge lemma.** For any $\varphi\in\mathbb{R}^n$ the map $(\mu,A,k_h)\mapsto(\mu+\varphi,\ A+S^\top\varphi,\ k_h e^{-\langle\nu_h^++\nu_h^-,\varphi\rangle/2})$ leaves every $a_h$ and $b_h$ unchanged. *Proof.* Both exponents gain $\langle\nu_h^++\nu_h^-,\varphi\rangle/2$, which the new $k_h$ cancels. $\square$ So only the class $[A]\in\mathbb{R}^m/\operatorname{im}S^\top$ is meaningful unless the potential part of $\mu$ is fixed by other means.
+**Gauge lemma.** For any $\psi\in\mathbb{R}^n$ the map $(\phi,A)\mapsto(\phi+\psi,\ A+S^\top\psi)$ leaves every $a_h$ and $b_h$ unchanged. *Proof.* The exponent of $a_h$ gains $\tfrac12\langle\nu_h^+-\nu_h^-,\psi\rangle+\tfrac12\langle S_h,\psi\rangle=0$, and the same holds for $b_h$. $\square$ So only the class $[A]\in\mathbb{R}^m/\operatorname{im}S^\top$ is meaningful unless the potential part of $\mu$ is fixed by other means. For $\psi\in\ker S^\top$ the shift changes neither $A$ nor the rates.
 
 We write $\beta_1:=\dim\ker S=m-\operatorname{rank}S$. For a graph incidence matrix $\operatorname{rank}S=|V|-c$, so $\beta_1=|E|-|V|+c$, the first Betti number. For a hypergraph we use $\beta_1$ as the definition, through the two-term chain complex $\mathbb{R}^m\xrightarrow{S}\mathbb{R}^n$ with $H_1=\ker S$ and $H_0=\operatorname{coker}S$. The dimension of $H_0$ counts the conservation laws.
 
@@ -45,7 +46,7 @@ We write $\beta_1:=\dim\ker S=m-\operatorname{rank}S$. For a graph incidence mat
 
 **Setting.** Notation is that of §0, with potentials in units of $T$. A condition is $\theta=(T,F,\mu_Y,U)$, where $\mu_Y$ are the chemical potentials of the chemostatted species, which are coordinates of $\mu$ fixed by $\theta$. The physical potential and force are
 
-$$\mu(c;\theta)=\log c+U/T+\delta\mu(c),\qquad f_h^{\rm phys}(c;\theta)=-\langle S_h,\mu(c;\theta)\rangle+A_h(\theta),\qquad A_h(\theta)=W_h(F)/T,$$
+$$\mu(c;\theta)=\log c+\delta\mu(c)+(U+\mu^0)/T,\qquad f_h^{\rm phys}(c;\theta)=-\langle S_h,\mu(c;\theta)\rangle+A_h(\theta),\qquad A_h(\theta)=W_h(F)/T,$$
 
 with $W_h(F)$ the line integral of $F$ along $h$. In parts (i) to (iv), $\delta\mu$ is known, possibly zero. A gray-box model sets $(a_h,b_h)=\Phi_h(\lambda_h,c,\theta)$ with $\Phi_h$ fixed and $\lambda_h=K(\xi_h;w)$ learned. In parts (i) to (iv), $\lambda_h$ depends on neither $c$ nor $\theta$. For any model, $\sigma_{\rm phys}(c;\theta)=\sum_hJ_hf_h^{\rm phys}(c;\theta)$ is the entropy production that the physical forces assign to the model's currents.
 
@@ -55,9 +56,9 @@ with $W_h(F)$ the line integral of $F$ along $h$. In parts (i) to (iv), $\delta\
 
 $$J=2g\sinh(f/2),\qquad \Lambda(a,b)=g\,\frac{\sinh(f/2)}{f/2}\ \ge g,$$
 
-with $\Lambda=g$ at $f=0$. For the rates of §0, $g_h=k_h\varepsilon_h$ with the factor $\varepsilon_h=e^{\langle\nu_h^++\nu_h^-,\mu\rangle/2}$, which physics fixes, and
+with $\Lambda=g$ at $f=0$. For the rates of §0, $g_h=k_h\varepsilon_h$ with the factor $\varepsilon_h=e^{\langle\nu_h^++\nu_h^-,y\rangle/2}$, which the state and the excess potential fix, and
 
-$$J_h=k_h\varphi_h,\qquad \varphi_h=2\varepsilon_h\sinh(f_h/2)=e^{\langle\nu_h^+,\mu\rangle+A_h/2}-e^{\langle\nu_h^-,\mu\rangle-A_h/2}.$$
+$$J_h=k_h\varphi_h,\qquad \varphi_h=2\varepsilon_h\sinh(f_h/2)=e^{\langle\nu_h^+,y\rangle+\frac12\langle\nu_h^+-\nu_h^-,\phi\rangle+A_h/2}-e^{\langle\nu_h^-,y\rangle-\frac12\langle\nu_h^+-\nu_h^-,\phi\rangle-A_h/2}.$$
 
 **Proof.** Substitution shows that the two maps are smooth and mutually inverse. Then $a-b=g(e^{f/2}-e^{-f/2})$ and $\Lambda=(a-b)/f$. The inequality is $\sinh x\ge x$ for $x\ge0$ together with evenness. For the §0 rates $\sqrt{a_hb_h}=k_h\varepsilon_h$, and $\varepsilon_he^{\pm f_h/2}$ gives the two exponentials. $\square$
 
@@ -83,7 +84,7 @@ Let the model be in the cut, with any learned output $k\ge0$.
 
 $$J_hf_h^{\rm phys}=2g_hf_h\sinh(f_h/2)\ge0\quad\text{for each }h,$$
 
-with equality iff $f_h=0$ or $k_h=0$. Suppose $[A(\theta')]=0$ and write $A(\theta')=S^\top\psi$. (1) The detailed-balanced states $\{c:S^\top\mu(c;\theta')=A(\theta')\}$ do not depend on $k$. (2) If $\delta\mu=\nabla F_{\rm ex}$ and $F_{\theta'}(c)=\sum_ic_i(\log c_i+U_i/T-1)+F_{\rm ex}(c)$, then $F_{\theta'}(c)-\langle\psi,c\rangle$ is nonincreasing along every solution. (3) At a detailed-balanced state with $H=\nabla^2F_{\theta'}\succ0$, the Jacobian $-S\,\mathrm{diag}(g)\,S^\top H$ has real nonpositive spectrum. (4) A forward step consumes $i$ at a rate with the factor $c_i^{\nu^+_{ih}}$ and a backward step at a rate with $c_i^{\nu^-_{ih}}$, so the positive orthant is invariant when $e^{\delta\mu}$ is bounded on bounded sets. BBKS and modified Patankar schemes keep $c>0$ for every step size (Burchard, Deleersnijder and Meister 2003, Bruggeman et al. 2007). All four statements hold for every $k$, with no penalty term.
+with equality iff $f_h=0$ or $k_h=0$. Suppose $[A(\theta')]=0$ and write $A(\theta')=S^\top\psi$. (1) The detailed-balanced states $\{c:S^\top\mu(c;\theta')=A(\theta')\}$ do not depend on $k$. (2) If $\delta\mu=\nabla F_{\rm ex}$ and $F_{\theta'}(c)=\sum_ic_i(\log c_i+\phi_i-1)+F_{\rm ex}(c)$, then $F_{\theta'}(c)-\langle\psi,c\rangle$ is nonincreasing along every solution. (3) At a detailed-balanced state with $H=\nabla^2F_{\theta'}\succ0$, the Jacobian $-S\,\mathrm{diag}(g)\,S^\top H$ has real nonpositive spectrum. (4) A forward step consumes $i$ at a rate with the factor $c_i^{\nu^+_{ih}}$ and a backward step at a rate with $c_i^{\nu^-_{ih}}$, so the positive orthant is invariant when $e^{\delta\mu}$ is bounded on bounded sets. BBKS and modified Patankar schemes keep $c>0$ for every step size (Burchard, Deleersnijder and Meister 2003, Bruggeman et al. 2007). All four statements hold for every $k$, with no penalty term.
 
 **Proof.** The first line is (i) and $x\sinh(x/2)\ge0$. (1) $f^{\rm phys}=0$ is a condition on $c$ only. (2) $\tfrac{d}{dt}F_{\theta'}=\langle\mu,SJ\rangle=\langle A-f^{\rm phys},J\rangle=\tfrac{d}{dt}\langle\psi,c\rangle-\sigma_{\rm phys}$. (3) At $f=0$, $\partial J_h/\partial f_h=g_h$ and the derivative of $g_h$ multiplies $\sinh 0=0$. With $\partial f/\partial c=-S^\top H$ the Jacobian is $M=-SGS^\top H$, and $H^{1/2}MH^{-1/2}=-H^{1/2}SGS^\top H^{1/2}$ is symmetric and negative semidefinite. (4) is cited. $\square$
 
@@ -143,11 +144,15 @@ The new condition enters only through $|\varphi_h|=2\varepsilon_h|\sinh(f_h/2)|$
 
 ### (v) Boundaries
 
-*State-dependent $k$* (crowding, saturation, exclusion). $\mathfrak G(S)$ becomes infinite-dimensional, with $k_h$ a positive function of the local state, and the learned map becomes $(\xi_h,s_h(c))\mapsto k_w$. Here $s_h$ is a state feature of hyperedge $h$ that is invariant under reversing $h$, such as the edge-mean density. The state $c$ is not a condition, so the premise of (iii) and of Proposition 0.1 that the learned part does not see $\theta$ still holds. Proposition 0.1 applies pointwise in $c$. The same $k_h$ multiplies $a_h$ and $b_h$, so $\log(a_h/b_h)=f_h^{\rm phys}$ is untouched. Property (a) is unchanged, since it uses only $g\ge0$ at the current state. The detailed-balanced states of (a)(1) still do not depend on $k$. Property (c) holds for $k=\sum_j\omega_j\psi_j(\xi,c)$ with fixed features. In (b) the identity $J-J^{\rm true}=(k-k^{\rm true})\varphi$ still holds pointwise. At a new condition the solution may visit states outside the training range. The error of $k$ there is extrapolation in $s$, which the theorem does not cover. A truth whose mobility depends on the state, such as $k^{\rm true}=k(\xi)/(1+\bar\rho/\rho_s)$, therefore lies in $\mathfrak G(S)$. A chart that reads $\xi$ alone misses it, and a chart that also reads $s_h$ can represent it.
+*State-dependent $k$* (crowding, saturation, exclusion). $\mathfrak G(S)$ becomes infinite-dimensional, with $k_h$ a positive function of the local state, and the learned map becomes $(\xi_h,s_h(c))\mapsto k_w$. Here $s_h$ is a state feature of hyperedge $h$ that is invariant under reversing $h$. The code uses the mean, over the cells $h$ touches, of the local density vector of all species. The state $c$ is not a condition, so the premise of (iii) and of Proposition 0.1 that the learned part does not see $\theta$ still holds. Proposition 0.1 applies pointwise in $c$. The same $k_h$ multiplies $a_h$ and $b_h$, so $\log(a_h/b_h)=f_h^{\rm phys}$ is untouched. Property (a) is unchanged, since it uses only $g\ge0$ at the current state. The detailed-balanced states of (a)(1) still do not depend on $k$. Property (c) holds for $k=\sum_j\omega_j\psi_j(\xi,c)$ with fixed features. In (b) the identity $J-J^{\rm true}=(k-k^{\rm true})\varphi$ still holds pointwise. At a new condition the solution may visit states outside the training range. The error of $k$ there is extrapolation in $s$, which the theorem does not cover. A truth whose mobility depends on the state, such as $k^{\rm true}=k(\xi)/(1+\bar\rho/\rho_s)$, therefore lies in $\mathfrak G(S)$. A chart that reads $\xi$ alone misses it, and a chart that also reads $s_h$ can represent it.
 
 *Temperature.* A known law such as $k=mT$ is built into the map. Eyring's $k=mTe^{-\Delta G^\ddagger/T}$ adds one scalar per class. NNLS at each temperature, followed by linear regression of $\log(k/T)$ on $1/T$, keeps both steps convex.
 
-*Learned $\delta\mu$.* The force is computed from the learned potential, so the model lies in the generator set of the learned free energy. Then $\sum_hJ_hf_h^{\rm model}\ge0$ for every learned $\delta\mu$, and (a)(2) holds for the learned $F$. $\sigma_{\rm phys}$ is controlled only as far as $\delta\mu$ is right. Property (b) needs $\delta\mu$ independent of $\theta$ (P1) and correct at the concentrations reached at $\theta'$. A learned activity correction is constrained only on the concentrations seen in training. Property (c) is convex in $k$ for fixed $\delta\mu$. It is not jointly convex in $(k,\delta\mu)$. For each $\delta\mu$ the optimal $k$ solves the NNLS problem of (c), so $k$ can be eliminated and the outer problem is over $\delta\mu$ alone (variable projection). Learned harmonic drive coefficients are part of $f$, so (c′) applies to them.
+*Learned free energy.* Let $\mu^0$ and $G$ be learned, with $\delta\mu=\nabla G$. The force is computed from the learned potential, so the model lies in the generator set of the learned free energy. Then $\sum_hJ_hf_h^{\rm model}\ge0$ for every parameter value, and (a)(2) holds for the learned $F$. $\sigma_{\rm phys}$ is controlled only as far as $\mu^0$ and $G$ are right. Property (b) needs both independent of $\theta$ (P1) and correct at the concentrations reached at $\theta'$. A learned $G$ is constrained only on the states seen in training. Property (c) is convex in $k$ for fixed $\delta\mu$, and it is not jointly convex in $(k,\delta\mu)$. The fit therefore uses (c) at $G=0$ and leaves $G$ to the rollouts. Learned harmonic drive coefficients are part of $f$, so (c′) applies to them.
+
+*The limit of cross-condition identification.* At one condition any $G$ that gives the right sign of $f$ can be compensated by $k=J/(\varepsilon\,2\sinh(f/2))$. Only the requirement that one $k$ and one $G$ serve every condition separates them. Around a cycle the internal potentials cancel and the drive and the chemostat standard free energies remain, and a state-dependent $k$ can compensate a wrong chemostat constant. Chemostat standard free energies are therefore inputs of the model.
+
+*Assumptions that are not learned.* The hypergraph, local detailed balance, the form of $\varepsilon$ and the way $U$ and the drive enter are fixed. $G$ is a local function of the density at each site, so gradient energies and long-range interactions are outside the model class.
 
 ### Remark: the other results as structure of $\mathfrak G(S)$
 
@@ -257,8 +262,8 @@ $$\bar k_{ab}=\sum_{i\in a,\,j\in b}k_{ij}\sqrt{\pi_{i|a}\,\pi_{j|b}} .$$
 
 **Statement.** Assume the following.
 
-- (P1) $\mu=\log c+U/T+\delta\mu(c)$, where $\delta\mu$ does not depend on the conditions.
-- (P2) $A_h=W_h(F)/T+A_h^{\rm chem}$, where $W_h$ is the line integral of the force $F$ along $h$ and the chemostat part is $-\sum_X S_{Xh}(\log c_X+U_X/T)$.
+- (P1) $\mu=\log c+\delta\mu(c)+(U+\mu^0)/T$, where $\delta\mu$ and $\mu^0$ do not depend on the conditions.
+- (P2) $A_h=W_h(F)/T+A_h^{\rm chem}$, where $W_h$ is the line integral of the force $F$ along $h$ and the chemostat part is $-\sum_X S_{Xh}(\log c_X+(U_X+\mu^0_X)/T)$.
 - (P3) $k_h=T\,m_h$ with $m_h$ independent of the conditions (the Einstein relation $D=mT$).
 
 Then $\log a_h$ and $\log b_h$ are affine in the natural parameters $(1/T,\,F/T,\,\log c_{\rm chem})$. A change of the conditions, monotone or not, therefore maps the model by substitution, with $m$ and $\delta\mu$ held fixed. For $T\to T'=rT$,
@@ -271,7 +276,7 @@ So the rate prefactor scales by $r$, and every non-entropic force, including $A$
 
 (b) If a condition enters as a normalized feature of a universal approximator, data on a training set $K$ of condition values do not constrain predictions at $\kappa'\notin\bar K$. For any continuous target there is a network in the class that fits the training data to any tolerance and matches the target at $\kappa'$. ReLU networks also extrapolate linearly in the input (Xu et al. 2021). That extrapolation is linear in the rate. The physics is linear in the log-rate.
 
-**Proof.** (P1)–(P3) give $\log a_h=\log m_h+\log T+\langle\nu_h^+,\log c+\delta\mu\rangle+T^{-1}\big[\langle\nu_h^+,U\rangle+W_h/2\big]+\tfrac12A_h^{\rm chem}$, and similarly for $b_h$. Every condition appears explicitly. For transport, the drift $k(W-\Delta U)/T=m(W-\Delta U)$ does not depend on $T$, and the diffusion $k=mT$ does. This is the SQRA discretization of $\partial_t\rho=\nabla\cdot(mT\nabla\rho+m\rho(\nabla U-F))$. (b) follows from the Tietze extension theorem and universal approximation on a compact set containing $K\cup\{\kappa'\}$. $\square$
+**Proof.** (P1)–(P3) give $\log a_h=\log m_h+\log T+\langle\nu_h^+,\log c+\delta\mu\rangle+T^{-1}\big[\tfrac12\langle\nu_h^+-\nu_h^-,U+\mu^0\rangle+W_h/2\big]+\tfrac12A_h^{\rm chem}$, and similarly for $b_h$. Every condition appears explicitly. For transport, the drift $k(W-\Delta U)/T=m(W-\Delta U)$ does not depend on $T$, and the diffusion $k=mT$ does. This is the SQRA discretization of $\partial_t\rho=\nabla\cdot(mT\nabla\rho+m\rho(\nabla U-F))$. (b) follows from the Tietze extension theorem and universal approximation on a compact set containing $K\cup\{\kappa'\}$. $\square$
 
 **Caveats.** For reactions with a barrier, Eyring's law $k_h\propto T e^{-\Delta G_h^\ddagger/T}$ needs one more scalar per hyperedge class, which data at two temperatures can identify. Debye–Hückel corrections depend on $T$, so (P1) must then be written with the explicit $T$ dependence. After coarse graining, temperature enters through $\bar\mu_a=-\log\sum_{i\in a}e^{-U_i/T}$, which is not affine in $1/T$. The map stays explicit, but it is no longer a rescaling.
 
@@ -283,7 +288,7 @@ So the rate prefactor scales by $r$, and every non-entropic force, including $A$
 
 $$\Phi_w:\Theta\times\Xi^m\to\mathfrak G(S),\qquad(\theta,\xi)\mapsto\big(f^{\rm phys}(\cdot;\theta),\,k_w(\xi)\big).$$
 
-The physical coordinate $f^{\rm phys}$ is fixed by the axioms of §0 and Theorem 0(ii). The material coordinate $k_w(\xi)$ is the output of a network. For state-dependent mobility, $k_w$ also reads the state feature $s_h(c)$ of Theorem 0(v). Strictly, $\Phi_w$ is a parametrization of $\mathfrak G(S)$, the inverse of a coordinate chart. The axioms supply some coordinates of the generator and a network supplies the rest. A Neural Chart is any model built this way.
+The driving coordinate is computed by the axioms of §0 and Theorem 0(ii) from the free energy. When $\mu^0$ and $G$ are learned it is the force of the learned free energy, as in Theorem 0(v). The material coordinate $k_w(\xi)$ is the output of a network, which also reads the state feature $s_h(c)$ of Theorem 0(v). Strictly, $\Phi_w$ is a parametrization of $\mathfrak G(S)$, the inverse of a coordinate chart. The axioms supply some coordinates of the generator and a network supplies the rest. A Neural Chart is any model built this way.
 
 The results below restate Theorems 0 to 3 and Proposition 4 in the dually flat geometry of the local jump law and prove them there. Throughout, $L(a,b)$ is the local law of the event counts at a frozen state. On a window of length $\tau$ the forward and backward counts of hyperedge $h$ are independent Poisson variables with means $\tau a_h$ and $\tau b_h$. We quote divergences per unit time. For intensity vectors, $D(a\|a')=\sum_h(a_h\log(a_h/a'_h)-a_h+a'_h)$.
 
