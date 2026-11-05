@@ -65,6 +65,26 @@ Seen as a learning problem, this mixing leads to three failures, all visible in 
 
 The Neural Chart addresses all three with one structural factorization of the rate of each step on a given hypergraph.
 
+## Where the hypergraph is known
+
+The hypergraph states which steps exist and their stoichiometry. It does not choose a rate law.
+In many fields the steps are known and the rate law is the hard part.
+
+**Cell metabolism and signalling.** Pathways such as glycolysis and the MAPK cascade are curated in databases such as Reactome and BioModels, which provide the species, the reactions and the stoichiometry.
+Rate laws are often measured in dilute solution, and crowding and interactions between species can change them inside a cell.
+In the chart these effects enter through $G_\theta$ and $g_\theta$.
+
+**Batteries and porous electrodes.** The main intercalation reaction, for example $\mathrm{Li}^++e^-+\mathrm{C}_6\rightleftharpoons\mathrm{LiC}_6$, and the transport mesh are known.
+The excess free energy of the solid phase is strongly nonlinear at high lithium content, and the effective diffusivity depends on the pore structure and the local concentration.
+$G_\theta$ is local, so it does not include the interface energy of a phase-separating electrode.
+
+**Catalysis and reactor engineering.** For reactions such as ammonia synthesis, microkinetic networks come from quantum-chemical calculations and surface experiments.
+Adsorbate coverage changes the free energy of the surface species, and transport inside catalyst pellets changes the effective rates.
+Both make it hard to carry an ideal rate law to other temperatures, pressures and reactor meshes.
+
+All benchmarks in this repository use simulated data, and these three fields are possible applications that we have not tested.
+A wrong hypergraph cannot be repaired by the fit (see [Why the hypergraph is an input](#why-the-hypergraph-is-an-input)).
+
 ## The idea: what stays the same when the conditions change
 
 ### Channel fluxes on a directed hypergraph
