@@ -1,6 +1,6 @@
 # Neural Chart
 
-> **Status.** Version 2.0 is in progress on this branch. The fit now includes variable projection, and porous media and the Brusselator now run on 16×16 grids. [Results at a glance](#results-at-a-glance) shows the new runs of the six benchmarks that have finished. The sections on each benchmark, the composition tables, the animations, `checkpoints/` and `results/` still come from earlier runs and will be replaced.
+> **Status.** Version 2.0 is in progress on this branch. The fit now includes variable projection, and porous media and the Brusselator now run on 16×16 grids. [Results at a glance](#results-at-a-glance) shows the new runs of the five benchmarks that have finished. The sections on each benchmark, the composition tables, the animations, `checkpoints/` and `results/` still come from earlier runs and will be replaced.
 
 A reaction or transport hypergraph fixes the set of all rate laws on it that satisfy local detailed balance, and this set is a manifold, the thermodynamic manifold.
 Each step has two coordinates on it.
@@ -60,8 +60,8 @@ Examples are FNO, graph networks that emit fluxes, and closures in universal dif
 Seen as a learning problem, this mixing leads to three failures, all visible in the benchmarks below.
 
 1. **Spurious correlation and failure under a shift of the conditions.** The network cannot tell which changes of the rate come from the material and which come from the temperature or the drive. When the test conditions leave the training range, it fails. Trained at one temperature, FNO reaches an error of 2.3 at four times that temperature in porous media, and the UDE closure 1.0.
-2. **An ill-conditioned, non-convex optimization.** The kinetic parameters and the state are strongly coupled, and gradient descent from a generic start stops at poor local optima. On the oscillating Brusselator every black-box model stays above an error of 0.29. On the Schlögl model the Neural Chart reaches 2.2e-5 with its closed-form step and 0.026 without it.
-3. **Observational equivalence.** Very different internal parameters can produce almost the same trajectories. A model of the Schlögl model built on a network of candidate reactions reaches a trajectory error of 2e-5, and its entropy production is still wrong by a factor of 4, and by up to 10 on another task. Fluxes that circulate around a cycle leave the state unchanged and change the entropy production (Theorem 1 of [docs/theory.md](docs/theory.md)). The learned flux of each step, and every readout built on it, then cannot be trusted. The same freedom lets the UDE closure send up to 69 % of its edge fluxes against the physical force.
+2. **An ill-conditioned, non-convex optimization.** The kinetic parameters and the state are strongly coupled, and gradient descent from a generic start stops at poor local optima. On the oscillating Brusselator every black-box model stays above an error of 0.29.
+3. **Observational equivalence.** Very different internal parameters can produce almost the same trajectories. A model of the phosphorylation cycle built on a network of candidate reactions reaches a trajectory error of 2e-5, and its entropy production is still wrong by a factor of 10. Fluxes that circulate around a cycle leave the state unchanged and change the entropy production (Theorem 1 of [docs/theory.md](docs/theory.md)). The learned flux of each step, and every readout built on it, then cannot be trusted. The same freedom lets the UDE closure send up to 69 % of its edge fluxes against the physical force.
 
 The Neural Chart addresses all three with one structural factorization of the rate of each step on a given hypergraph.
 
@@ -290,7 +290,6 @@ The truth differs in what it asks of the chart.
 | Phosphorylation cycle on heterogeneous media | the same | mobilities from a hidden medium, seen through 3 descriptors | the same, on unseen media |
 | Phosphorylation cycle with interactions | the same | a cross-species excess free energy | drive, potential, higher concentrations, larger grid |
 | Phosphorylation cycle with a saturating rate | the same | a mobility that falls with the local density | drive, potential, higher concentrations, larger grid |
-| Schlögl model | as above, ideal | nothing | chemostat levels, travelling fronts, larger grid |
 | Brusselator | four reactions, two diffusing species | nothing | chemostat levels, Turing regime, finer grid |
 | MAPK cascade | 22 species, 20 reactions | nothing | ATP level, initial state |
 
@@ -313,14 +312,13 @@ The best baseline is the most accurate baseline in that column. The variant of t
 | Phosphorylation, heterogeneous media | **0.012** | 0.029 (CRNN, condition features) | stronger, finer potential U | **0.015** | 0.049 (CRNN, condition features) |
 | Phosphorylation, interactions | **2.8e-04** | 0.022 (UDE closure) | stronger, finer potential U | **0.014** | 0.149 (CRNN, condition features) |
 | Phosphorylation, saturating rate | **4.4e-04** | 0.019 (FNO) | X and Xp at the start × 3 | **0.010** | 0.090 (UDE closure) |
-| Schlögl model | 1.8e-05 | **4.1e-06** (CRNN, mass action) | a 3.15–3.35, b 0.3–1.0 | 4.9e-05 | **3.7e-06** (CRNN, mass action) |
 | Brusselator | in training | | | | |
 | MAPK cascade | in training | | | | |
 
-On these six benchmarks and every test set no step of the Neural Chart carries flux against its own force, no sample has negative entropy production, and no concentration becomes negative.
+On these five benchmarks and every test set no step of the Neural Chart carries flux against its own force, no sample has negative entropy production, and no concentration becomes negative.
 
-The Neural Chart is the most accurate on every test set of five of the six benchmarks.
-The baseline errors on these six benchmarks come from earlier runs on the same data.
+The Neural Chart is the most accurate on every test set of these five benchmarks.
+The baseline errors on these five benchmarks come from earlier runs on the same data.
 
 The baselines are:
 - the UDE closure, a free neural flux on the same graph
@@ -674,48 +672,8 @@ The learned $\log k$ has a Pearson r of 0.993 or higher against the truth, inclu
 
 ## Ideal reaction networks
 
-In these three benchmarks the truth is ideal mass action, and the two networks have nothing to learn beyond constants.
+In these two benchmarks the truth is ideal mass action, and the two networks have nothing to learn beyond constants.
 CRNN with mass action is given the same graph and only those constants, so it has exactly the right model class and is the fair comparison.
-
-### Schlögl model: bistability and travelling fronts
-
-The Schlögl model $A+2X\rightleftharpoons3X$, $X\rightleftharpoons B$ with chemostats $A$, $B$ on an 8×8 periodic grid, with diffusing $X$.
-It is bistable, and a planar front between the two states travels with a speed whose sign changes at the Maxwell point.
-
-![Schlögl model, travelling front](assets/schlogl_front.gif)
-
-| Method | training conditions | a 3.15–3.35, b 0.3–1.0 | planar fronts, a = 3, b 1.7–2.3 | 16×16 grid | parameters |
-|---|---|---|---|---|---|
-| **Neural Chart** | 2.2e-05 | 5.5e-05 | 1.8e-05 | 1.7e-05 | 5,702 |
-| Neural Chart with given standard potentials | 1.5e-06 | 1.9e-06 | 1.3e-06 | 1.1e-06 | 5,701 |
-| No chart (Flux-GNN) | 0.018 | 0.943 | 6.4e-03 | 1.4e-03 | 150,850 |
-| CRNN (mass action) | **4.1e-06** | **3.7e-06** | **5.8e-06** | **3.5e-06** | 6 |
-| CRNN (condition features) | 0.059 | 1.405 | 0.073 | 0.010 | 4,674 |
-| UDE closure | 0.123 | 0.923 | 0.057 | 0.172 | 4,737 |
-| FNO | 0.025 | 0.952 | 8.6e-03 | 0.014 | 172,545 |
-| BSMS-GNN | 0.022 | 1.037 | 0.011 | 0.056 | 1,392,001 |
-| GENERIC-FNO | 2.246 | 4.569 | 0.581 | 0.659 | 1,002,004 |
-| Persistence (u(t) = u(0)) | 2.246 | 4.569 | 0.581 | 0.659 | 0 |
-
-| Method | hyperedges with flux against the true force | samples with σ < 0 | negative values |
-|---|---|---|---|
-| Neural Chart | 0 | 0 | 0 |
-| No chart (Flux-GNN) | 0.241 | 0.235 | 0 |
-| CRNN (mass action) | 0 | 0 | 0 |
-| CRNN (condition features) | 0.164 | 0 | 0 |
-| UDE closure | 0.456 | 0.835 | 0.043 |
-| FNO | N/A | N/A | 7.2e-03 |
-| BSMS-GNN | N/A | N/A | 0.240 |
-| GENERIC-FNO | N/A | N/A | 0 |
-
-CRNN with mass action and the Neural Chart with given standard potentials are at the floor of the integrator, about 2e-6, which the true rates also reach.
-The Neural Chart is at 1.7e-5 to 5.5e-5, with its networks near zero.
-The black boxes reach 1e-3 to 1e-2 in the training ranges and fail at the new chemostat levels, with errors near 1.
-GENERIC-FNO equals persistence on this task: its instance normalisation removes the spatial mean of every update, and the update collapses to zero.
-
-![Tracers, Schlögl model](assets/schlogl_track_high_a_low_b.gif)
-
-The tracers show new chemostat levels (a = 3.32, b = 0.40).
 
 ### Brusselator: oscillations and Turing patterns
 
@@ -851,7 +809,6 @@ This experiment is not part of the release, and every value in the table comes f
 
 | Benchmark | 10T error, network of candidates | 10T error, hypergraph given | entropy production, candidate model / truth |
 |---|---|---|---|
-| Schlögl model | 2.2e-05 | 1.8e-06 | 4.0 |
 | Brusselator | 0.019 | 2.6e-03 | 1.08, with 6.4 % of the steps against the true force |
 | Phosphorylation cycle | 2.0e-05 | 5.9e-06 | 10.2 |
 
@@ -919,11 +876,11 @@ pytest -m slow              # regression tests on the benchmark data (needs data
 **One command for every task and model.**
 
 ```bash
-python -m neuralchart.run --task schlogl --cmd generate                  # reference data
-python -m neuralchart.run --task schlogl --model chart                   # train and evaluate
-python -m neuralchart.run --task schlogl --model chart --cmd evaluate    # evaluate stored weights
-python -m neuralchart.run --task schlogl --cmd tables                    # results/<task>/
-python -m neuralchart.run --task schlogl --cmd gifs                      # assets/
+python -m neuralchart.run --task schlogl_nonideal --cmd generate                  # reference data
+python -m neuralchart.run --task schlogl_nonideal --model chart                   # train and evaluate
+python -m neuralchart.run --task schlogl_nonideal --model chart --cmd evaluate    # evaluate stored weights
+python -m neuralchart.run --task schlogl_nonideal --cmd tables                    # results/<task>/
+python -m neuralchart.run --task schlogl_nonideal --cmd gifs                      # assets/
 ```
 
 The data go to `data/<task>/`, or to `$NEURALCHART_DATA/<task>` when that variable is set.
