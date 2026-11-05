@@ -18,7 +18,7 @@ import time
 import numpy as np
 import torch
 
-from .chart import NeuralChart, VARIANTS
+from .chart import ITERS, NeuralChart, VARIANTS
 from .data import Trajectories
 from .diagnostics import LDB_RULE, relerr_traj
 from .fit import rollout
@@ -41,6 +41,9 @@ TASKS = {
     'compose_thermo_cross': 'composition',
     'compose_kinetic_cross': 'composition',
 }
+
+
+BASELINE_ITERS = 4000
 
 
 def get_task(name, data=None):
@@ -93,7 +96,9 @@ def evaluate(task, name, model, device, log):
     return res
 
 
-def run_train(task, name, iters=4000, seed=0, device='cuda', out='runs', resume=False, lr=1e-3):
+def run_train(task, name, iters=None, seed=0, device='cuda', out='runs', resume=False, lr=1e-3):
+    if iters is None:
+        iters = ITERS if name in VARIANTS or name.startswith('composed') else BASELINE_ITERS
     from benchmarks.common import check_gpu
     check_gpu(device)
     torch.manual_seed(seed); np.random.seed(seed)
@@ -142,7 +147,7 @@ def main(argv=None):
     p.add_argument('--task', required=True, choices=list(TASKS))
     p.add_argument('--model', default='chart')
     p.add_argument('--cmd', default='train', choices=['train', 'evaluate', 'generate', 'calibrate', 'tables', 'gifs', 'figures'])
-    p.add_argument('--iters', type=int, default=4000)
+    p.add_argument('--iters', type=int, default=None, help=f'rollout steps (default: {ITERS} for the Neural Chart and composition, {BASELINE_ITERS} for the baselines)')
     p.add_argument('--seed', type=int, default=0)
     p.add_argument('--device', default='cuda')
     p.add_argument('--lr', type=float, default=1e-3)

@@ -31,7 +31,7 @@ from .graphs import Hypergraph
 from .model import Context, Drive, FreeEnergy, MasterEquation, Mobility, featurizer
 
 RTOL, THETA = 1e-4, 0.5
-ITERS, LR, BATCH, KMIN, KMAX = 4000, 1e-3, 8, 4, 20
+ITERS, LR, BATCH, KMIN, KMAX = 500, 1e-3, 8, 4, 20
 MAX_SUB_TRAIN, MAX_SUB_EVAL = 2000, 4000
 BUDGET_H = 12.0
 

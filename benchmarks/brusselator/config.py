@@ -12,7 +12,7 @@ every DT = 0.2.
 
 Protocol (every trained model, seed 0).  Training windows of 50 sampling steps (10 time units).  Rollout loss over
 K in [4, 20] steps from a random start inside the window, batch 8, Adam with learning rate 1e-3 and a cosine
-schedule, 4000 steps or 12 h of wall clock, gradient clip 1.  The continuous-time models use the positive adaptive
+schedule, 500 steps for the Neural Chart and 4000 for the baselines, or 12 h of wall clock, gradient clip 1.  The continuous-time models use the positive adaptive
 SSP-RK2 of neuralchart.fast with error control (neuralchart.chart.RTOL) in float32; the substep cap is 2000 per sampling
 interval in training and 4000 in evaluation.  FNO, BSMS-GNN and GENERIC-FNO are one-step maps.
 """

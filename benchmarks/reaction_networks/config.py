@@ -11,7 +11,7 @@ read the module-level values (SYSTEM, DT, N_TRAIN, W_TRAIN, DATA, ...).
     mapk_cascade              MAPK cascade with three tiers, 4 x 4 grid (DT 0.5)
 
 Protocol (every model, seed 0): training window 100 sampling steps (MAPK: 20 steps, also 10 time units), rollouts of
-K in [4, 20] steps, batch 8, Adam lr 1e-3 with a cosine schedule on p = max(step / 4000, elapsed / 12 h), gradient
+K in [4, 20] steps, batch 8, Adam lr 1e-3 with a cosine schedule on p = max(step / steps, elapsed / 12 h) (500 steps for the Neural Chart, 4000 for the baselines), gradient
 clip 1.  Test rollouts run for 10T = 200 sampling steps.  Integration: neuralchart.fast, sample_err, float32 in training
 and evaluation, the rtol of neuralchart.chart;
 substep cap 2000 per sampling interval in training and 4000 in evaluation.
@@ -32,7 +32,7 @@ GRID = dict(schlogl=(0.05, 8, 100), schlogl_nonideal=(0.05, 8, 100), schlogl_non
             mapk_cascade=(0.5, 4, 20))      # DT, training grid, training window
 STEP = dict(dt_max=DT / 8, theta0=0.5, theta1=0.5, max_sub=4000, t_tol=1e-9)
 MAXSUB_TRAIN, MAXSUB_EVAL = 2000, 4000
-ITERS, LR, BATCH, KMIN, KMAX = 4000, 1e-3, 8, 4, 20
+LR, BATCH, KMIN, KMAX = 1e-3, 8, 4, 20
 BUDGET_S = 12 * 3600
 RTOL = 1e-4
 FAST = None                                # the integrator settings of a run (neuralchart.fast.accelerate kwargs)
