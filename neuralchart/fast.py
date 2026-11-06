@@ -203,6 +203,8 @@ class ChartKernel(Kernel):
         s.excess = bool(fe.c_dependent and getattr(fe, 'local_excess', False))
         assert s.excess or not fe.c_dependent, 'fast path: the excess potential must not depend on c'
         s.state = bool(kin.rho_dependent)
+        if getattr(model, 'networks_zero', False):           # G_theta = g_theta = 0 and frozen: no evaluation of them per substep
+            s.excess = s.state = False
 
     def prepare(s, ctx, dtype):
         m = s.model

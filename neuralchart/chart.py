@@ -136,10 +136,13 @@ class NeuralChart(MasterEquation):
             iters = ITERS_CONSTANTS if iters == ITERS else iters
             for p in nets:
                 p.requires_grad_(False)
+            s.networks_zero = True
+            s._integrator(MAX_SUB_TRAIN)
         info.update(train(s, data, iters, seed, tr.dt, batch=BATCH, lr=lr, kmin=KMIN, kmax=KMAX, log=log, budget_s=BUDGET_H * 3600,
                           ckpt=checkpoint, resume=resume))
         for p in nets:
             p.requires_grad_(True)
+        s.networks_zero = False
         s.eval()
         info['summary'] = chart_summary(s, data)
         s.accelerate()
