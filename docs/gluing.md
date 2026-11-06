@@ -84,24 +84,14 @@ Both cases use the modules of the two-cycle benchmark, so the modules are the sa
 
 | Method | training conditions | stronger drive | start × 1.5 |
 |---|---|---|---|
-| Glued chart, no retraining | 0.029 | 5.9e-03 | 0.050 |
-| Refined on 2 coupled trajectories | 0.013 | 7.4e-03 | 9.2e-03 |
-| Refined on 8 | 4.3e-03 | 2.3e-03 | 2.8e-03 |
-| Refined on 32 | 3.5e-03 | 1.9e-03 | 2.6e-03 |
-| Chart fitted on composite data | 6.0e-04 | 6.9e-04 | 1.4e-03 |
-| Flux-GNN on the data of both modules | 0.029 | 0.012 | 0.048 |
-| Flux-GNN on composite data | 5.1e-03 | 0.022 | 0.011 |
+| **Glued chart, no retraining** | 0.029 | 6.0e-03 | 0.050 |
+| Glued chart, refined on 8 | 4.3e-03 | 2.4e-03 | 2.8e-03 |
 
 **Kinetic cross term.** The rate constant of the first step is divided by $1+c_{Y_p}/K_I$ with $K_I=0.5$.
 
 | Method | training conditions | stronger drive | start × 1.5 |
 |---|---|---|---|
-| Glued chart, no retraining | 0.135 | 0.096 | 0.199 |
-| Refined on 2 coupled trajectories | 0.036 | 0.042 | 0.053 |
-| Refined on 8 | 0.011 | 6.5e-03 | 0.020 |
-| Refined on 32 | 0.013 | 9.4e-03 | 0.021 |
-| Chart fitted on composite data | 9.6e-04 | 1.4e-03 | 2.0e-03 |
-| Flux-GNN on the data of both modules | 0.136 | 0.090 | 0.201 |
-| Flux-GNN on composite data | 4.7e-03 | 0.084 | 0.019 |
+| **Glued chart, no retraining** | 0.135 | 0.096 | 0.199 |
+| Glued chart, refined on 8 | 0.011 | 6.5e-03 | 0.020 |
 
-Without refinement the glued chart is at the level of Flux-GNN trained on the same data, as Proposition 3 predicts. With 8 coupled trajectories it is more accurate than Flux-GNN trained on 48 composite trajectories of 100 steps on all three test sets of the thermodynamic case, and under the stronger drive in the kinetic case. A chart fitted from scratch on composite data remains the most accurate. In the kinetic case refinement on 32 trajectories does not improve on 8.
+Without refinement the glued chart fails in both cases, as Proposition 3 predicts. With 8 coupled trajectories the error falls by a factor of 2.5 to 18 in the thermodynamic case and of 10 to 15 in the kinetic case.

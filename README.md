@@ -1,7 +1,5 @@
 # Neural Chart
 
-> **Status.** Version 2.0 is in progress on this branch. The fit now includes variable projection, and porous media and the Brusselator now run on 16×16 grids. [Results at a glance](#results-at-a-glance) shows the new runs of the six benchmarks that have finished. The sections on each benchmark, the composition tables, the animations, `checkpoints/` and `results/` still come from earlier runs and will be replaced.
-
 A reaction or transport hypergraph fixes the set of all rate laws on it that satisfy local detailed balance, and this set is a manifold, the thermodynamic manifold.
 Each step has two coordinates on it.
 The driving coordinate $f$ is the thermodynamic force of the step.
@@ -59,9 +57,9 @@ Most neural simulators learn the flux or the time derivative from the state $c$,
 Examples are FNO, graph networks that emit fluxes, and closures in universal differential equations.
 Seen as a learning problem, this mixing leads to three failures, all visible in the benchmarks below.
 
-1. **Spurious correlation and failure under a shift of the conditions.** The network cannot tell which changes of the rate come from the material and which come from the temperature or the drive. When the test conditions leave the training range, it fails. Trained at one temperature, FNO reaches an error of 2.3 at four times that temperature in porous media, and the UDE closure 1.0.
-2. **An ill-conditioned, non-convex optimization.** The kinetic parameters and the state are strongly coupled, and gradient descent from a generic start stops at poor local optima. On the oscillating Brusselator every black-box model stays above an error of 0.29.
-3. **Observational equivalence.** Very different internal parameters can produce almost the same trajectories. A model of the phosphorylation cycle built on a network of candidate reactions reaches a trajectory error of 2e-5, and its entropy production is still wrong by a factor of 10. Fluxes that circulate around a cycle leave the state unchanged and change the entropy production (Theorem 1 of [docs/theory.md](docs/theory.md)). The learned flux of each step, and every readout built on it, then cannot be trusted. The same freedom lets the UDE closure send up to 69 % of its edge fluxes against the physical force.
+1. **Spurious correlation and failure under a shift of the conditions.** The network cannot tell which changes of the rate come from the material and which come from the temperature or the drive. When the test conditions leave the training range, it fails. Trained at one temperature, FNO reaches an error of 1.1 at four times that temperature in porous media, and the UDE closure 0.16.
+2. **An ill-conditioned, non-convex optimization.** The kinetic parameters and the state are strongly coupled, and gradient descent from a generic start stops at poor local optima. On the oscillating Brusselator every black-box model stays above an error of 0.2.
+3. **Observational equivalence.** Very different internal parameters can produce almost the same trajectories. A model of the phosphorylation cycle built on a network of candidate reactions reaches a trajectory error of 2e-5, and its entropy production is still wrong by a factor of 10. Fluxes that circulate around a cycle leave the state unchanged and change the entropy production (Theorem 1 of [docs/theory.md](docs/theory.md)). The learned flux of each step, and every readout built on it, then cannot be trusted. The same freedom lets the UDE closure send up to 82 % of its edge fluxes against the physical force.
 
 The Neural Chart addresses all three with one structural factorization of the rate of each step on a given hypergraph.
 
@@ -175,18 +173,18 @@ It also shows what a gray-box model loses when its learned part reads the condit
 ### Extrapolation in the drive
 
 A new condition changes $f$ and $\varepsilon$ by known formulas and changes no learned parameter. At a fixed state, if the true mobility lies in the model class and the force is right, the flux error at any condition has a closed form, $\|J-J^{\rm true}\|^2_{\Lambda^{-1}}=\sum_h\delta_h^2\,\sigma_h^{\rm true}$ with $\delta_h=k_h/k_h^{\rm true}-1$ (IG2(c)). This does not make transfer automatic. A new condition can drive the system into states that training never visited, and it can change the true mobility of the material. Over long rollouts the error also depends on the stability of the dynamics.
-In the benchmarks, eight times the training drive in porous media gives an error of 0.39, against 0.81 for the best baseline, and the stronger drive of the phosphorylation cycle leaves the error at 3.5e-6.
+In the benchmarks, eight times the training drive in porous media gives an error of 0.18, against 0.65 for the best baseline, and the stronger drive of the phosphorylation cycle leaves the error at 2.6e-6.
 
 ### Optimization
 
 At initialisation both networks are zero, so every one-way rate is a class constant times a factor that the state and the conditions fix. The change of the state over a sampling interval is linear in the one-way class constants, and fitting it is a non-negative least-squares problem. This relaxation is convex and its optimum is global. The constants are then mapped back to the shared physical parameters, the class mobilities $\omega_c$ and the standard potentials, by least squares on their logarithms. When the classes are coupled through shared parameters, the code then minimises the residual over those parameters with L-BFGS, which is not convex.
 
-The convex problem holds only when both networks are zero. Variable projection then trains $G_\theta$ and $g_\theta$ jointly on the same residual for 500 steps. At each step the class constants are solved again by non-negative least squares for the current networks, so the networks and the constants do not compete for the same part of the rate. Rollout training follows. Neither of these two stages is convex. With variable projection the error on the non-ideal Schlögl model at 10T under training conditions falls from 6.1e-03 to 7.2e-04.
+The convex problem holds only when both networks are zero. The residual at its optimum also holds the error of the quadrature over a sampling step, which no parameter should fit. The integrator measures that error for the fitted constants, as the same integral along the model's own path. If the rest of the residual is no larger than the quadrature error, the class constants already hold the data, and $G_\theta$ and $g_\theta$ stay zero. This is what happens on the two ideal reaction networks and on the phosphorylation cycle. Otherwise variable projection trains $G_\theta$ and $g_\theta$ jointly on the same residual for 500 steps. At each step the class constants are solved again by non-negative least squares for the current networks, so the networks and the constants do not compete for the same part of the rate. Rollout training follows in both cases. Neither of these two stages is convex. With variable projection the error on the non-ideal Schlögl model at 10T under training conditions falls from 0.077 to 6.7e-4.
 
 ### Identifiability
 
 Under the invariance, trajectories recorded at different conditions constrain the same mobilities. The flux of step $h$ is $J_h=k_h\varphi_h(c,\theta)$ with a known $\varphi_h$. Noise-free data determine every $k_h$ exactly when no nonzero $v$ satisfies $\mathrm{diag}(\varphi^i)\,v\in\ker S$ at every data point $i$ (Theorem 0(iii)(d)). New conditions add data points with new $\varphi^i$ and shrink this set. Once $k$ and the force are determined, so are the flux of every step, the cycle currents and the entropy production. When the set is not empty, the data cannot separate the mechanisms it contains. In the phosphorylation cycle, for example, the two rate constants are identified when the cycle affinity is nonzero and the data contain two ratios of phosphorylated to unphosphorylated substrate. At zero affinity only their sum is. Two steps that remove the same species in the same proportion at every data point are never separated (the parallel-channel lemma).
-In the benchmarks the learned $\log k$ has a Pearson r of at least 0.99 on the interacting and saturating phosphorylation tasks and 0.96 on heterogeneous media. It is weaker on the MAPK cascade (0.83 to 0.86). Without the hypergraph the readouts fail ([Why the hypergraph is an input](#why-the-hypergraph-is-an-input)).
+In the benchmarks the learned $\log k$ has a Pearson r of 0.9999 on the interacting and 0.998 to 0.999 on the saturating phosphorylation task, and 0.94 to 0.96 on heterogeneous media. Without the hypergraph the readouts fail ([Why the hypergraph is an input](#why-the-hypergraph-is-an-input)).
 
 ### Non-negative dissipation
 
@@ -263,36 +261,28 @@ The design was fixed before any result (`benchmarks/composition/__init__.py`).
 The tests are the sets of the phosphorylation cycle.
 Every species of the transport module is also in the reaction module, so no cross term exists to refine.
 
-| Method | training conditions (ΔG 1–3) | drive ΔG 3–4 | stronger, finer potential U | 16×16 grid | affinity error |
+| Method | training conditions | stronger drive | stronger, finer potential U | 16×16 grid | affinity error |
 |---|---|---|---|---|---|
-| **Glued chart, no retraining** | 1.1e-05 | 1.1e-05 | 2.5e-05 | 1.4e-05 | 4.7e-16 |
-| Chart fitted on composite data | 2.9e-06 | 3.5e-06 | 5.9e-06 | 3.5e-06 | 1.8e-15 |
-| Flux-GNN on the data of both modules | 0.151 | 0.174 | 0.185 | 0.143 | 1.906 |
-| Flux-GNN on composite data | 2.1e-03 | 0.038 | 0.113 | 4.1e-03 | N/A |
+| **Glued chart, no retraining** | 1.9e-06 | 1.6e-06 | 1.8e-06 | 2.1e-06 | 4.5e-16 |
+| Chart fitted on composite data | 2.9e-06 | 2.6e-06 | 2.5e-06 | 3.0e-06 | 0 |
 
 **Two cycles.** Two phosphorylation cycles share $X_p$ as the kinase input of the second and share ATP and ADP. This gluing creates no new cycle.
 The tests are a coupled cascade under the training conditions, under a stronger drive, and from a start at 1.5 times the concentrations.
 
-| Method | training conditions | stronger drive | start × 1.5 | affinity error |
-|---|---|---|---|---|
-| **Glued chart, no retraining** | 3.0e-05 | 1.8e-05 | 3.8e-05 | 5.6e-16 |
-| Glued chart, refined on 2 coupled trajectories | 1.3e-05 | 4.5e-06 | 1.6e-05 | 5.8e-16 |
-| Glued chart, refined on 8 | 5.7e-06 | 3.2e-06 | 8.1e-06 | 5.3e-16 |
-| Glued chart, refined on 32 | 3.2e-06 | 2.4e-06 | 3.3e-06 | 5.6e-16 |
-| Chart fitted on composite data | 9.2e-07 | 8.4e-07 | 1.2e-06 | 5.6e-16 |
-| Flux-GNN on the data of both modules | 1.2e-03 | 7.7e-03 | 1.9e-03 | 0.612 |
-| Flux-GNN on composite data | 1.1e-03 | 0.078 | 1.9e-03 | 2.152 |
+| Method | training conditions | stronger drive | start × 1.5 |
+|---|---|---|---|
+| **Glued chart, no retraining** | 1.1e-06 | 7.1e-07 | 1.1e-06 |
+| Glued chart, refined on 8 | 4.0e-06 | 1.7e-06 | 6.3e-06 |
+| Chart fitted on composite data | 8.3e-07 | 5.0e-07 | 7.4e-07 |
 
 The affinity error is the mean absolute error of the affinity around the cycles under the training conditions.
 For the Neural Chart it is zero by construction, because the internal potentials cancel around a cycle and the chemostat values are inputs.
-With no composite data the glued chart is about 1e4 times more accurate than Flux-GNN trained on the same data on reaction and transport, and 40 to 430 times on the two cycles.
-A chart fitted from scratch on composite data is more accurate still, and it needs those data.
+With no composite data the glued chart is as accurate as a chart fitted from scratch on composite data, which needs those data: 1.9e-6 against 2.9e-6 on reaction and transport, and 1.1e-6 against 8.3e-7 on the two cycles.
 The largest spurious affinity is zero to rounding, and the force changes by less than 1e-15.
 
 **With cross terms.** Two further cases were fixed in advance to fail without refinement, and they do.
-With a cross term in $G$ the glued chart reaches 5.9e-3 to 0.050, and with an inhibition of one step by a species of the other module it reaches 0.096 to 0.20.
-Flux-GNN on the data of both modules is at the same level.
-Refinement on 32 coupled trajectories of 20 steps brings these errors to 1.9e-3 to 3.5e-3 and to 9.4e-3 to 0.021.
+With a cross term in $G$ the glued chart reaches 6.0e-3 to 0.050, and with an inhibition of one step by a species of the other module it reaches 0.096 to 0.20.
+Refinement on 8 coupled trajectories of 20 steps brings these errors to 2.4e-3 to 4.3e-3 and to 6.5e-3 to 0.020.
 The tables are in [docs/gluing.md](docs/gluing.md#appendix-cases-with-cross-terms).
 
 ## The benchmarks
@@ -320,25 +310,37 @@ The code is the same on all of them: `NeuralChart(hypergraph, chemostats=...)` a
 Every model is trained once, with one seed, under the training conditions, and is then evaluated on every test set without retraining.
 The error is the relative L2 error of the state at 10T (200 sampling steps), median over the test trajectories.
 The hardest new condition is the test set on which the Neural Chart has its largest error.
-The best baseline is the most accurate baseline in that column. The variant of the Neural Chart without its chart (Flux-GNN, described below) is an ablation and is not counted.
+The best baseline is the most accurate baseline in that column.
+The Neural Chart trains for 500 rollout steps after variable projection, or for 4000 steps on the constants alone where the start check keeps the networks at zero. Every baseline trains for 4000 steps.
 
 | Benchmark | training conditions: Neural Chart | best baseline | hardest new condition | Neural Chart | best baseline |
 |---|---|---|---|---|---|
-| Porous media | in training | | | | |
-| Porous media with crowding | in training | | | | |
-| Non-ideal Schlögl model | **7.2e-04** | 2.6e-03 (FNO) | a 3.5–4.0, b 2.0–3.5 (higher concentrations) | **0.012** | 0.033 (FNO) |
-| Non-ideal Schlögl, strong crowding | **5.5e-04** | 0.015 (BSMS-GNN) | a 4.6–5.0, b 2.0–3.5 | **3.2e-03** | 7.0e-03 (BSMS-GNN) |
-| Phosphorylation cycle | **7.2e-06** | 5.2e-03 (CRNN, condition features) | stronger, finer potential U | **2.8e-05** | 0.011 (CRNN, condition features) |
-| Phosphorylation, heterogeneous media | **0.012** | 0.029 (CRNN, condition features) | stronger, finer potential U | **0.015** | 0.049 (CRNN, condition features) |
-| Phosphorylation, interactions | **2.8e-04** | 0.022 (UDE closure) | stronger, finer potential U | **0.014** | 0.149 (CRNN, condition features) |
-| Phosphorylation, saturating rate | **4.4e-04** | 0.019 (FNO) | X and Xp at the start × 3 | **0.010** | 0.090 (UDE closure) |
-| Brusselator | in training | | | | |
-| MAPK cascade | in training | | | | |
+| Porous media | **0.030** | 0.031 (UDE closure) | drive ×8 | **0.183** | 0.649 (UDE closure) |
+| Porous media with crowding | 0.035 | **0.029** (UDE closure) | drive ×8 | **0.228** | 0.759 (UDE closure) |
+| Non-ideal Schlögl model | **6.7e-04** | 2.6e-03 (FNO) | a 3.5–4.0, b 2.0–3.5 | **0.011** | 0.033 (FNO) |
+| Non-ideal Schlögl, strong crowding | **8.6e-04** | 0.015 (BSMS-GNN) | a 4.6–5.0, b 2.0–3.5 | **1.1e-03** | 7.0e-03 (BSMS-GNN) |
+| Phosphorylation cycle | **2.9e-06** | 5.2e-03 (CRNN, condition features) | 16×16 grid | **3.0e-06** | 7.6e-03 (CRNN, condition features) |
+| Phosphorylation, heterogeneous media | **0.015** | 0.029 (CRNN, condition features) | stronger, finer potential U | **0.021** | 0.049 (CRNN, condition features) |
+| Phosphorylation, interactions | **4.4e-04** | 0.022 (UDE closure) | stronger, finer potential U | **0.019** | 0.149 (CRNN, condition features) |
+| Phosphorylation, saturating rate | **9.9e-04** | 0.019 (FNO) | X and Xp at the start × 3 | **0.013** | 0.090 (UDE closure) |
+| Brusselator | 6.2e-03 | **1.7e-03** (CRNN, mass action) | a 1.3–1.5 (a and b outside training) | 0.016 | **3.8e-03** (CRNN, mass action) |
+| MAPK cascade | 0.011 | **8.1e-03** (CRNN, condition features) | ATP 3–5 | **0.019** | 0.027 (CRNN, mass action) |
 
-On these six benchmarks and every test set no step of the Neural Chart carries flux against its own force, no sample has negative entropy production, and no concentration becomes negative.
+On every benchmark and every test set no sample of the Neural Chart has negative entropy production, and no concentration becomes negative.
 
-The Neural Chart is the most accurate on every test set of these six benchmarks.
-The baseline errors on these six benchmarks come from earlier runs on the same data.
+The Neural Chart is the most accurate model on 43 of the 50 test sets. The sets where a baseline is more accurate are these.
+
+| Benchmark | test set | Neural Chart | most accurate baseline |
+|---|---|---|---|
+| Porous media | 32×32 grid | 0.037 | 0.035 (UDE closure) |
+| Porous media with crowding | training conditions | 0.035 | 0.029 (UDE closure) |
+| Porous media with crowding | 32×32 grid | 0.041 | 0.031 (UDE closure) |
+| Brusselator | training conditions | 6.2e-03 | 1.7e-03 (CRNN, mass action) |
+| Brusselator | a 1.3–1.5 (a and b outside training) | 0.016 | 3.8e-03 (CRNN, mass action) |
+| MAPK cascade | training conditions (ATP 0.5–2) | 0.011 | 8.1e-03 (CRNN, condition features) |
+| MAPK cascade | phosphorylated initial states | 0.011 | 8.3e-03 (CRNN, condition features) |
+
+On the Brusselator and the MAPK cascade the truth is ideal mass action, so CRNN with mass action has exactly the right model class, and the start check keeps the two networks of the Neural Chart at zero. Both models then fit the same constants. In the Neural Chart the forward and backward rates of a step are tied by the standard potentials, which the data of a nearly irreversible step leave weakly determined, and this makes its rollout training slower than that of free rate constants. On porous media the three sets are under the training conditions, where the UDE closure, a free flux on the same graph with the same descriptors, trains for eight times as many steps. Under every changed condition the Neural Chart is ahead.
 
 The baselines are:
 - the UDE closure, a free neural flux on the same graph
@@ -346,10 +348,6 @@ The baselines are:
 - CRNN with the conditions as features
 - BSMS-GNN, FNO, GENERIC-FNO, and HelmFluid on porous media only
 - persistence, $u(t)=u(0)$
-
-The tables also show the Neural Chart without its chart, as an ablation.
-In this variant a message-passing network on the same hypergraph emits the forward and backward rate of every step from the state, the conditions and the descriptors, with the same mass-action factors and the same integrator (we call it Flux-GNN).
-It has no split into driving and material coordinates, so none of the properties above apply to it.
 
 The physics tables count, for every model with its own edge flux, the steps whose flux runs against the true physical force, $J_hf_h<-10^{-6}(a_h+b_h)|f_h|$, and the samples with $\sigma<0$.
 Models that return only a state update have N/A there.
@@ -364,41 +362,36 @@ A tracer turns magenta in a cell with negative local entropy production, or in a
 ### Porous media
 
 A density moves by diffusion and a divergence-free drive through random porous media.
-The true mobility comes from an effective-medium rule on a 128×128 pore map that the models never see.
+The true mobility comes from an effective-medium rule on a 64×64 pore map that the models never see.
 The models see 12 local porosity and connectivity descriptors per edge.
-They are trained on 64 media at temperature 1 and drive amplitude 1 on a 32×32 grid.
-The tests use 16 unseen media, other temperatures and drives, unseen low-porosity media (porosity 0.15–0.3, training 0.3–0.7), a 64×64 grid and a point cloud of 1024 Voronoi cells.
+They are trained on 32 media at temperature 1 and drive amplitude 1 on a 16×16 grid.
+The tests use 16 unseen media, other temperatures and drives, unseen low-porosity media (porosity 0.15–0.3, training 0.3–0.7), a 32×32 grid and a point cloud of 256 Voronoi cells.
 
 | Drive ×8 on an unseen medium | Point cloud (training conditions) |
 |---|---|
 | ![porous media, drive x8](assets/porous_media_drive_x8.gif) | ![porous media, point cloud](assets/porous_media_point_cloud.gif) |
 
-| Method | training conditions | temperature ×0.25 | temperature ×4 | drive ×4 | drive ×8 | unseen low-porosity media | 64×64 grid | point cloud | parameters |
+| Method | training conditions | temperature ×0.25 | temperature ×4 | drive ×4 | drive ×8 | unseen low-porosity media | 32×32 grid | point cloud | parameters |
 |---|---|---|---|---|---|---|---|---|---|
-| **Neural Chart** | **0.065** | **0.075** | **0.104** | **0.186** | **0.394** | **0.077** | **0.075** | **0.090** | 6,340 |
-| No chart (Flux-GNN) | 0.078 | 0.797 | 2.138 | 1.046 | 1.091 | 0.116 | 0.515 | 0.458 | 151,234 |
-| UDE closure | 0.077 | 0.700 | 1.023 | 0.588 | 0.811 | 0.104 | 0.093 | 0.255 | 5,441 |
-| BSMS-GNN | 0.736 | 0.911 | 2.430 | 2.945 | 3.050 | 0.737 | 1.079 | 0.915 | 1,724,417 |
-| FNO | 0.510 | 0.894 | 2.256 | 2.544 | 7.262 | 0.460 | 0.516 | N/A | 1,188,609 |
-| GENERIC-FNO | 1.852 | 1.210 | 2.562 | 1.272 | 1.146 | 1.021 | 1.428 | N/A | 1,002,388 |
-| HelmFluid | 0.846 | 1.154 | 0.472 | 0.930 | 0.976 | 0.946 | N/A | N/A | 9,930,381 |
-| Persistence (u(t) = u(0)) | 1.603 | 1.118 | 2.256 | 1.238 | 1.115 | 0.696 | 1.607 | 1.616 | 0 |
+| **Neural Chart** | **0.030** | **0.070** | **0.011** | **0.096** | **0.183** | **0.094** | 0.037 | **0.058** | 6,340 |
+| UDE closure | 0.031 | 0.623 | 0.160 | 0.377 | 0.649 | 0.095 | **0.035** | 0.097 | 5,441 |
+| BSMS-GNN | 0.699 | 0.812 | 1.716 | 1.539 | 2.482 | 1.064 | 0.688 | 0.730 | 1,724,417 |
+| FNO | 0.422 | 0.796 | 1.083 | 1.093 | 1.432 | 0.788 | 0.427 | N/A | 303,873 |
+| GENERIC-FNO | 2.136 | 1.246 | 2.353 | 1.713 | 1.456 | 1.825 | 1.184 | N/A | 1,002,388 |
+| HelmFluid | 0.708 | 0.886 | 0.656 | 0.891 | 0.948 | 0.794 | N/A | N/A | 9,930,381 |
+| Persistence (u(t) = u(0)) | 0.839 | 0.949 | 0.856 | 0.936 | 0.955 | 0.465 | 0.844 | 0.845 | 0 |
 
 | Method | edges with flux against the true force | samples with σ < 0 | negative values |
 |---|---|---|---|
-| Neural Chart | 5.3e-03 | 0 | 0 |
-| No chart (Flux-GNN) | 0.311 | 0 | 0 |
-| UDE closure | 0.688 | 0.882 | 0.236 |
-| BSMS-GNN | N/A | N/A | 0.518 |
-| FNO | N/A | N/A | 0.512 |
-| GENERIC-FNO | N/A | N/A | 0.335 |
-| HelmFluid | N/A | N/A | 0.033 |
+| Neural Chart | 1.8e-03 | 0 | 0 |
+| UDE closure | 0.800 | 0.916 | 0.129 |
+| BSMS-GNN | N/A | N/A | 0.055 |
+| FNO | N/A | N/A | 0.149 |
+| GENERIC-FNO | N/A | N/A | 0.266 |
+| HelmFluid | N/A | N/A | 0.011 |
 
-Under the training conditions the UDE closure and the variant without the chart are close to the Neural Chart (0.077 and 0.078 against 0.065).
-Under changed temperature and drive their errors grow to 0.6–2.1.
-The Neural Chart stays between 0.075 and 0.39.
-One constant mobility for all edges gives an error near 1 on most test sets.
-The UDE closure produces negative densities on all 64 test trajectories.
+Under the training conditions the UDE closure is close to the Neural Chart (0.031 against 0.030).
+Under changed temperature and drive its error grows to 0.16 to 0.65, and the Neural Chart stays between 0.011 and 0.18.
 
 **The learned law.** The descriptors are local, so the same functional applies to the point cloud without retraining.
 
@@ -416,7 +409,7 @@ The local entropy production of the same scene stays non-negative everywhere for
 
 ![Tracers, point cloud](assets/porous_media_track_point_cloud.gif)
 
-The last animation uses a random point cloud of 1024 cells, with the parameters trained on the 32×32 grid.
+The last animation uses a random point cloud of 256 cells, with the parameters trained on the 16×16 grid.
 More animations are in the [gallery](results/porous_media/gallery/).
 
 ### Porous media with crowding
@@ -429,30 +422,27 @@ Its network $g_\theta$ reads the local density.
 |---|---|
 | ![porous media with crowding, drive x8](assets/porous_media_crowding_drive_x8.gif) | ![porous media with crowding, point cloud](assets/porous_media_crowding_point_cloud.gif) |
 
-| Method | training conditions | temperature ×0.25 | temperature ×4 | drive ×4 | drive ×8 | unseen low-porosity media | 64×64 grid | point cloud | parameters |
+| Method | training conditions | temperature ×0.25 | temperature ×4 | drive ×4 | drive ×8 | unseen low-porosity media | 32×32 grid | point cloud | parameters |
 |---|---|---|---|---|---|---|---|---|---|
-| **Neural Chart** | **0.056** | **0.060** | **0.130** | **0.143** | **0.339** | **0.055** | **0.067** | **0.082** | 6,340 |
-| No chart (Flux-GNN) | 0.057 | 0.808 | 2.053 | 0.856 | 1.049 | 0.057 | 0.573 | 0.473 | 151,234 |
-| UDE closure | 0.066 | 0.679 | 1.916 | 0.601 | 0.917 | 0.075 | 0.756 | 0.485 | 5,441 |
-| BSMS-GNN | 0.592 | 0.837 | 2.739 | 1.386 | 1.355 | 0.435 | 1.008 | 0.713 | 1,724,417 |
-| FNO | 0.464 | 0.898 | 2.370 | 1.897 | 3.316 | 0.386 | 0.469 | N/A | 1,188,609 |
-| GENERIC-FNO | 1.158 | 0.924 | 1.768 | 1.098 | 1.054 | 0.371 | 1.206 | N/A | 1,002,388 |
-| HelmFluid | 14.957 | 7.914 | 284.284 | 199.367 | 149.037 | 14.371 | N/A | N/A | 9,930,381 |
-| Persistence (u(t) = u(0)) | 1.363 | 0.989 | 2.161 | 1.156 | 1.083 | 0.447 | 1.360 | 1.392 | 0 |
+| **Neural Chart** | 0.035 | **0.056** | **0.018** | **0.119** | **0.228** | **0.078** | 0.041 | **0.058** | 6,340 |
+| UDE closure | **0.029** | 0.596 | 0.263 | 0.425 | 0.759 | 0.085 | **0.031** | 0.089 | 5,441 |
+| BSMS-GNN | 0.560 | 0.917 | 0.640 | 1.293 | 1.433 | 1.019 | 0.681 | 0.703 | 1,724,417 |
+| FNO | 0.440 | 0.790 | 1.084 | 1.308 | 2.356 | 0.738 | 0.447 | N/A | 303,873 |
+| GENERIC-FNO | 1.256 | 1.033 | 1.442 | 1.227 | 1.180 | 1.227 | 0.930 | N/A | 1,002,388 |
+| HelmFluid | 0.737 | 0.903 | 0.815 | 0.845 | 1.009 | 0.850 | N/A | N/A | 9,930,381 |
+| Persistence (u(t) = u(0)) | 0.837 | 0.913 | 0.834 | 0.935 | 0.964 | 0.379 | 0.842 | 0.836 | 0 |
 
 | Method | edges with flux against the true force | samples with σ < 0 | negative values |
 |---|---|---|---|
-| Neural Chart | 5.2e-03 | 0 | 0 |
-| No chart (Flux-GNN) | 0.304 | 0 | 0 |
-| UDE closure | 0.808 | 0.999 | 0.194 |
-| BSMS-GNN | N/A | N/A | 0.704 |
-| FNO | N/A | N/A | 0.560 |
-| GENERIC-FNO | N/A | N/A | 0.279 |
-| HelmFluid | N/A | N/A | 0.038 |
+| Neural Chart | 1.7e-03 | 0 | 0 |
+| UDE closure | 0.819 | 0.908 | 0.089 |
+| BSMS-GNN | N/A | N/A | 0.063 |
+| FNO | N/A | N/A | 0.234 |
+| GENERIC-FNO | N/A | N/A | 0.226 |
+| HelmFluid | N/A | N/A | 0.055 |
 
-Under the training conditions the Neural Chart, the variant without the chart and the UDE closure are close (0.056, 0.057 and 0.066).
-Under changed temperature, drive and discretisation the Neural Chart is 2.7 to 14 times more accurate than the best baseline of each column.
-One constant mobility for all edges gives an error near 1 on most test sets.
+Under the training conditions the UDE closure is more accurate (0.029 against 0.035), and on the 32×32 grid too.
+Under changed temperature and drive the Neural Chart is 3.3 to 15 times more accurate than the best baseline of each column.
 
 ### Non-ideal Schlögl model
 
@@ -460,40 +450,36 @@ The Schlögl model $A+2X\rightleftharpoons3X$, $X\rightleftharpoons B$ on an 8×
 The Neural Chart learns the excess potential $\nabla G_\theta$, the mobility and the standard potentials.
 The closed-form start assumes $G_\theta=0$, and the rollouts fit the rest.
 
-![Non-ideal Schlögl model, higher concentrations](assets/schlogl_nonideal_high_concentration.gif)
+![Non-ideal Schlögl model, a stripe of high concentration, a scene outside the test sets](assets/schlogl_nonideal_stripe.gif)
 
-| Method | training conditions | a 3.5–4.0, b 2.0–3.5 (higher concentrations) | 16×16 grid | parameters |
+| Method | training conditions | a 3.5–4.0, b 2.0–3.5 | 16×16 grid | parameters |
 |---|---|---|---|---|
-| **Neural Chart** | 6.1e-03 | 0.082 | 4.5e-03 | 5,702 |
-| Neural Chart with given standard potentials | 4.8e-03 | 0.080 | 4.6e-03 | 5,701 |
-| No chart (Flux-GNN) | 1.8e-03 | 0.265 | 2.7e-03 | 150,850 |
+| **Neural Chart** | **6.7e-04** | **0.011** | **7.7e-04** | 5,702 |
 | CRNN (mass action) | 0.060 | 0.726 | 0.062 | 6 |
 | CRNN (condition features) | 0.026 | 0.340 | 0.035 | 4,674 |
 | UDE closure | 0.046 | 0.645 | 0.046 | 4,737 |
-| FNO | **2.6e-03** | **0.033** | **2.4e-03** | 172,545 |
+| FNO | 2.6e-03 | 0.033 | 2.4e-03 | 172,545 |
 | BSMS-GNN | 0.011 | 0.411 | 0.054 | 1,392,001 |
 | GENERIC-FNO | 1.117 | 0.565 | 1.060 | 1,002,004 |
 | Persistence (u(t) = u(0)) | 1.117 | 0.565 | 1.060 | 0 |
 
 | Method | hyperedges with flux against the true force | samples with σ < 0 | negative values |
 |---|---|---|---|
-| Neural Chart | 0.257 | 0 | 0 |
-| No chart (Flux-GNN) | 0.517 | 0.890 | 0 |
-| CRNN (mass action) | 0.253 | 0 | 0 |
-| CRNN (condition features) | 0.395 | 0.604 | 0 |
+| Neural Chart | 6.7e-05 | 0 | 0 |
+| CRNN (mass action) | 0.254 | 0 | 0 |
+| CRNN (condition features) | 0.396 | 0.604 | 0 |
 | UDE closure | 0.195 | 0.292 | 0 |
 | FNO | N/A | N/A | 9.5e-05 |
 | BSMS-GNN | N/A | N/A | 0 |
 | GENERIC-FNO | N/A | N/A | 0 |
 
-FNO is more accurate than the Neural Chart on all three test sets (2.6e-3 against 6.1e-3, 0.033 against 0.082 and 2.4e-3 against 4.5e-3), and it produces negative concentrations on two trajectories.
-The Neural Chart is weakest at the higher concentrations, where 26 % of its hyperedges carry flux against the true force.
-Started without the closed-form step, the same model reaches 0.011 there, with 0.04 % of its hyperedges against the true force.
-The closed-form start assumes $G_\theta=0$, so on this task the start can hurt.
+The Neural Chart is the most accurate model on all three test sets, and FNO is the closest baseline (2.6e-3, 0.033 and 2.4e-3 against 6.7e-4, 0.011 and 7.7e-4).
 CRNN with mass action has the right graph but no excess free energy, and it reaches 0.73 at the higher concentrations.
-The learned excess potential has a Pearson r of 0.986 or higher against the truth.
+The learned activity coefficient has an RMSE of 8.2e-3 over the training range and 0.032 over the extension to the higher concentrations, with a slope of 1.01 against the truth.
+Without variable projection the same model reaches 0.077 under the training conditions and 1.5 at the higher concentrations ([How each part contributes](#how-each-part-contributes)).
+The animations show a scene outside the test sets, a stripe of high concentration at $a=3$ and $b=2$ on a 16×16 grid, chosen from the reference data alone.
 
-![Tracers, non-ideal Schlögl model](assets/schlogl_nonideal_track_high_concentration.gif)
+![Tracers, non-ideal Schlögl model, the same stripe](assets/schlogl_nonideal_track_scene_stripe.gif)
 
 The tracers follow the transport flux of $X$ at higher concentrations, ten times faster than the clock in every panel.
 
@@ -502,25 +488,22 @@ The tracers follow the transport flux of $X$ at higher concentrations, ten times
 The same model with the chemostat $a$ over 1.5–4.5 in place of 2.85–3.10.
 Concentrations reach 2.23 in training, where the true $\ln\gamma$ is 1.26.
 
-![Non-ideal Schlögl model with strong crowding](assets/schlogl_nonideal_strong_high_a.gif)
+![Non-ideal Schlögl model with strong crowding, the same stripe](assets/schlogl_nonideal_strong_stripe.gif)
 
 | Method | training conditions | a 4.6–5.0, b 2.0–3.5 | 16×16 grid | parameters |
 |---|---|---|---|---|
-| **Neural Chart** | **4.8e-03** | 0.018 | **6.4e-03** | 5,702 |
-| Neural Chart with given standard potentials | 7.1e-03 | 0.022 | 7.3e-03 | 5,701 |
-| No chart (Flux-GNN) | 3.1e-03 | 2.6e-03 | 2.9e-03 | 150,850 |
+| **Neural Chart** | **8.6e-04** | **1.1e-03** | **4.7e-04** | 5,702 |
 | CRNN (mass action) | 0.325 | 2.210 | 0.284 | 6 |
 | CRNN (condition features) | 0.039 | 0.098 | 0.031 | 4,674 |
 | UDE closure | 0.030 | 0.239 | 0.098 | 4,737 |
 | FNO | 0.018 | 0.080 | 0.019 | 172,545 |
-| BSMS-GNN | 0.015 | **7.0e-03** | 0.060 | 1,392,001 |
+| BSMS-GNN | 0.015 | 7.0e-03 | 0.060 | 1,392,001 |
 | GENERIC-FNO | 1.040 | 0.567 | 0.870 | 1,002,004 |
 | Persistence (u(t) = u(0)) | 1.040 | 0.567 | 0.870 | 0 |
 
 | Method | hyperedges with flux against the true force | samples with σ < 0 | negative values |
 |---|---|---|---|
-| Neural Chart | 4.4e-04 | 0 | 0 |
-| No chart (Flux-GNN) | 0.544 | 1.000 | 0 |
+| Neural Chart | 1.8e-04 | 0 | 0 |
 | CRNN (mass action) | 0.186 | 0.021 | 0 |
 | CRNN (condition features) | 0.107 | 0.060 | 0 |
 | UDE closure | 0.404 | 0.631 | 0 |
@@ -528,11 +511,11 @@ Concentrations reach 2.23 in training, where the true $\ln\gamma$ is 1.26.
 | BSMS-GNN | N/A | N/A | 0 |
 | GENERIC-FNO | N/A | N/A | 0 |
 
-The variant without the chart is the most accurate model on this task (3.1e-3, 2.6e-3 and 2.9e-3 against 4.8e-3, 0.018 and 6.4e-3), and 54 % of its hyperedges carry flux against the true force.
-BSMS-GNN is also more accurate at the highest chemostat levels (7.0e-3).
-Without $G_\theta$ the Neural Chart reaches 0.036 to 0.13.
+The Neural Chart is the most accurate model on all three test sets (8.6e-4, 1.1e-3 and 4.7e-4).
+BSMS-GNN is the closest baseline at the highest chemostat levels (7.0e-3), and CRNN with mass action reaches 2.2 there.
+The learned activity coefficient has an RMSE of 8.8e-3 over the training range and 3.7e-3 over the extension, with a slope of 0.99 against the truth.
 
-![Tracers, non-ideal Schlögl model with strong crowding](assets/schlogl_nonideal_strong_track_high_a.gif)
+![Tracers, non-ideal Schlögl model with strong crowding](assets/schlogl_nonideal_strong_track_scene_stripe.gif)
 
 ### Driven phosphorylation cycle
 
@@ -548,9 +531,7 @@ The animation shows the phosphorylated fraction $X_p/(X+X_p)$.
 
 | Method | training conditions (ΔG 1–3) | drive ΔG 3–4 | stronger, finer potential U | 16×16 grid | parameters |
 |---|---|---|---|---|---|
-| **Neural Chart** | **2.9e-06** | **3.5e-06** | **5.9e-06** | **3.5e-06** | 5,961 |
-| Neural Chart with given standard potentials | 2.8e-06 | 3.2e-06 | 4.8e-06 | 3.5e-06 | 5,958 |
-| No chart (Flux-GNN) | 2.1e-03 | 0.038 | 0.113 | 4.1e-03 | 151,170 |
+| **Neural Chart** | **2.9e-06** | **2.6e-06** | **2.5e-06** | **3.0e-06** | 5,961 |
 | CRNN (mass action) | 0.017 | 0.018 | 0.021 | 0.025 | 10 |
 | CRNN (condition features) | 5.2e-03 | 0.045 | 0.011 | 7.6e-03 | 4,866 |
 | UDE closure | 0.018 | 0.057 | 0.130 | 0.026 | 5,121 |
@@ -561,8 +542,7 @@ The animation shows the phosphorylated fraction $X_p/(X+X_p)$.
 
 | Method | hyperedges with flux against the true force | samples with σ < 0 | negative values |
 |---|---|---|---|
-| Neural Chart | 3.1e-05 | 0 | 0 |
-| No chart (Flux-GNN) | 0.140 | 0 | 0 |
+| Neural Chart | 0 | 0 | 0 |
 | CRNN (mass action) | 0.068 | 0 | 0 |
 | CRNN (condition features) | 0.222 | 0 | 0 |
 | UDE closure | 0.405 | 0 | 0.032 |
@@ -570,10 +550,10 @@ The animation shows the phosphorylated fraction $X_p/(X+X_p)$.
 | BSMS-GNN | N/A | N/A | 0.191 |
 | GENERIC-FNO | N/A | N/A | 0.109 |
 
-The Neural Chart stays between 2.9e-6 and 5.9e-6 on every test set, including the stronger drive and the new potential, close to the integration floor of about 2e-6.
-The best baseline, CRNN with condition features, is at 5e-3 under the training conditions and at 0.011 in the new potential. The variant without the chart is at 2e-3 and 0.11.
+The Neural Chart stays between 2.5e-6 and 3.0e-6 on every test set, including the stronger drive and the new potential, close to the integration floor of about 2e-6.
+The start check keeps both networks at zero on this task, so only the constants train.
+The best baseline, CRNN with condition features, is at 5.2e-3 under the training conditions and at 0.011 in the new potential.
 CRNN with mass action has the right graph but one rate constant per class of steps, so it cannot represent the spatial potential, and it stays near 0.02.
-The networks stay near zero on this task, with $|g_\theta|$ and $|\nabla G_\theta|$ below 0.01.
 
 ![Tracers, phosphorylation cycle](assets/phosphorylation_cycle_track_strong_drive.gif)
 
@@ -587,11 +567,9 @@ The models see 3 descriptors per hyperedge, and all tests use unseen media.
 
 ![Phosphorylation cycle on heterogeneous media, strong drive](assets/phosphorylation_heterogeneous_strong_drive.gif)
 
-| Method | unseen media, training conditions (ΔG 1–3) | unseen media, drive ΔG 3–4 | unseen media, stronger, finer potential U | unseen media, 16×16 grid | parameters |
+| Method | training conditions (ΔG 1–3) | drive ΔG 3–4 | stronger, finer potential U | 16×16 grid | parameters |
 |---|---|---|---|---|---|
-| **Neural Chart** | **0.014** | **0.016** | **0.016** | **0.016** | 6,153 |
-| Neural Chart with given standard potentials | 0.014 | 0.016 | 0.015 | 0.016 | 6,150 |
-| No chart (Flux-GNN) | 0.013 | 0.028 | 0.082 | 0.015 | 151,554 |
+| **Neural Chart** | **0.015** | **0.020** | **0.021** | **0.020** | 6,153 |
 | CRNN (mass action) | 0.154 | 0.119 | 0.141 | 0.170 | 10 |
 | CRNN (condition features) | 0.029 | 0.059 | 0.049 | 0.033 | 5,058 |
 | UDE closure | 0.034 | 0.049 | 0.139 | 0.042 | 5,313 |
@@ -602,8 +580,7 @@ The models see 3 descriptors per hyperedge, and all tests use unseen media.
 
 | Method | hyperedges with flux against the true force | samples with σ < 0 | negative values |
 |---|---|---|---|
-| Neural Chart | 0.015 | 0 | 0 |
-| No chart (Flux-GNN) | 0.099 | 0 | 0 |
+| Neural Chart | 0.046 | 0 | 0 |
 | CRNN (mass action) | 0.137 | 0 | 0 |
 | CRNN (condition features) | 0.148 | 0 | 0 |
 | UDE closure | 0.411 | 0.900 | 0.031 |
@@ -611,10 +588,8 @@ The models see 3 descriptors per hyperedge, and all tests use unseen media.
 | BSMS-GNN | N/A | N/A | 0.199 |
 | GENERIC-FNO | N/A | N/A | 0.097 |
 
-The error of the Neural Chart stays at 0.014 to 0.016 across the unseen media, the drive, the potential and the grid.
-One constant mobility per class gives 0.18 to 0.24, so $g_\theta$ is what captures the medium.
-Its $\log k$ has a Pearson r of 0.96 to 0.97 against the truth on unseen media, with an RMSE of 0.26 to 0.28.
-The variant without the chart is as accurate under the training conditions (0.013) and reaches 0.082 in the new potential.
+The error of the Neural Chart stays at 0.015 to 0.021 across the unseen media, the drive, the potential and the grid, against 0.029 to 0.059 for the best baseline, CRNN with condition features.
+Its $\log k$ has a Pearson r of 0.94 to 0.96 against the truth on unseen media.
 
 ![Tracers, phosphorylation cycle on heterogeneous media](assets/phosphorylation_heterogeneous_track_strong_drive.gif)
 
@@ -626,9 +601,7 @@ The same network with a true excess free energy that couples species, $G=\chi_1c
 
 | Method | training conditions (ΔG 1–3) | drive ΔG 3–4 | stronger, finer potential U | X and Xp at the start × 1.5 | 16×16 grid | parameters |
 |---|---|---|---|---|---|---|
-| **Neural Chart** | **1.9e-03** | **2.9e-03** | **0.022** | **3.1e-03** | **1.7e-03** | 5,961 |
-| Neural Chart with given standard potentials | 4.5e-04 | 1.0e-03 | 8.3e-03 | 1.8e-03 | 4.6e-04 | 5,958 |
-| No chart (Flux-GNN) | 5.0e-03 | 0.035 | 0.227 | 0.022 | 5.6e-03 | 151,170 |
+| **Neural Chart** | **4.4e-04** | **7.2e-04** | **0.019** | **1.9e-03** | **5.0e-04** | 5,961 |
 | CRNN (mass action) | 0.062 | 0.086 | 0.172 | 0.098 | 0.072 | 10 |
 | CRNN (condition features) | 0.048 | 0.067 | 0.149 | 0.080 | 0.050 | 4,866 |
 | UDE closure | 0.022 | 0.054 | 0.230 | 0.049 | 0.023 | 5,121 |
@@ -639,8 +612,7 @@ The same network with a true excess free energy that couples species, $G=\chi_1c
 
 | Method | hyperedges with flux against the true force | samples with σ < 0 | negative values |
 |---|---|---|---|
-| Neural Chart | 0.020 | 0 | 0 |
-| No chart (Flux-GNN) | 0.238 | 0 | 0 |
+| Neural Chart | 3.7e-03 | 0 | 0 |
 | CRNN (mass action) | 0.158 | 0 | 0 |
 | CRNN (condition features) | 0.210 | 0 | 0 |
 | UDE closure | 0.311 | 0.339 | 0.022 |
@@ -648,9 +620,9 @@ The same network with a true excess free energy that couples species, $G=\chi_1c
 | BSMS-GNN | N/A | N/A | 0.104 |
 | GENERIC-FNO | N/A | N/A | 0.099 |
 
-Without $G_\theta$ the error is 0.066 to 0.29, and with it 1.7e-3 to 0.022.
-The learned excess potential has a Pearson r of 0.85 to 0.93 against the truth, and the learned $\log k$ has 0.99 or higher.
-The stronger and finer potential is the hardest test set for the Neural Chart.
+The Neural Chart is 46 to 75 times more accurate than the best baseline under the training conditions, the drive and the grid (4.4e-4, 7.2e-4 and 5.0e-4 against 0.022, 0.054 and 0.023).
+The stronger and finer potential is its hardest test set (0.019 against 0.149).
+The learned $\log k$ has a Pearson r of 0.9999 against the truth.
 
 ![Tracers, phosphorylation cycle with interactions](assets/phosphorylation_interacting_track_high_concentration.gif)
 
@@ -663,9 +635,7 @@ This factor depends on the local state and does not read the conditions.
 
 | Method | training conditions (ΔG 1–3) | drive ΔG 3–4 | stronger, finer potential U | X and Xp at the start × 3 | 16×16 grid | parameters |
 |---|---|---|---|---|---|---|
-| **Neural Chart** | **7.2e-04** | **2.5e-03** | **9.3e-03** | **0.014** | **1.2e-03** | 5,961 |
-| Neural Chart with given standard potentials | 1.0e-03 | 4.3e-03 | 8.3e-03 | 0.016 | 1.4e-03 | 5,958 |
-| No chart (Flux-GNN) | 2.3e-03 | 0.031 | 0.117 | 0.080 | 3.3e-03 | 151,170 |
+| **Neural Chart** | **9.9e-04** | **4.4e-03** | **5.6e-03** | **0.013** | **1.4e-03** | 5,961 |
 | CRNN (mass action) | 0.046 | 0.037 | 0.146 | 0.215 | 0.054 | 10 |
 | CRNN (condition features) | 0.028 | 0.052 | 0.093 | 0.210 | 0.043 | 4,866 |
 | UDE closure | 0.020 | 0.053 | 0.110 | 0.090 | 0.028 | 5,121 |
@@ -676,8 +646,7 @@ This factor depends on the local state and does not read the conditions.
 
 | Method | hyperedges with flux against the true force | samples with σ < 0 | negative values |
 |---|---|---|---|
-| Neural Chart | 0.012 | 0 | 0 |
-| No chart (Flux-GNN) | 0.230 | 0 | 0 |
+| Neural Chart | 6.9e-03 | 0 | 0 |
 | CRNN (mass action) | 0.033 | 0 | 0 |
 | CRNN (condition features) | 0.362 | 0 | 0 |
 | UDE closure | 0.235 | 0 | 0.023 |
@@ -685,61 +654,56 @@ This factor depends on the local state and does not read the conditions.
 | BSMS-GNN | N/A | N/A | 0.239 |
 | GENERIC-FNO | N/A | N/A | 0.068 |
 
-One constant mobility per class gives 0.011 to 0.042, and $g_\theta$ gives 7.2e-4 to 0.014.
-The learned $\log k$ has a Pearson r of 0.993 or higher against the truth, including at three times the starting concentration.
+The Neural Chart is the most accurate model on all five test sets (9.9e-4 to 0.013, against 0.019 to 0.090 for the best baseline of each column).
+The learned $\log k$ has a Pearson r of 0.998 to 0.999 against the truth, including at three times the starting concentration.
 
 ![Tracers, phosphorylation cycle with a saturating rate](assets/phosphorylation_saturating_track_high_concentration.gif)
 
 ## Ideal reaction networks
 
 In these two benchmarks the truth is ideal mass action, and the two networks have nothing to learn beyond constants.
+The start check finds this and keeps them at zero, so the Neural Chart trains only its class mobilities and standard potentials.
 CRNN with mass action is given the same graph and only those constants, so it has exactly the right model class and is the fair comparison.
 
 ### Brusselator: oscillations and Turing patterns
 
-The Brusselator $A\to X$, $2X+Y\to3X$, $B+X\to Y+D$, $X\to E$ with chemostats $A$, $B$, $D$, $E$ on a 32×32 periodic grid, with diffusing $X$ and $Y$.
+The Brusselator $A\to X$, $2X+Y\to3X$, $B+X\to Y+D$, $X\to E$ with chemostats $A$, $B$, $D$, $E$ on a 16×16 periodic grid, with diffusing $X$ and $Y$.
 Depending on the chemostat levels it shows a limit cycle or Turing patterns.
 
 | Turing pattern formation (a = 1.90, b = 3.90) | Oscillation, both chemostats outside the training range (a = 1.39, b = 4.30) |
 |---|---|
 | ![Brusselator, Turing pattern](assets/brusselator_turing.gif) | ![Brusselator, oscillation](assets/brusselator_oscillation.gif) |
 
-| Method | training conditions | b 3.2–3.7 | b 4.0–4.6 | a 1.3–1.5 (a and b outside training) | Turing regime (below the Hopf line) | 64×64 grid | parameters |
+| Method | training conditions | b 3.2–3.7 | b 4.0–4.6 | a 1.3–1.5 (a and b outside training) | Turing regime (below the Hopf line) | 32×32 grid | parameters |
 |---|---|---|---|---|---|---|---|
-| **Neural Chart** | 4.4e-03 | 4.1e-03 | 0.013 | 0.056 | **4.3e-03** | 0.020 | 5,994 |
-| Neural Chart with given standard potentials | 9.5e-05 | 4.6e-04 | 3.4e-04 | 4.9e-04 | 1.9e-04 | 2.0e-04 | 5,992 |
-| No chart (Flux-GNN) | 0.075 | 0.499 | 0.639 | 0.638 | 0.292 | 0.201 | 151,170 |
-| CRNN (mass action) | **2.4e-03** | **3.0e-03** | **3.4e-03** | **4.1e-03** | 0.026 | **0.013** | 12 |
-| CRNN (condition features) | 0.724 | 0.755 | 0.771 | 0.802 | 0.698 | 0.749 | 4,866 |
-| UDE closure | 0.550 | 0.622 | 0.689 | 1.004 | 1.408 | 0.573 | 4,929 |
-| BSMS-GNN | 0.729 | 0.805 | 0.687 | 0.858 | 1.849 | 0.761 | 1,723,522 |
-| FNO | 0.297 | 0.370 | 0.678 | 0.639 | 0.321 | 0.697 | 1,188,514 |
-| GENERIC-FNO | 0.780 | 0.835 | 1.016 | 0.762 | 0.580 | 0.825 | 1,003,588 |
-| Persistence (u(t) = u(0)) | 0.780 | 0.835 | 1.016 | 0.762 | 0.580 | 0.825 | 0 |
+| **Neural Chart** | 6.2e-03 | **1.2e-03** | **1.6e-03** | 0.016 | **2.0e-03** | **0.015** | 5,994 |
+| CRNN (mass action) | **1.7e-03** | 1.2e-03 | 1.8e-03 | **3.8e-03** | 0.030 | 0.017 | 12 |
+| CRNN (condition features) | 0.677 | 0.718 | 0.754 | 0.675 | 0.622 | 0.756 | 4,866 |
+| UDE closure | 0.492 | 0.568 | 0.615 | 0.945 | 1.394 | 0.594 | 4,929 |
+| BSMS-GNN | 0.601 | 0.716 | 0.859 | 0.929 | 1.533 | 0.647 | 1,723,522 |
+| FNO | 0.202 | 0.303 | 0.669 | 0.731 | 0.349 | 0.695 | 303,778 |
+| GENERIC-FNO | 0.757 | 0.822 | 0.999 | 0.744 | 0.587 | 0.813 | 1,003,588 |
+| Persistence (u(t) = u(0)) | 0.757 | 0.822 | 0.999 | 0.744 | 0.587 | 0.813 | 0 |
 
 | Method | hyperedges with flux against the true force | samples with σ < 0 | negative values |
 |---|---|---|---|
-| Neural Chart | 6.3e-05 | 0 | 0 |
-| No chart (Flux-GNN) | 0.139 | 0 | 0 |
-| CRNN (mass action) | 0.067 | 0 | 0 |
-| CRNN (condition features) | 0.311 | 0 | 0 |
-| UDE closure | 0.627 | 1.000 | 0.498 |
-| BSMS-GNN | N/A | N/A | 0.940 |
-| FNO | N/A | N/A | 3.2e-03 |
+| Neural Chart | 0 | 0 | 0 |
+| CRNN (mass action) | 0.070 | 0 | 0 |
+| CRNN (condition features) | 0.317 | 0 | 0 |
+| UDE closure | 0.632 | 0.994 | 0.560 |
+| BSMS-GNN | N/A | N/A | 0.657 |
+| FNO | N/A | N/A | 6.1e-03 |
 | GENERIC-FNO | N/A | N/A | 0 |
 
-CRNN with mass action is more accurate than the Neural Chart on five of the six test sets, most of all with both chemostats outside training (4.1e-3 against 0.056).
-The Neural Chart is ahead in the Turing regime (4.3e-3 against 0.026).
+CRNN with mass action is more accurate than the Neural Chart under the training conditions (1.7e-3 against 6.2e-3) and with both chemostats outside training (3.8e-3 against 0.016).
+The Neural Chart is ahead in the Turing regime (2.0e-3 against 0.030) and on the 32×32 grid (0.015 against 0.017), and the two are equal at b 3.2–3.7.
 Both are far more accurate than every other baseline.
-Without the chart the model reaches 0.075 under the training conditions and 0.29 to 0.64 under new ones.
+No hyperedge of the Neural Chart carries flux against the true force on this task.
 
 The steps of the Brusselator are close to irreversible, and the affinity of such a step, and with it the internal standard potentials, is only weakly determined by data (Theorem 0(iii)(d) and Theorem 2 of the theory notes).
-With all standard potentials given, the error drops to 9.5e-5 to 4.9e-4.
-Learned chemostat values give a lower trajectory error than the looked-up ones (1.5e-3 to 0.012) and a larger error of the entropy production.
 
 In the Turing regime half of the test trajectories start from a uniform state, which is unstable to spatial perturbations.
-In FP32 integration rounding noise can break the symmetry and grow into a pattern, so the error of these trajectories depends on rounding.
-This is the source of the 0.026 of CRNN with mass action in that column (`results/brusselator/NOTES.md`).
+In FP32 integration rounding noise can break the symmetry and grow into a pattern, so the error of these trajectories depends on rounding (`results/brusselator/NOTES.md`).
 
 ![Tracers, Brusselator Turing regime](assets/brusselator_track_turing.gif)
 
@@ -759,11 +723,9 @@ The animation shows all 22 species at the 16 sites.
 
 | Method | training conditions (ATP 0.5–2) | ATP 3–5 | ATP 0.15–0.3 | phosphorylated initial states | parameters |
 |---|---|---|---|---|---|
-| **Neural Chart** | **3.4e-03** | **9.5e-03** | **7.7e-03** | **3.7e-03** | 9,039 |
-| Neural Chart with given standard potentials | 3.8e-03 | 6.8e-04 | 1.5e-03 | 3.1e-03 | 9,017 |
-| No chart (Flux-GNN) | 6.3e-03 | 0.115 | 0.409 | 6.1e-03 | 153,410 |
+| **Neural Chart** | 0.011 | **0.019** | **8.5e-03** | 0.011 | 9,039 |
 | CRNN (mass action) | 8.5e-03 | 0.027 | 0.020 | 8.7e-03 | 46 |
-| CRNN (condition features) | 8.1e-03 | 0.032 | 0.099 | 8.3e-03 | 5,890 |
+| CRNN (condition features) | **8.1e-03** | 0.032 | 0.099 | **8.3e-03** | 5,890 |
 | UDE closure | 0.090 | 0.745 | 0.390 | 0.084 | 8,641 |
 | FNO | 0.469 | 0.819 | 0.675 | 0.472 | 61,206 |
 | BSMS-GNN | 2.307 | 8.783 | 4.501 | 10.463 | 1,066,006 |
@@ -772,8 +734,7 @@ The animation shows all 22 species at the 16 sites.
 
 | Method | hyperedges with flux against the true force | samples with σ < 0 | negative values |
 |---|---|---|---|
-| Neural Chart | 0.073 | 0 | 0 |
-| No chart (Flux-GNN) | 0.133 | 0 | 0 |
+| Neural Chart | 0.029 | 0 | 0 |
 | CRNN (mass action) | 0.054 | 0 | 0 |
 | CRNN (condition features) | 0.232 | 0 | 0 |
 | UDE closure | 0.837 | 1.000 | 0.354 |
@@ -781,11 +742,10 @@ The animation shows all 22 species at the 16 sites.
 | BSMS-GNN | N/A | N/A | 0.495 |
 | GENERIC-FNO | N/A | N/A | 0.362 |
 
-The variant without the chart is close to the Neural Chart under the training conditions (6.3e-3 against 3.4e-3).
-At new ATP levels its error grows to 0.12 and 0.41, while the Neural Chart stays at 9.5e-3 and 7.7e-3 and CRNN with mass action at 0.027 and 0.020.
+CRNN with condition features is more accurate than the Neural Chart under the training conditions (8.1e-3 against 0.011) and from the phosphorylated initial states (8.3e-3 against 0.011).
+At new ATP levels the Neural Chart is ahead (0.019 and 8.5e-3, against 0.027 and 0.020 for CRNN with mass action and 0.032 and 0.099 for CRNN with condition features).
 ATP enters the Neural Chart only through the force, so a new ATP level changes no learned parameter.
-The internal standard potentials are weakly determined here too. At low ATP 7.3 % of the hyperedges carry flux against the true force, and with all potentials given the error drops from 7.7e-3 to 1.5e-3.
-The learned $\log k$ has a Pearson r of 0.83 to 0.86 against the truth, with an RMSE of about 1.1.
+The internal standard potentials are weakly determined here: 2.9 % of the hyperedges carry flux against the true force, and the learned $\log k$ has a Pearson r of 0.85 to 0.88 against the truth.
 
 ![Tracers, MAPK cascade](assets/mapk_cascade_track_low_atp.gif)
 
@@ -793,21 +753,26 @@ The tracers follow phosphorylated MAPK ($K_p+K_{pp}$) at low ATP.
 
 ## How each part contributes
 
-Every variant is the Neural Chart with one change (`neuralchart/chart.py`, `VARIANTS`).
+Every variant is the Neural Chart with one change (`neuralchart/chart.py`, `VARIANTS`), on the non-ideal Schlögl model.
+In the variant without the chart a message-passing network on the same hypergraph emits the forward and backward rate of every step from the state, the conditions and the descriptors, with the same mass-action factors and the same integrator (we call it Flux-GNN).
+It has no split into driving and material coordinates, so none of the properties above apply to it.
+The last column is the largest fraction, over the test sets, of hyperedges whose flux runs against the true force.
 
-| Part of the model | Variant without it | 10T error, Neural Chart → variant, training conditions unless stated |
-|---|---|---|
-| the chart itself, the split into driving and material coordinates | a hypergraph network emits both rates (Flux-GNN) | porous media at temperature ×4 0.10 → 2.14, Brusselator 4.4e-3 → 0.075, MAPK at low ATP 7.7e-3 → 0.41 |
-| material network $g_\theta$ | one constant mobility per class | porous media 0.065 → 1.1, heterogeneous media 0.014 → 0.19, saturating rate 7.2e-4 → 0.011 |
-| excess free energy $G_\theta$ | $G=0$ | interactions 1.9e-3 → 0.082, non-ideal Schlögl 6.1e-3 → 0.11, strong crowding 4.8e-3 → 0.055 |
-| closed-form start | zero-initialised rollouts | phosphorylation cycle 2.9e-6 → 6.4e-3, Schlögl 2.2e-5 → 0.026, saturating rate 7.2e-4 → 0.011, MAPK 3.4e-3 → 0.023, interactions 1.9e-3 → 8.5e-3, heterogeneous media 0.014 → 0.033. It does not help on strong crowding (4.8e-3 → 3.7e-3) or on non-ideal Schlögl at higher concentrations (0.082 → 0.011) |
-| drive $A$ | $A=0$, a reversible model | errors of 0.10 to 1.4: the driven steady states cannot be represented |
-| looked-up chemostat values | learned chemostat values | interactions 1.9e-3 → 4.4e-3, Brusselator 4.4e-3 → 2.7e-3. The trajectory error can improve while the entropy production gets worse |
-| learned internal potentials | all standard potentials given | Brusselator 4.4e-3 → 9.5e-5, MAPK at low ATP 7.7e-3 → 1.5e-3, interactions 1.9e-3 → 4.5e-4 |
+| Variant | training conditions | a 3.5–4.0, b 2.0–3.5 | 16×16 grid | hyperedges against the true force | parameters |
+|---|---|---|---|---|---|
+| **Neural Chart** | 6.7e-04 | 0.011 | 7.7e-04 | 6.7e-05 | 5,702 |
+| Neural Chart, given standard potentials of the internal species | 7.9e-04 | 0.015 | 6.5e-04 | 1.7e-04 | 5,701 |
+| Neural Chart, learned chemostat standard free energies | 1.7e-03 | 0.017 | 9.4e-04 | 3.0e-04 | 5,704 |
+| Neural Chart, constant mobility per class | 0.111 | 1.187 | 0.042 | 0.255 | 1,157 |
+| Neural Chart, no excess free energy | 0.012 | 0.018 | 4.3e-03 | 3.2e-03 | 4,549 |
+| Neural Chart, no variable projection | 0.077 | 1.500 | 0.058 | 0.514 | 5,702 |
+| Neural Chart, reversible (no drive) | 0.614 | 0.880 | 0.569 | 0.534 | 5,702 |
+| No chart (Flux-GNN) | 1.8e-03 | 0.265 | 2.7e-03 | 0.517 | 150,850 |
 
-Removing $G_\theta$ leaves the tasks with a learned mobility unchanged, and removing $g_\theta$ costs them more than a factor of ten.
-Removing $G_\theta$ costs the tasks with an excess free energy more than a factor of ten.
-On the non-ideal Schlögl tasks removing $g_\theta$ costs accuracy too, although the true mobility is constant there.
+Removing the drive, the material network or variable projection costs more than a factor of 100 under the training conditions.
+Removing the excess free energy costs a factor of 18 there and leaves the error at 0.018 at the higher concentrations, where the true excess free energy is strongest.
+Given standard potentials of the internal species change little, and learned chemostat values cost a factor of 2.5.
+The variant without the chart is at 1.8e-3 under the training conditions and at 0.265 at the higher concentrations, with 52 % of its hyperedges against the true force.
 
 ## Why the hypergraph is an input
 
@@ -876,6 +841,7 @@ Here modules meet at shared species of a hypergraph, which brings in the potenti
 - **Second law.** Non-negative dissipation holds with respect to the model's own force. The physics tables measure the distance to the true force.
 - **Transfer across conditions is conditional.** It needs the invariance to hold in the truth and the test states to lie where the networks are accurate. A new condition can drive the system to states that training never visited.
 - **The convex start covers one step.** The non-negative least squares on the class constants is convex. The mapping back to coupled parameters and the rollouts are not.
+- **The start check is a heuristic.** It compares the residual at the convex optimum with the quadrature error that the integrator measures, and it was validated only on the ten simulated benchmarks here. A sampling step that is coarse for the fastest time scale can mislead it.
 - **Chemostat standard free energies are inputs.** Where they cannot be looked up, they are fitted, density data do not fix them, and cycle affinities and the entropy production are unreliable.
 - **Internal standard potentials are weakly determined by concentration data.** Theorem 0(iii)(d) and Theorem 2 of [docs/theory.md](docs/theory.md) show why: the affinity of a step that is close to irreversible carries little information in the data.
 - **$G_\theta$ is local.** Gradient energies and long-range interactions are outside the model class.
@@ -906,9 +872,9 @@ python -m neuralchart.run --task schlogl_nonideal --cmd gifs                    
 The data go to `data/<task>/`, or to `$NEURALCHART_DATA/<task>` when that variable is set.
 The trained charts of every benchmark are in `checkpoints/`.
 
-Tasks: `porous_media`, `porous_media_crowding`, `schlogl`, `schlogl_nonideal`, `schlogl_nonideal_strong`, `phosphorylation_cycle`, `phosphorylation_heterogeneous`, `phosphorylation_interacting`, `phosphorylation_saturating`, `brusselator`, `mapk_cascade`, `compose_reaction_transport`, `compose_cycle_cycle`, `compose_thermo_cross`, `compose_kinetic_cross`.
+Tasks: `porous_media`, `porous_media_crowding`, `schlogl_nonideal`, `schlogl_nonideal_strong`, `phosphorylation_cycle`, `phosphorylation_heterogeneous`, `phosphorylation_interacting`, `phosphorylation_saturating`, `brusselator`, `mapk_cascade`, `compose_reaction_transport`, `compose_cycle_cycle`, `compose_thermo_cross`, `compose_kinetic_cross`.
 
-Models: `chart` and its ablations (`chart-const-k`, `chart-no-excess`, `chart-zero-init`, `chart-reversible`, `chart-learned-chem-mu0`, `chart-given-mu0`, `flux_gnn`), and the baselines `ude`, `crnn_mass_action`, `crnn_features`, `fno`, `bsms`, `generic_fno`, `helmfluid` (porous media only) and `persistence`.
+Models: `chart` and its ablations (`chart-const-k`, `chart-no-excess`, `chart-zero-init`, `chart-no-projection`, `chart-reversible`, `chart-learned-chem-mu0`, `chart-given-mu0`, `flux_gnn`), and the baselines `ude`, `crnn_mass_action`, `crnn_features`, `fno`, `bsms`, `generic_fno`, `helmfluid` (porous media only) and `persistence`.
 HelmFluid needs its upstream code (see [THIRD_PARTY.md](THIRD_PARTY.md)).
 
 ## Repository layout
@@ -919,13 +885,13 @@ neuralchart/            the library
   model.py              master equation: free energy, mobility, drive, rates
   graphs.py             hypergraphs of reaction and transport networks
   data.py               Conditions, Trajectories
-  fit.py                closed-form start and rollout training
+  fit.py                closed-form start, variable projection and rollout training
   compose.py            composition of hypergraphs and of fitted charts
   fast.py               fast integrator with error control (GPU and CPU)
   integrators.py        positive SSP-RK2
   diagnostics.py        local detailed balance rule, entropy production error
   run.py                one dispatch for every task and model
-  baselines/            Flux-GNN (the ablation without the chart), CRNN, BSMS-GNN, GENERIC-FNO, HelmFluid wrapper
+  baselines/            the ablation without the chart (Flux-GNN), CRNN, BSMS-GNN, GENERIC-FNO, HelmFluid wrapper
 benchmarks/<family>/    data, test sets, evaluation, tables and animations of each benchmark family
 examples/               a fit on a small driven network
 results/<task>/         tables (markdown and csv)

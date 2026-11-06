@@ -76,7 +76,7 @@ The integrator is a positivity-preserving adaptive SSP-RK2 (`neuralchart.fast`),
 
 The same protocol applies to the Neural Chart, its ablations and every baseline.
 
-- **Training.** One seed (0). Batch 8, Adam with learning rate 1e-3 and a cosine schedule, gradient clip 1, 4000 steps or 12 hours of wall-clock time, whichever comes first. The time of the closed-form step counts in the budget. Baselines that train on one-step targets (FNO, BSMS-GNN, GENERIC-FNO, HelmFluid) keep their own loss and schedule with the same number of gradient steps.
+- **Training.** One seed (0). Batch 8, Adam with learning rate 1e-3 and a cosine schedule, gradient clip 1. Every baseline trains for 4000 steps. The Neural Chart trains for 500 rollout steps after variable projection, or for 4000 steps on the constants alone when the start check keeps the networks at zero. Baselines that train on one-step targets (FNO, BSMS-GNN, GENERIC-FNO, HelmFluid) keep their own loss and schedule with the same number of gradient steps.
 - **Precision.** Training and evaluation integrate in FP32. The step control (time, step size) stays in FP64.
 - **Metric.** The relative L2 error of the full state at 10T (200 sampling steps), median over the test trajectories. A rollout that is not finite, or whose error exceeds 1e3, is reported as diverged.
 - **Local detailed balance.** A hyperedge violates local detailed balance when its flux runs against the true physical force of the test condition beyond rounding, evaluated at the model's own state: $J_hf_h<-10^{-6}\,(a_h+b_h)\,|f_h|$. For a model with a single edge flux (the UDE closure) the scale is $|J_h|$. The same rule (`neuralchart.diagnostics.ldb_violation`) applies to every model and every task.
