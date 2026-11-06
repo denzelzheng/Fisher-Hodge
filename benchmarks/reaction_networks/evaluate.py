@@ -66,8 +66,11 @@ def k_law(model, sd, hg, every=20):
         if model.kinetics.rho_dependent:
             k = k * torch.exp(model.kinetics.state_term(ctx['feats']['edge_sym'], c))
         lm.append(torch.log(k).double().cpu())
-        lt.append(TR.pc_true_log_k(hg, sd['drive'], c.double().cpu()) if C.is_pc() else
-                  torch.as_tensor(true_log_k(), dtype=torch.float64)[typ][None].expand(c.shape[0], -1))
+        if C.is_pc():
+            lt.append(TR.pc_true_log_k(hg, sd['drive'], c.double().cpu()))
+        else:
+            base = torch.as_tensor(true_log_k(), dtype=torch.float64)[typ][None].expand(c.shape[0], -1)
+            lt.append(base + TR.mapk_state_logk(hg, c.double().cpu()) if C.crowded() else base)
     lm, lt = torch.cat(lm), torch.cat(lt)
     groups = [('all', torch.ones_like(typ, dtype=torch.bool))]
     if C.is_pc():

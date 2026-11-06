@@ -13,6 +13,7 @@ import torch
 from benchmarks.common import LABELS
 from neuralchart.diagnostics import ldb_violation
 from neuralchart.fit import rollout
+from . import config as C
 from .config import DT
 from .data import load_set, train_norm, true_rates, hg_of
 from .evaluate import site_map
@@ -156,7 +157,7 @@ def make_figures(device='cuda', data=None, weights=None):
     dkw = {} if data is None else dict(data=data)
     os.makedirs(ASSETS, exist_ok=True)
     out = []
-    for fname, fn in (('brusselator_phase_portraits.png', phase_portraits), ('brusselator_entropy_b_far.png', entropy_maps)):
+    for fname, fn in ((f'{C.SYSTEM}_phase_portraits.png', phase_portraits), (f'{C.SYSTEM}_entropy_b_far.png', entropy_maps)):
         p = os.path.join(ASSETS, fname)
         fn(device, dkw, weights, p)
         out.append((fname, os.path.getsize(p) / 2 ** 20))

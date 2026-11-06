@@ -22,7 +22,8 @@ from neuralchart.chart import RTOL
 from neuralchart.model import MLP, Context, featurizer
 from neuralchart.baselines import FluxGNN, CRNN
 from neuralchart.graphs import grid_edge_list
-from .config import CHECKPOINTS, DT, STEP, KF, EPS, DIFF, H_GRID, MAXSUB_EVAL, N_TRAIN, RUNS
+from . import config as C
+from .config import DT, STEP, KF, EPS, DIFF, H_GRID, MAXSUB_EVAL, N_TRAIN
 from .data import hg_of
 
 GRAPH_BUFFERS = ('p_h', 'p_m', 'p_v', 'm_h', 'm_m', 'm_v')
@@ -450,7 +451,7 @@ def rebind(name, model, n, norm, device):
 def load_trained(name, norm, device, weights=None):
     """a trained model in its evaluation configuration on the training grid, None without weights: a Neural Chart from <weights>/<name>.pt
     or checkpoints/brusselator/<name>.pt, a baseline from <weights>/<name>.pt (weights default: runs/brusselator)"""
-    dirs = [weights or RUNS] + ([CHECKPOINTS] if name in VARIANTS else [])
+    dirs = [weights or C.RUNS] + ([C.CHECKPOINTS] if name in VARIANTS else [])
     f = next((p for p in (os.path.join(d, name + '.pt') for d in dirs) if os.path.exists(p)), None)
     if name in VARIANTS:
         return None if f is None else NeuralChart.load(f, map_location=device).to(device).accelerate()

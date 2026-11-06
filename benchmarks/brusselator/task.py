@@ -11,7 +11,7 @@ from neuralchart.fit import fit_linear, rollout, train
 from ..common import check_gpu
 from . import config as C
 from .data import generate, hg_of, load_set, train_norm
-from .evaluate import set_metrics
+from .evaluate import set_metrics, excess_law
 from .fitters import train_bsms, train_generic_fno
 from .models import FLOAT32_MODELS, accelerate, build, known_chem_mu0, known_mu0, oracle, rebind, set_max_sub, true_log_k
 from .test_sets import GEN, TEST_SETS
@@ -26,6 +26,7 @@ class Task:
 
     def __init__(s, name, data=None):
         s.name = name
+        C.configure(name)
         s.data = data or C.DATA
         s.dt, s.t_steps, s.n_descriptors = C.DT, C.T_STEPS, 0
 
@@ -101,6 +102,8 @@ class Task:
     def metrics(s, name, model, sd, R, Yc, m):
         """limit cycle, patterns, local detailed balance against the true force, entropy production and cycle affinities"""
         set_metrics(model, sd, R, Yc, m)
+        if isinstance(model, NeuralChart) and model.free_energy.c_dependent:
+            m['excess_law'] = excess_law(model, sd)
 
     def extras(s, name, model):
         if not isinstance(model, NeuralChart):

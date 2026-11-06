@@ -109,7 +109,7 @@ class Task:
         V = hg.V
         dev = sd['c'].device
         lab = {k: v.double().cpu() for k, v in sd['drive'].items()}
-        if C.SYSTEM == 'mapk_cascade':
+        if C.is_mapk():
             L = hg.on('cpu', torch.float64)['L']
             q = torch.nan_to_num(R, nan=float('inf')) @ L
             m['moiety_drift'] = dict(all=float((torch.linalg.vector_norm(q - q[:, :1], dim=-1) / torch.linalg.vector_norm(q[:, :1], dim=-1)).max()))
@@ -155,7 +155,7 @@ class Task:
             ct = TR.model_cycle_affinity((torch.log(at) - torch.log(bt)).double(), V).numpy()
             m['cycle_affinity'] = dict(model_mean=float(ca.mean()), true_mean=float(ct.mean()), mae=float(np.abs(ca - ct).mean()))
         if isinstance(model, NeuralChart):
-            if C.is_pc() or C.SYSTEM == 'mapk_cascade':
+            if C.is_pc() or C.is_mapk():
                 m['k_law'] = k_law(model, sd, hg)
             m['excess_law'] = excess_law(model, sd)
         if 'planar' in str(sd.get('name', '')) or (C.SYSTEM == 'schlogl' and R.shape[0] == 13):   # the front set

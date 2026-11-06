@@ -22,7 +22,7 @@ def random_condition(bench, n, B, g):
 
 
 def _raw_condition(bench, n, B, g):
-    if bench == 'mapk_cascade':
+    if bench.startswith('mapk'):
         return dict(logc=torch.stack([torch.empty(B, dtype=torch.float64).uniform_(-2, 1.5, generator=g),
                                       torch.zeros(B, dtype=torch.float64), torch.zeros(B, dtype=torch.float64)], 1))
     if bench in ('phosphorylation_cycle', 'phosphorylation_interacting', 'phosphorylation_saturating'):

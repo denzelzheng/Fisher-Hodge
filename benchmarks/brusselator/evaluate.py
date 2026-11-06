@@ -12,7 +12,7 @@ import torch
 from neuralchart import fast
 from neuralchart.diagnostics import ldb_violation, relerr_traj, sigma_error, sigma_times, LDB_RULE
 from .config import DT
-from .data import hg_of, true_rates
+from .data import hg_of, true_excess_potential, true_rates
 from .models import UDE, next_dtype
 
 
@@ -57,6 +57,24 @@ def site_map(hg, q, half=True):
 
 
 @torch.no_grad()
+@torch.no_grad()
+def excess_law(model, sd, every=20):
+    """the learned excess potential against the true one on the reference states of a test set, over all sites and species"""
+    from scipy.stats import spearmanr
+    dev = next(iter(model.parameters())).device
+    dt = next_dtype(model)
+    L, Tt = [], []
+    for t in range(0, sd['c'].shape[1], every):
+        c = sd['c'][:, t].to(dev).to(dt)
+        L.append(model.free_energy.correction(c, None).double().cpu())
+        Tt.append(true_excess_potential(c.double().cpu()))
+    a, b = torch.cat(L).reshape(-1).numpy(), torch.cat(Tt).reshape(-1).numpy()
+    ok = a.std() > 1e-12 and b.std() > 1e-12
+    return dict(pearson=float(np.corrcoef(a, b)[0, 1]) if ok else None, spearman=float(spearmanr(a, b).statistic) if ok else None,
+                rmse=float(np.sqrt(np.mean((a - b) ** 2))), slope=float(np.polyfit(b, a, 1)[0]) if ok else None,
+                median_diff=float(np.median(a - b)), std_true=float(b.std()), max_abs=float(np.abs(a).max()))
+
+
 def set_metrics(model, sd, R, Yc, m):
     """the readouts of one test set, added to the dict m: R, Yc (B, T + 1, M) float64 on the CPU"""
     n = sd['n']

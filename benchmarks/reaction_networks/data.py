@@ -201,7 +201,7 @@ def generate(names=None, out=None):
     names = names or all_sets()
     out = out or C.DATA
     os.makedirs(out, exist_ok=True)
-    if C.SYSTEM == 'mapk_cascade':
+    if C.is_mapk():
         res = make_sets_mapk(names)
     else:
         from multiprocessing import get_context
@@ -218,7 +218,7 @@ def generate(names=None, out=None):
 def load_set(name, device='cpu'):
     d = torch.load(os.path.join(C.DATA, f'{name}.pt'))
     d['c'] = d['c'].to(device)
-    if C.SYSTEM == 'mapk_cascade':
+    if C.is_mapk():
         d['drive'] = dict(logc=d['logc'].double().to(device))
     elif C.is_pc():
         d['drive'] = dict(U=d['U'].double().to(device), dG=d['dG'].double().to(device))
@@ -233,7 +233,7 @@ def load_set(name, device='cpu'):
 def train_norm():
     """training-set scalars used to normalise the inputs of the black-box baselines"""
     tr = torch.load(os.path.join(C.DATA, 'train.pt'))
-    if C.SYSTEM == 'mapk_cascade':
+    if C.is_mapk():
         return dict(logATP_mean=float(tr['logc'][:, 0].mean()), logATP_std=float(tr['logc'][:, 0].std()),
                     c_scale=float(tr['c'].mean()), c_min=float(tr['c'].min()), c_max=float(tr['c'].max()))
     if C.is_pc():

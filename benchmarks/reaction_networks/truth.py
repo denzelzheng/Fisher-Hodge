@@ -65,6 +65,7 @@ STEPS = [('E1', 'KKK', 'ES1', 'KKKp', True), ('E2', 'KKKp', 'ES2', 'KKK', False)
          ('P3', 'Kpp', 'ES9', 'Kp', False), ('P3', 'Kp', 'ES10', 'K', False)]
 DIFFUSING = ['K', 'Kp', 'Kpp']
 A_BIND, D_UNBIND, K_KIN, K_PHOS, EPS, D_DIFF = 10.0, 2.0, 2.0, 1.0, 1e-3, 0.5
+K_MAPK = 1.0                                     # crowded cascade: every reaction mobility at a site is divided by 1 + rho / K_MAPK
 TOTALS = dict(KKK=1.0, KK=1.0, K=1.0, E2=0.2, P2=0.3, P3=0.3)
 INPUT_SITES = [0, 1, 4, 5]                       # the 2 x 2 corner
 
@@ -88,7 +89,7 @@ def phi_of():
 
 def n_channels():
     """state species per site"""
-    return 3 if C.is_pc() else 22 if C.SYSTEM == 'mapk_cascade' else 1
+    return 3 if C.is_pc() else 22 if C.is_mapk() else 1
 
 
 CHI_XXP, CHI_XPE, K_SAT = -0.15, 0.15, 2.0
@@ -190,11 +191,29 @@ def mapk_chem_factors(hg, logc):
     return torch.exp(lcv @ (-Y).clamp_min(0).T), torch.exp(lcv @ Y.clamp_min(0).T)
 
 
-def mapk_true_rates(hg, logc):
+def mapk_state_logk(hg, c):
+    """crowded cascade: the log factor of the true symmetric rate constant per hyperedge at the states c (B, 22 V): every reaction
+    hyperedge at site v carries -log(1 + rho_v / K_MAPK) with rho_v the total concentration of the state species at v, (B, H)"""
+    B, V = c.shape[0], hg.V
+    R = len(STEPS) * 2
+    rho = c.reshape(B, len(STATE), V).sum(1)
+    out = torch.zeros(B, hg.H, dtype=c.dtype, device=c.device)
+    out[:, :R * V] = -torch.log1p(rho / K_MAPK).repeat(1, R)            # reaction hyperedges are r * V + v
+    return out
+
+
+def mapk_true_rates(hg, logc, ideal=False):
     KF_, KB_ = (torch.as_tensor(x, dtype=logc.dtype, device=logc.device) for x in mapk_true_constants(hg))
     ff, fb = mapk_chem_factors(hg, logc)
     pa, pb = KF_[None] * ff, KB_[None] * fb
-    return lambda c: (pa * hg.mass_action(c, '+'), pb * hg.mass_action(c, '-'))
+
+    def rates(c):
+        a, b = pa * hg.mass_action(c, '+'), pb * hg.mass_action(c, '-')
+        if C.crowded() and not ideal:
+            fac = torch.exp(mapk_state_logk(hg, c))
+            a, b = a * fac, b * fac
+        return a, b
+    return rates
 
 
 def kpp_fraction(c):
@@ -236,9 +255,9 @@ def schlogl_hg(n=8):
 
 
 def hg_of(n):
-    key = ('mapk_cascade' if C.SYSTEM == 'mapk_cascade' else 'phosphorylation_cycle' if C.is_pc() else 'schlogl', n)
+    key = ('mapk_cascade' if C.is_mapk() else 'phosphorylation_cycle' if C.is_pc() else 'schlogl', n)
     if key not in _HG:
-        if C.SYSTEM == 'mapk_cascade':
+        if C.is_mapk():
             _HG[key] = mapk_hg(n)
         elif C.is_pc():
             _HG[key] = Hypergraph.reaction_transport(PC_SPECIES, PC_RX, grid_n=n, diffusing=['X', 'Xp'], chemostats=['ATP', 'ADP'])
@@ -289,8 +308,8 @@ def pc_true_log_k(hg, drive, c):
 def true_rates(hg, drive, c, ideal=False):
     """one-way rates of the reference model (mass action in the activity), float64 on the CPU; drive: the condition
     dict (or the (log a, log b) tensor of the Schloegl models)"""
-    if C.SYSTEM == 'mapk_cascade':
-        return mapk_true_rates(hg, drive['logc'].double().cpu())(c.double().cpu())
+    if C.is_mapk():
+        return mapk_true_rates(hg, drive['logc'].double().cpu(), ideal=ideal)(c.double().cpu())
     if C.is_pc():
         la, lb = pc_log_constants(hg, drive)
         c = c.double().cpu()
@@ -323,7 +342,7 @@ def mass_action_rates(hg, logab, c, kf, kb, D):
 def model_cycle_affinity(la, V):
     """a local cycle at site 0 from log(a / b) (B, H): R1 + R2 (Schloegl, phosphorylation cycle); MAPK: the first-tier
     futile cycle E1 + KKK <-> ES1 -> E1 + KKKp, E2 + KKKp <-> ES2 -> E2 + KKK (ATP -> ADP + Pi)"""
-    if C.SYSTEM == 'mapk_cascade':
+    if C.is_mapk():
         return la[:, 0] + la[:, V] + la[:, 2 * V] + la[:, 3 * V]
     return la[:, 0] + la[:, V]
 

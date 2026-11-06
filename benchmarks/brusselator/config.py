@@ -3,6 +3,8 @@
 Physics (the reference, never shown to the models).  Four reactions at every site of a periodic n x n grid,
     R1 A -> X (k1 a),  R2 2X + Y -> 3X (k2 x^2 y),  R3 B + X -> Y + D (k3 b x),  R4 X -> E (k4 x),  k1 = ... = k4 = 1.
 Every reverse rate is eps = 1e-3 (times the chemostatted product, d = e = 1), so all affinities are finite.  The
+non-ideal variant (brusselator_nonideal) is mass action in the activities y = c gamma with ln gamma_X = ln gamma_Y =
+PHI (x + y), the gradient of the excess free energy G = PHI (x + y)^2 / 2 per site, PHI = 0.1.  The
 chemostats A, B, D, E are held fixed; a and b are the conditions.  X and Y diffuse with D_X = 0.4 and D_Y = 3.6
 (transport rate D / h^2).  The Turing wavelength at a = 1 is lambda_c = 2 pi (D_X D_Y)^(1/4) = 6.88.  The training
 grid is 16 x 16 with spacing h = 2 lambda_c / 16 = 0.860, and the 32 x 32 test grid keeps h.  The homogeneous state
@@ -20,10 +22,22 @@ import math
 import os
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DATA = os.path.join(os.environ.get('NEURALCHART_DATA', os.path.join(ROOT, 'data')), 'brusselator')
-RESULTS = os.path.join(ROOT, 'results', 'brusselator')
-CHECKPOINTS = os.path.join(ROOT, 'checkpoints', 'brusselator')      # the shipped Neural Chart checkpoints
-RUNS = os.path.join(ROOT, 'runs', 'brusselator')                    # outputs of neuralchart.run
+SYSTEM, PHI = 'brusselator', 0.0
+NONIDEAL_PHI = 0.1
+
+
+def configure(name):
+    """select the ideal Brusselator or the non-ideal variant: the activity coefficient and the directories"""
+    global SYSTEM, PHI, DATA, RESULTS, CHECKPOINTS, RUNS
+    assert name in ('brusselator', 'brusselator_nonideal'), name
+    SYSTEM, PHI = name, (NONIDEAL_PHI if name == 'brusselator_nonideal' else 0.0)
+    DATA = os.path.join(os.environ.get('NEURALCHART_DATA', os.path.join(ROOT, 'data')), name)
+    RESULTS = os.path.join(ROOT, 'results', name)
+    CHECKPOINTS = os.path.join(ROOT, 'checkpoints', name)      # the shipped Neural Chart checkpoints
+    RUNS = os.path.join(ROOT, 'runs', name)                    # outputs of neuralchart.run
+
+
+configure(SYSTEM)
 
 DT, W_TRAIN, T_TEST, N_TRAIN, T_STEPS = 0.2, 50, 200, 16, 20      # T = 20 sampling steps, 10T = 200
 KF, EPS, DIFF = (1.0, 1.0, 1.0, 1.0), 1e-3, (0.4, 3.6)

@@ -9,7 +9,7 @@ import os
 
 from benchmarks.common import LABELS, OWN_FLUX, excess_table, write_table, fmt
 from neuralchart.chart import ABLATIONS
-from .config import RESULTS
+from . import config as C
 from .test_sets import TEST_SETS, LABELS as SET_LABELS
 
 MODELS = ['chart', 'chart-given-mu0', 'chart-learned-chem-mu0', 'chart-const-k', 'chart-no-excess', 'chart-zero-init', 'chart-no-projection', 'chart-reversible', 'flux_gnn',
@@ -114,18 +114,32 @@ def training_table(R, models):
     return header, rows
 
 
+def excess_law_table(R, models):
+    """the learned excess potential against the true one on the test states"""
+    header = ['Method', 'test set', 'Pearson r', 'RMSE', 'slope, learned against true', 'standard deviation of the true excess potential']
+    rows = []
+    for m in models:
+        for s in TEST_SETS:
+            g = (_set(R.get(m) or {}, s) or {}).get('excess_law')
+            if g:
+                rows.append([LABELS[m], SET_LABELS[s], g['pearson'], g['rmse'], g['slope'], g['std_true']])
+    return header, rows
+
+
 def load_runs(runs=None):
-    d = runs or os.path.join(RESULTS, 'runs')
+    d = runs or os.path.join(C.RESULTS, 'runs')
     return {f[:-5]: json.load(open(os.path.join(d, f))) for f in sorted(os.listdir(d)) if f.endswith('.json')}
 
 
-def make_tables(models=MODELS, out=RESULTS, runs=None):
+def make_tables(models=MODELS, out=None, runs=None):
+    out = out or C.RESULTS
     R = load_runs(runs)
     for stem, (h, rows) in (('main', main_table(R, [m for m in MAIN if m in models])),
                             ('physics', physics_table(R, models)),
                             ('ablations', ablation_table(R)),
                             ('oscillation_patterns', oscillation_table(R, models)),
                             ('entropy_readout', entropy_table(R, models)),
+                            ('excess_law', excess_law_table(R, ['chart', 'chart-given-mu0', 'chart-learned-chem-mu0'])),
                             ('training', training_table(R, models))):
         print(write_table(os.path.join(out, stem), h, rows), '\n')
     excess_table(R, ABLATION_MODELS, os.path.join(out, 'excess'))

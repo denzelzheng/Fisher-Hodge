@@ -12,6 +12,7 @@ import torch
 
 from benchmarks.common import LABELS
 from neuralchart.fit import rollout
+from . import config as C
 from .config import DT
 from .data import conditions, load_set, train_norm
 from .models import FLOAT32_MODELS, load_trained
@@ -22,9 +23,9 @@ ASSETS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.ab
 # forms in the first 8 time units, which are shown at every sampling step.  Trajectory 30 of the a 1.3-1.5 set is the
 # spatial start with the largest growth of spatial structure while it oscillates (0.40 -> 1.38).
 SCENES = [
-    ('brusselator_turing.gif', 'turing', 30, ['chart', 'crnn_mass_action', 'fno'], 'Turing regime',
+    ('{sys}_turing.gif', 'turing', 30, ['chart', 'crnn_mass_action', 'fno'], 'Turing regime',
      list(range(0, 40)) + list(range(40, 201, 5))),
-    ('brusselator_oscillation.gif', 'a_high', 30, ['chart', 'crnn_mass_action', 'fno'], 'Oscillations, a and b outside training',
+    ('{sys}_oscillation.gif', 'a_high', 30, ['chart', 'crnn_mass_action', 'fno'], 'Oscillations, a and b outside training',
      list(range(0, 201, 2))),
 ]
 TRAINING_RANGE = 'training a 0.9–1.1, b 2.3–3.0'
@@ -70,7 +71,7 @@ def make_gifs(device='cuda', data=None, weights=None, scenes=SCENES, panel_in=2.
             errs.append([f'relative error {x:.2g}' if np.isfinite(x) else 'diverged' for x in e])
         times = idx * DT
         sup = f'{what}: a = {a:.2f}, b = {b:.2f} ({TRAINING_RANGE}), concentration of X'
-        mb = comparison_gif(os.path.join(ASSETS, fname), frames, titles, suptitle=sup, times=times,
+        mb = comparison_gif(os.path.join(ASSETS, fname.format(sys=C.SYSTEM)), frames, titles, suptitle=sup, times=times,
                             panel_in=panel_in, extra_titles=errs, max_mb=max_mb, time_label=lambda t: f't = {times[t]:.1f}')
         std = ', '.join(f'{t_}: {F[-1].std() / abs(F[-1].mean()):.3g}' for t_, F in zip(titles, frames))
         print(f'{fname}: {mb:.2f} MB ({sname}, trajectory {i}, a {a:.3f}, b {b:.3f}); relative spatial std of X at the '
@@ -130,7 +131,7 @@ def make_track_gif(device='cuda', data=None, weights=None, scene=TRACK):
             continue
         panels.append((LABELS[m], track_panel(out[1], out[0][idx], logab, hg, scene['species'])))
     a, b = np.exp(logab[0].double().cpu().numpy())
-    path = os.path.join(ASSETS, f'brusselator_track_{scene["set"]}.gif')
+    path = os.path.join(ASSETS, f'{C.SYSTEM}_track_{scene["set"]}.gif')
     times = idx * DT
     note = 'tracers follow v = J / rho' + (f' ({scene["speed"]}× faster than the clock)' if scene['speed'] != 1 else '')
     mb = track_gif(path, f'{scene["what"]}: a = {a:.2f}, b = {b:.2f} ({TRAINING_RANGE}): {scene["species"]}', panels,

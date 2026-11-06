@@ -9,6 +9,7 @@ read the module-level values (SYSTEM, DT, N_TRAIN, W_TRAIN, DATA, ...).
     phosphorylation_interacting     the same network with a cross-species excess free energy, 8 x 8 grid (DT 0.05)
     phosphorylation_saturating      the same network with a state-dependent rate constant, 8 x 8 grid (DT 0.05)
     mapk_cascade              MAPK cascade with three tiers, 4 x 4 grid (DT 0.5)
+    mapk_crowded              the same cascade whose reaction mobilities fall with the local density, 4 x 4 grid (DT 0.5)
 
 Protocol (every model, seed 0): training window 100 sampling steps (MAPK: 20 steps, also 10 time units), rollouts of
 K in [4, 20] steps, batch 8, Adam lr 1e-3 with a cosine schedule on p = max(step / steps, elapsed / 12 h) (500 steps for the Neural Chart, 4000 for the baselines), gradient
@@ -21,7 +22,7 @@ import os
 from ..common import ROOT
 
 BENCHMARKS = ('schlogl', 'schlogl_nonideal', 'schlogl_nonideal_strong', 'phosphorylation_cycle',
-              'phosphorylation_heterogeneous', 'phosphorylation_interacting', 'phosphorylation_saturating', 'mapk_cascade')
+              'phosphorylation_heterogeneous', 'phosphorylation_interacting', 'phosphorylation_saturating', 'mapk_cascade', 'mapk_crowded')
 NONIDEAL = ('schlogl_nonideal', 'schlogl_nonideal_strong')     # the Schloegl models with crowded activities
 SYSTEM = 'schlogl_nonideal'
 DT, N_TRAIN, W_TRAIN = 0.05, 8, 100
@@ -29,7 +30,7 @@ T_TEST, T_STEPS = 200, 20                  # 10T, sampling steps per time unit T
 GRID = dict(schlogl=(0.05, 8, 100), schlogl_nonideal=(0.05, 8, 100), schlogl_nonideal_strong=(0.05, 8, 100),
             phosphorylation_cycle=(0.05, 8, 100), phosphorylation_heterogeneous=(0.05, 8, 100),
             phosphorylation_interacting=(0.05, 8, 100), phosphorylation_saturating=(0.05, 8, 100),
-            mapk_cascade=(0.5, 4, 20))      # DT, training grid, training window
+            mapk_cascade=(0.5, 4, 20), mapk_crowded=(0.5, 4, 20))      # DT, training grid, training window
 STEP = dict(dt_max=DT / 8, theta0=0.5, theta1=0.5, max_sub=4000, t_tol=1e-9)
 MAXSUB_TRAIN, MAXSUB_EVAL = 2000, 4000
 LR, BATCH, KMIN, KMAX = 1e-3, 8, 4, 20
@@ -90,6 +91,7 @@ TEST_SETS = {
         'phosphorylated_start': 'phosphorylated initial states',
     },
 }
+TEST_SETS['mapk_crowded'] = dict(TEST_SETS['mapk_cascade'])
 TITLES = dict(schlogl='Schlögl model: bistability and travelling fronts',
               schlogl_nonideal='Schlögl model with non-ideal (crowded) activities',
               schlogl_nonideal_strong='Schlögl model with strong crowding (chemostat a 1.5–4.5)',
@@ -97,7 +99,7 @@ TITLES = dict(schlogl='Schlögl model: bistability and travelling fronts',
               phosphorylation_heterogeneous='Driven phosphorylation cycle on heterogeneous reaction media',
               phosphorylation_interacting='Driven phosphorylation cycle with cross-species interactions',
               phosphorylation_saturating='Driven phosphorylation cycle with a saturating rate constant',
-              mapk_cascade='MAPK cascade')
+              mapk_cascade='MAPK cascade', mapk_crowded='MAPK cascade with crowded reaction steps')
 
 
 def configure(system, data=None, out=None):
@@ -128,6 +130,16 @@ def interacting():
 
 def saturating():
     return SYSTEM == 'phosphorylation_saturating'
+
+
+def is_mapk():
+    """the MAPK cascade, ideal or crowded"""
+    return SYSTEM in ('mapk_cascade', 'mapk_crowded')
+
+
+def crowded():
+    """the MAPK cascade whose reaction mobilities fall with the local density"""
+    return SYSTEM == 'mapk_crowded'
 
 
 def hetero():

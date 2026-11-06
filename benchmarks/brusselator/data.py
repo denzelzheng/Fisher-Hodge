@@ -10,7 +10,8 @@ import numpy as np
 import torch
 
 from neuralchart.graphs import Hypergraph
-from .config import DATA, DT, KF, EPS, DIFF, H_GRID, SPECIES, CHEM, REACTIONS
+from . import config as C
+from .config import DT, KF, EPS, DIFF, H_GRID, SPECIES, CHEM, REACTIONS
 from .test_sets import GEN, sample_ab
 
 _HG = {}
@@ -38,11 +39,23 @@ def true_constants(hg, logab):
     return kF * torch.exp(lc @ Yp.T), kB * torch.exp(lc @ Ym.T)
 
 
+def log_activity(c):
+    """log of the activity y = c gamma at the states c (..., 2 V): ln gamma_X = ln gamma_Y = PHI (x + y), zero on the ideal model"""
+    V = c.shape[-1] // 2
+    rho = c[..., :V] + c[..., V:]
+    return torch.log(c) + C.PHI * torch.cat([rho, rho], -1)
+
+
+def true_excess_potential(c):
+    """the true excess potential at the states c (..., 2 V)"""
+    return log_activity(c) - torch.log(c)
+
+
 def true_rates(hg, logab, c):
-    """one-way rates (a, b) of the reference at the states c (B, M), float64"""
+    """one-way rates (a, b) of the reference at the states c (B, M), float64: mass action in the activity"""
     kf, kb = true_constants(hg, logab)
-    c = c.double()
-    return kf.to(c.device) * hg.mass_action(c, '+'), kb.to(c.device) * hg.mass_action(c, '-')
+    y = torch.exp(log_activity(c.double()))
+    return kf.to(c.device) * hg.mass_action(y, '+'), kb.to(c.device) * hg.mass_action(y, '-')
 
 
 class TruthNP:
@@ -56,6 +69,10 @@ class TruthNP:
 
     def rhs(s, t, x):
         L = np.log(np.maximum(x, 1e-300))
+        if C.PHI:
+            V = x.shape[0] // 2
+            rho = x[:V] + x[V:]
+            L = L + C.PHI * np.concatenate([rho, rho])
         return s.S @ (s.kf * np.exp(s.Np @ L) - s.kb * np.exp(s.Nm @ L))
 
 
@@ -131,7 +148,8 @@ def make_set(name, procs=12, idx=None):
                 homog=torch.tensor([r[2] for r in res]), n=n)
 
 
-def generate(sets, procs=12, data=DATA):
+def generate(sets, procs=12, data=None):
+    data = data or C.DATA
     os.makedirs(data, exist_ok=True)
     for name in sets:
         t0 = time.time()
@@ -163,7 +181,8 @@ def conditions(logab):
     return dict(logab=logab, chem_logc=torch.cat([logab, torch.zeros(logab.shape[0], len(CHEM) - logab.shape[1], dtype=logab.dtype, device=logab.device)], -1))
 
 
-def load_set(name, device='cpu', data=DATA):
+def load_set(name, device='cpu', data=None):
+    data = data or C.DATA
     d = torch.load(os.path.join(data, f'{name}.pt'))
     d['c'] = d['c'].to(device)
     d['drive'] = conditions(d['logab'].to(device))
@@ -171,7 +190,8 @@ def load_set(name, device='cpu', data=DATA):
     return d
 
 
-def train_norm(data=DATA):
+def train_norm(data=None):
+    data = data or C.DATA
     """z-scoring of the conditions and the concentration scale, from the training set (inputs of the black boxes)"""
     tr = torch.load(os.path.join(data, 'train.pt'))
     lab = tr['logab']

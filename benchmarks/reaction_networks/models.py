@@ -89,11 +89,11 @@ def set_true_mass_action(model, kf, kb, D, logab=None):
 @torch.no_grad()
 def set_true(m):
     """the reference model's constants in the class (exact for every condition; the excess potential is set separately)"""
-    if C.SYSTEM == 'mapk_cascade':
+    if C.is_mapk():
         g = torch.Generator().manual_seed(3)
         c = 0.05 + torch.rand(1, m.hg.M, generator=g, dtype=torch.float64)
         drive = TR.conditions(dict(logc=torch.tensor([[0.4, -0.1, 0.2]], dtype=torch.float64)))
-        a, b = TR.true_rates(m.hg, drive, c)
+        a, b = TR.true_rates(m.hg, drive, c, ideal=True)
         err = set_to_rates(m, c, drive, a[0], b[0])
     elif C.is_pc():
         c, drive = _pc_ref_state(m.hg)
@@ -146,7 +146,7 @@ def oracle(n):
 def cond_z(drive, norm):
     """the z-scored conditions of the black boxes: (log a, log b) on the Schloegl models, dG on the phosphorylation
     cycle, log ATP on the MAPK cascade; (B, k)"""
-    if C.SYSTEM == 'mapk_cascade':
+    if C.is_mapk():
         lc = drive['logc']
         return ((lc[:, :1] - norm['logATP_mean']) / norm['logATP_std'])
     if C.is_pc():
@@ -156,7 +156,7 @@ def cond_z(drive, norm):
 
 
 def n_cond():
-    return 1 if C.is_pc() or C.SYSTEM == 'mapk_cascade' else 2
+    return 1 if C.is_pc() or C.is_mapk() else 2
 
 
 def n_desc():

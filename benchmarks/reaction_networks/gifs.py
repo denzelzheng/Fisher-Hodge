@@ -31,10 +31,11 @@ SCENES = {
     'phosphorylation_interacting': ('high_concentration', ['chart', 'crnn_mass_action', 'fno'], 'Xp fraction', 'phosphorylation_interacting_high_concentration.gif'),
     'phosphorylation_saturating': ('high_concentration', ['chart', 'crnn_mass_action', 'fno'], 'Xp fraction', 'phosphorylation_saturating_high_concentration.gif'),
     'mapk_cascade': ('low_atp', ['chart', 'crnn_mass_action', 'fno'], 'state', 'mapk_cascade_low_atp.gif'),
+    'mapk_crowded': ('low_atp', ['chart', 'crnn_mass_action', 'fno'], 'state', 'mapk_crowded_low_atp.gif'),
 }
 TRAJ = dict(schlogl=8, schlogl_nonideal=0, schlogl_nonideal_strong=0, phosphorylation_cycle=0, phosphorylation_heterogeneous=0,
             phosphorylation_interacting=0, phosphorylation_saturating=0,
-            mapk_cascade=0)   # the README trajectories
+            mapk_cascade=0, mapk_crowded=0)   # the README trajectories
 SUPTITLE = {
     'schlogl': 'Schlögl model, travelling front (a = 3, b = {b:.2f}): concentration of X',
     'schlogl_nonideal': 'Non-ideal Schlögl model, a stripe outside the test sets, a = {a:.2f}, b = {b:.2f}: concentration of X',
@@ -44,6 +45,7 @@ SUPTITLE = {
     'phosphorylation_interacting': 'Interacting phosphorylation cycle, X and Xp × 1.5 at the start, ΔG = {dG:.2f}: phosphorylated fraction Xp / (X + Xp)',
     'phosphorylation_saturating': 'Saturating phosphorylation cycle, X and Xp × 3 at the start, ΔG = {dG:.2f}: phosphorylated fraction Xp / (X + Xp)',
     'mapk_cascade': 'MAPK cascade, ATP = {atp:.2f} (training 0.5–2): 22 species (rows) at 16 sites (columns)',
+    'mapk_crowded': 'MAPK cascade with crowded reaction steps, ATP = {atp:.2f} (training 0.5–2): 22 species (rows) at 16 sites (columns)',
 }
 
 
@@ -53,7 +55,7 @@ def field(R, n):
     if C.is_pc():
         x, xp = R[:, :V], R[:, V:2 * V]
         f = xp / (x + xp)
-    elif C.SYSTEM == 'mapk_cascade':                    # every species at every site: (T, 22, 16)
+    elif C.is_mapk():                    # every species at every site: (T, 22, 16)
         return np.asarray(R).reshape(R.shape[0], len(TR.STATE), V)
     else:
         f = R

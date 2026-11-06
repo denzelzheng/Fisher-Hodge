@@ -153,9 +153,9 @@ def make_tables(runs=None):
     if C.nonideal():
         lngamma_table(R, os.path.join(out, 'activity_coefficient'))
         lngamma_curve_table(R, os.path.join(out, 'activity_coefficient_curve'))
-    if C.SYSTEM == 'mapk_cascade':
+    if C.is_mapk():
         mapk_table(R, MAIN + ABLATIONS[2:-1], os.path.join(out, 'conservation_and_output'))
-    if C.is_pc() or C.SYSTEM == 'mapk_cascade':
+    if C.is_pc() or C.is_mapk():
         k_law_table(R, ['chart', 'chart-given-mu0', 'chart-learned-chem-mu0', 'chart-const-k'], os.path.join(out, 'law'))
     excess_law_table(R, ['chart', 'chart-given-mu0', 'chart-learned-chem-mu0'], os.path.join(out, 'excess_law'))
     if C.SYSTEM == 'schlogl':
