@@ -97,7 +97,6 @@ def class_structure(model, c_ref, drive_ref, decimals=6):
     return params, U, inv[:H], inv[H:]
 
 
-@torch.no_grad()
 def _simpson(x, dt):
     return dt / 3 * (x[:, :-2] + 4 * x[:, 1:-1] + x[:, 2:])
 
