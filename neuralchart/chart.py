@@ -32,6 +32,7 @@ from .model import Context, Drive, FreeEnergy, MasterEquation, Mobility, featuri
 
 RTOL, THETA = 1e-4, 0.5
 ITERS, LR, BATCH, KMIN, KMAX = 500, 1e-3, 8, 4, 20
+ITERS_CONSTANTS = 4000                 # the rollouts when only the constants train, as for a model of constants
 MAX_SUB_TRAIN, MAX_SUB_EVAL = 2000, 4000
 BUDGET_H = 12.0
 
@@ -126,8 +127,19 @@ class NeuralChart(MasterEquation):
                 info['linear_fit_at_zero'] = info['linear_fit']
                 info['linear_fit'] = info['varpro']['linear_fit']
             s.diagnostics.update(s._design_report(info['linear_fit'], log))
+        nets = [p for p in list(s.free_energy.excess_parameters()) + (list(s.kinetics.net.parameters()) if s.kinetics.net is not None else [])
+                if p.requires_grad]
+        constants_only = 'varpro' in info and info['varpro']['steps'] == 0 and bool(nets)   # the class already holds the data: G_theta = g_theta = 0
+        info['constants_only'] = constants_only
+        if constants_only:
+            log('the residual is the quadrature error: G_theta and g_theta stay zero, only the constants train')
+            iters = ITERS_CONSTANTS if iters == ITERS else iters
+            for p in nets:
+                p.requires_grad_(False)
         info.update(train(s, data, iters, seed, tr.dt, batch=BATCH, lr=lr, kmin=KMIN, kmax=KMAX, log=log, budget_s=BUDGET_H * 3600,
                           ckpt=checkpoint, resume=resume))
+        for p in nets:
+            p.requires_grad_(True)
         s.eval()
         info['summary'] = chart_summary(s, data)
         s.accelerate()
