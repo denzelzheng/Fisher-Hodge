@@ -13,7 +13,8 @@ convex, so its optimum is global (fit_linear).  The optimum is mapped back to th
 
 Variable projection (fit_varpro).  G_theta and g_theta then descend the same residual, with kappa solved again at every step.  The residual
 also holds the error of the quadrature, which no parameter should fit.  The integrator measures that error for the current model: the same
-integral along the model's own path from the same start.  Variable projection stops when the rest of the residual is no larger than it.
+integral along the model's own path from the same start.  At the closed-form optimum, if the rest of the residual is no larger than that error,
+the model class already holds the data and variable projection does not run.
 
 Rollout refinement (train).  Every parameter is then refined on multi-step rollouts: K in [kmin, kmax] steps from a
 random start inside the data, batch 8, Adam with a cosine schedule, gradient clip 1.
@@ -248,7 +249,7 @@ def fit_linear(model, data, dt, rule=None, floor=FLOOR, batch=16, log=print):
 
 
 # ------------------------------------------------------------------------------------------ variable projection
-VP_STEPS, VP_LR, VP_CHECK = 500, 1e-3, 25
+VP_STEPS, VP_LR = 500, 1e-3
 
 
 def _projected_residual_backward(model, tr, dt, batch=16):
@@ -310,8 +311,8 @@ def quadrature_check(model, tr, dt, batch=16):
 def fit_varpro(model, tr, dt, steps=VP_STEPS, lr=VP_LR, batch=16, log=print, trace=None):
     """G_theta and g_theta descend the derivative residual jointly, with the linear parameters at their closed-form optimum (fit_linear) at every
     step: by the envelope theorem the gradient at the optimal linear parameters is that of the projected residual.  Adam, a fixed number of
-    steps at most, gradient clip 1.  The networks train in FP32, the closed-form step stays in float64.  The descent stops when the part of the
-    residual beyond the quadrature error is no larger than that error, the point past which it would fit the quadrature."""
+    steps, gradient clip 1.  The networks train in FP32, the closed-form step stays in float64.  The descent does not run when, at the closed-form
+    optimum, the part of the residual beyond the quadrature error is no larger than that error: there it could only fit the quadrature."""
     params = list(model.free_energy.excess_parameters()) + (list(model.kinetics.net.parameters()) if model.kinetics.net is not None else [])
     params = [p for p in params if p.requires_grad]
     t0 = time.time()
@@ -321,15 +322,11 @@ def fit_varpro(model, tr, dt, steps=VP_STEPS, lr=VP_LR, batch=16, log=print, tra
         return dict(linear_fit=info, steps=0, time_s=time.time() - t0)
     opt = torch.optim.Adam(params, lr=lr)
     hist = []
-    start, stopped = info['residual_theta'], None
-    for it in range(steps):
+    start = info['residual_theta']
+    res, err = quadrature_check(model, tr, dt, batch)
+    log(f'varpro: residual {res:.4e}, quadrature error {err:.4e} at the closed-form optimum')
+    for it in range(steps if res > 2 * err else 0):
         fit_linear(model, tr, dt, log=quiet)
-        if it % VP_CHECK == 0:
-            res, err = quadrature_check(model, tr, dt, batch)
-            if res <= 2 * err:
-                stopped = it
-                log(f'varpro it {it:4d}: residual {res:.4e}, quadrature error {err:.4e}: stops')
-                break
         opt.zero_grad(set_to_none=True)
         with torch.enable_grad():
             hist.append(_projected_residual_backward(model, tr, dt, batch))
@@ -344,7 +341,7 @@ def fit_varpro(model, tr, dt, steps=VP_STEPS, lr=VP_LR, batch=16, log=print, tra
     info = fit_linear(model, tr, dt, log=log)
     done = len(hist)
     log(f'varpro: {done} steps, projected derivative residual {start:.4e} -> {info["residual_theta"]:.4e}, {time.time() - t0:.0f}s')
-    return dict(linear_fit=info, steps=done, stopped_at=stopped, lr=lr, residual_start=start, residual_end=info['residual_theta'], curve=hist[::10], time_s=time.time() - t0)
+    return dict(linear_fit=info, steps=done, residual_check=res, quadrature_error=err, lr=lr, residual_start=start, residual_end=info['residual_theta'], curve=hist[::10], time_s=time.time() - t0)
 
 
 # ------------------------------------------------------------------------------------------ rollout training
