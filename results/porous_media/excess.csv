@@ -1,6 +1,2 @@
 Method,"largest |∇G|, training states","largest |g_θ|, training states",parameters of G_θ,parameters of g_θ
-Neural Chart,0.15165719389915466,6.503926753997803,"1,153","5,185"
-"Neural Chart, constant mobility per class",0.918450117111206,0.0,"1,153",0
-"Neural Chart, no excess free energy",0.0,6.576512336730957,0,"5,185"
-"Neural Chart, no convex initialisation",0.06778419017791748,10.744140625,"1,153","5,185"
-"Neural Chart, reversible (no drive)",1.3467844724655151,8.692732810974121,"1,153","5,185"
+Neural Chart,0.04743435740527038,7.04337886207374,"1,153","5,185"

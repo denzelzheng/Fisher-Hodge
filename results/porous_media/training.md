@@ -1,14 +1,9 @@
 | Method | parameters | training time (min) | final training loss |
 |---|---|---|---|
-| Neural Chart | 6,340 | 35.3 | 1.3e-04 |
-| Neural Chart, constant mobility per class | 1,155 | 7.9 | 0.030 |
-| Neural Chart, no excess free energy | 5,187 | 17.7 | 1.4e-04 |
-| Neural Chart, no convex initialisation | 6,340 | 46.8 | 1.6e-04 |
-| Neural Chart, reversible (no drive) | 6,340 | 12.4 | 0.021 |
-| No chart (Flux-GNN) | 151,234 | 639.0 | 4.5e-04 |
-| UDE closure | 5,441 | 11.7 | 2.8e-04 |
-| BSMS-GNN | 1,724,417 | 48.0 | 0.358 |
-| FNO | 1,188,609 | 118.9 | 2.1e-03 |
-| GENERIC-FNO | 1,002,388 | 35.6 | 1.2e-03 |
-| HelmFluid | 9,930,381 | 37.8 | 0.054 |
+| Neural Chart | 6,340 | 19.2 | 8.4e-05 |
+| UDE closure | 5,441 | 9.5 | 1.1e-04 |
+| BSMS-GNN | 1,724,417 | 1.6 | 0.377 |
+| FNO | 303,873 | 5.1 | 1.8e-04 |
+| GENERIC-FNO | 1,002,388 | 2.6 | 7.5e-06 |
+| HelmFluid | 9,930,381 | 29.2 | 0.021 |
 | Persistence (u(t) = u(0)) | 0 | N/A | N/A |

@@ -1,0 +1,21 @@
+Method,test set,hyperedges,Pearson r of log k,Spearman r of log k,RMSE of log k,median log ratio (learned / true),standard deviation of the true log k
+Neural Chart,training conditions (ΔG 1–3),all,0.9999999932479109,0.8703882797784891,0.00012963217776200287,+0.00,0.8206328482714829
+Neural Chart,training conditions (ΔG 1–3),R1,,,0.00023911376189522654,+0.00,0.0
+Neural Chart,training conditions (ΔG 1–3),R2,,,0.00020344232257896167,+0.00,0.0
+Neural Chart,training conditions (ΔG 1–3),transport X,,,3.3518187624686234e-05,+0.00,0.0
+Neural Chart,training conditions (ΔG 1–3),transport Xp,,,2.819709259861138e-06,-0.00,0.0
+Neural Chart,drive ΔG 3–4,all,0.9999999932479109,0.8703882797784891,0.00012963217776200287,+0.00,0.8206328482714829
+Neural Chart,drive ΔG 3–4,R1,,,0.00023911376189522654,+0.00,0.0
+Neural Chart,drive ΔG 3–4,R2,,,0.00020344232257896167,+0.00,0.0
+Neural Chart,drive ΔG 3–4,transport X,,,3.3518187624686234e-05,+0.00,0.0
+Neural Chart,drive ΔG 3–4,transport Xp,,,2.819709259861138e-06,-0.00,0.0
+Neural Chart,"stronger, finer potential U",all,0.9999999932479109,0.8703882797784891,0.00012963217776200287,+0.00,0.8206328482714829
+Neural Chart,"stronger, finer potential U",R1,,,0.00023911376189522654,+0.00,0.0
+Neural Chart,"stronger, finer potential U",R2,,,0.00020344232257896167,+0.00,0.0
+Neural Chart,"stronger, finer potential U",transport X,,,3.3518187624686234e-05,+0.00,0.0
+Neural Chart,"stronger, finer potential U",transport Xp,,,2.819709259861138e-06,-0.00,0.0
+Neural Chart,16×16 grid,all,0.9999999932479031,0.8703882797784891,0.00012963217776200287,+0.00,0.8206328482714829
+Neural Chart,16×16 grid,R1,,,0.00023911376189522654,+0.00,0.0
+Neural Chart,16×16 grid,R2,,,0.00020344232257896167,+0.00,0.0
+Neural Chart,16×16 grid,transport X,,,3.3518187624686234e-05,+0.00,0.0
+Neural Chart,16×16 grid,transport Xp,,,2.819709259861138e-06,-0.00,0.0

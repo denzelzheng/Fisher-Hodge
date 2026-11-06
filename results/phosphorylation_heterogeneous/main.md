@@ -1,7 +1,6 @@
 | Method | unseen media, training conditions (ΔG 1–3) | unseen media, drive ΔG 3–4 | unseen media, stronger, finer potential U | unseen media, 16×16 grid | trajectories with a negative value | parameters |
 |---|---|---|---|---|---|---|
-| Neural Chart | 0.029 | 0.036 | 0.047 | 0.033 | 0 | 6,155 |
-| Neural Chart, given standard potentials (oracle-type information) | 0.030 | 0.036 | 0.046 | 0.034 | 0 | 6,150 |
+| Neural Chart | 0.015 | 0.020 | 0.021 | 0.020 | 0 | 6,153 |
 | No chart (Flux-GNN) | 0.013 | 0.028 | 0.082 | 0.015 | 0 | 151,554 |
 | CRNN (mass action) | 0.154 | 0.119 | 0.141 | 0.170 | 0 | 10 |
 | CRNN (condition features) | 0.029 | 0.059 | 0.049 | 0.033 | 0 | 5,058 |

@@ -1,38 +1,23 @@
-| Method | quantity | training conditions | b 3.2–3.7 | b 4.0–4.6 | a 1.3–1.5 (a and b outside training) | Turing regime (below the Hopf line) | 64×64 grid |
+| Method | quantity | training conditions | b 3.2–3.7 | b 4.0–4.6 | a 1.3–1.5 (a and b outside training) | Turing regime (below the Hopf line) | 32×32 grid |
 |---|---|---|---|---|---|---|---|
-| Neural Chart | hyperedges violating local detailed balance | 0.017 | 0.021 | 0.017 | 0.021 | 0.011 | 0.014 |
+| Neural Chart | hyperedges violating local detailed balance | 0 | 0 | 0 | 0 | 0 | 0 |
 | Neural Chart | samples with sigma < 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | Neural Chart | negative concentration values (fraction) | 0 | 0 | 0 | 0 | 0 | 0 |
-| Neural Chart, given standard potentials (oracle-type information) | hyperedges violating local detailed balance | 0 | 5.1e-07 | 2.5e-07 | 5.1e-07 | 0 | 0 |
-| Neural Chart, given standard potentials (oracle-type information) | samples with sigma < 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| Neural Chart, given standard potentials (oracle-type information) | negative concentration values (fraction) | 0 | 0 | 0 | 0 | 0 | 0 |
-| Neural Chart, constant mobility per class | hyperedges violating local detailed balance | 0.017 | 0.021 | 0.017 | 0.021 | 0.011 | 0.014 |
-| Neural Chart, constant mobility per class | samples with sigma < 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| Neural Chart, constant mobility per class | negative concentration values (fraction) | 0 | 0 | 0 | 0 | 0 | 0 |
-| Neural Chart, no excess free energy | hyperedges violating local detailed balance | 0.017 | 0.021 | 0.017 | 0.022 | 0.011 | 0.014 |
-| Neural Chart, no excess free energy | samples with sigma < 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| Neural Chart, no excess free energy | negative concentration values (fraction) | 0 | 0 | 0 | 0 | 0 | 0 |
-| Neural Chart, reversible (no drive) | hyperedges violating local detailed balance | 3.4e-03 | 7.4e-03 | 0.011 | 2.5e-03 | 2.2e-03 | 4.8e-03 |
-| Neural Chart, reversible (no drive) | samples with sigma < 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| Neural Chart, reversible (no drive) | negative concentration values (fraction) | 0 | 0 | 0 | 0 | 0 | 0 |
-| No chart (Flux-GNN) | hyperedges violating local detailed balance | 0.130 | 0.115 | 0.114 | 0.131 | 0.107 | 0.139 |
-| No chart (Flux-GNN) | samples with sigma < 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| No chart (Flux-GNN) | negative concentration values (fraction) | 0 | 0 | 0 | 0 | 0 | 0 |
-| CRNN (mass action) | hyperedges violating local detailed balance | 0.046 | 0.029 | 0.024 | 0.067 | 0.045 | 0.014 |
+| CRNN (mass action) | hyperedges violating local detailed balance | 0.050 | 0.033 | 0.029 | 0.070 | 0.045 | 0.014 |
 | CRNN (mass action) | samples with sigma < 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | CRNN (mass action) | negative concentration values (fraction) | 0 | 0 | 0 | 0 | 0 | 0 |
-| CRNN (condition features) | hyperedges violating local detailed balance | 0.233 | 0.199 | 0.188 | 0.214 | 0.233 | 0.311 |
+| CRNN (condition features) | hyperedges violating local detailed balance | 0.234 | 0.190 | 0.187 | 0.230 | 0.247 | 0.317 |
 | CRNN (condition features) | samples with sigma < 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | CRNN (condition features) | negative concentration values (fraction) | 0 | 0 | 0 | 0 | 0 | 0 |
-| UDE closure | hyperedges violating local detailed balance | 0.627 | 0.540 | 0.224 | 1.9e-04 | 1.0e-04 | 0.431 |
-| UDE closure | samples with sigma < 0 | 0.986 | 0.812 | 0.297 | 0 | 0 | 1.000 |
-| UDE closure | negative concentration values (fraction) | 0.036 | 0.021 | 0.069 | 0.336 | 0.498 | 0.055 |
+| UDE closure | hyperedges violating local detailed balance | 0.632 | 0.472 | 0.052 | 7.6e-04 | 1.8e-05 | 0.444 |
+| UDE closure | samples with sigma < 0 | 0.992 | 0.719 | 0.059 | 0 | 0 | 0.994 |
+| UDE closure | negative concentration values (fraction) | 0.020 | 3.6e-03 | 0.022 | 0.381 | 0.560 | 0.030 |
 | BSMS-GNN | hyperedges violating local detailed balance | N/A | N/A | N/A | N/A | N/A | N/A |
 | BSMS-GNN | samples with sigma < 0 | N/A | N/A | N/A | N/A | N/A | N/A |
-| BSMS-GNN | negative concentration values (fraction) | 7.4e-03 | 0.081 | 0.111 | 0.399 | 0.940 | 0.017 |
+| BSMS-GNN | negative concentration values (fraction) | 8.7e-03 | 0.151 | 0.359 | 0.409 | 0.657 | 0.032 |
 | FNO | hyperedges violating local detailed balance | N/A | N/A | N/A | N/A | N/A | N/A |
 | FNO | samples with sigma < 0 | N/A | N/A | N/A | N/A | N/A | N/A |
-| FNO | negative concentration values (fraction) | 1.9e-04 | 8.5e-04 | 3.2e-03 | 7.7e-05 | 6.1e-06 | 3.0e-05 |
+| FNO | negative concentration values (fraction) | 5.5e-04 | 1.6e-03 | 6.1e-03 | 1.8e-03 | 2.2e-04 | 1.7e-04 |
 | GENERIC-FNO | hyperedges violating local detailed balance | N/A | N/A | N/A | N/A | N/A | N/A |
 | GENERIC-FNO | samples with sigma < 0 | N/A | N/A | N/A | N/A | N/A | N/A |
 | GENERIC-FNO | negative concentration values (fraction) | 0 | 0 | 0 | 0 | 0 | 0 |

@@ -1,7 +1,8 @@
 Method,"largest |∇G|, training states","largest |g_θ|, training states",parameters of G_θ,parameters of g_θ
-Neural Chart,0.6401625636094042,0.33853629988350525,"1,153","4,545"
-"Neural Chart, given standard potentials (oracle-type information)",0.7854925174918831,0.793895628572156,"1,153","4,545"
-"Neural Chart, constant mobility per class",0.7723607491165697,0.0,"1,153",0
-"Neural Chart, no excess free energy",0.0,2.2652833617310946,0,"4,545"
-"Neural Chart, no convex initialisation",0.38297361956931353,9.441670106944624,"1,153","4,545"
-"Neural Chart, reversible (no drive)",0.08866683364306661,12.891603991730685,"1,153","4,545"
+Neural Chart,0.9146768958196123,0.05956350068565061,"1,153","4,545"
+"Neural Chart, given standard potentials (oracle-type information)",0.9121802687117719,0.2069488908353583,"1,153","4,545"
+"Neural Chart, learned chemostat standard free energies",0.8663006470036432,0.0828457681417914,"1,153","4,545"
+"Neural Chart, constant mobility per class",0.49580923524931353,0.0,"1,153",0
+"Neural Chart, no excess free energy",0.0,1.5749255312760146,0,"4,545"
+"Neural Chart, no variable projection",0.39613106890483996,1.1563290695725472,"1,153","4,545"
+"Neural Chart, reversible (no drive)",0.9627850589303861,19.204661315382637,"1,153","4,545"

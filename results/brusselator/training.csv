@@ -1,14 +1,9 @@
 Method,gradient steps,training time (h),final training loss,substeps per sampling step (mean),largest substeps per sampling step
-Neural Chart,4000,4.06,1.2336342496925755e-07,23.211,121
-"Neural Chart, given standard potentials (oracle-type information)",4000,4.05,1.4439710378460325e-10,23.266,120
-"Neural Chart, constant mobility per class",4000,1.58,1.2943572867103616e-07,23.198,120
-"Neural Chart, no excess free energy",4000,2.73,3.0506502159002823e-07,23.259,121
-"Neural Chart, reversible (no drive)",4000,1.62,0.06131180749719392,13.712,389
-No chart (Flux-GNN),4000,9.00,3.7427440729516094e-05,18.501,168
-CRNN (mass action),4000,0.32,3.427040455764524e-07,23.247,120
-CRNN (condition features),4000,0.22,0.0259398554229356,19.230,160
-UDE closure,4000,0.48,0.030828,10.073,47
-BSMS-GNN,4000,0.09,0.06369686522753909,1 (one-step map),1
-FNO,4000,0.14,0.00041735623228305484,1 (one-step map),1
-GENERIC-FNO,4000,0.06,0.04753085155971348,1 (one-step map),1
+Neural Chart,4000,0.32,2.801620446472028e-06,19.817,91
+CRNN (mass action),4000,0.31,3.4048046349436795e-07,19.850,91
+CRNN (condition features),4000,0.22,0.02558717332116902,15.996,114
+UDE closure,4000,0.20,0.036601069066673514,8.709,31
+BSMS-GNN,4000,0.03,0.047294429980684075,1 (one-step map),1
+FNO,4000,0.09,0.00044740763936715664,1 (one-step map),1
+GENERIC-FNO,4000,0.06,0.04773308057337999,1 (one-step map),1
 Persistence (u(t) = u(0)),0 (not trained),–,–,–,–

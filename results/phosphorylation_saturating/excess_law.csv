@@ -1,0 +1,21 @@
+Method,test set,species,Pearson r,RMSE,"slope, learned against true",standard deviation of the true excess potential
+Neural Chart,training conditions (ΔG 1–3),all,,0.04050054053893435,,0.0
+Neural Chart,training conditions (ΔG 1–3),X,,0.016987301678132515,,0.0
+Neural Chart,training conditions (ΔG 1–3),Xp,,0.007549652653608831,,0.0
+Neural Chart,training conditions (ΔG 1–3),E,,0.06764107981355388,,0.0
+Neural Chart,drive ΔG 3–4,all,,0.03991281606474281,,0.0
+Neural Chart,drive ΔG 3–4,X,,0.01860781849862488,,0.0
+Neural Chart,drive ΔG 3–4,Xp,,0.009803704600448888,,0.0
+Neural Chart,drive ΔG 3–4,E,,0.06585389225765889,,0.0
+Neural Chart,"stronger, finer potential U",all,,0.04104417995837859,,0.0
+Neural Chart,"stronger, finer potential U",X,,0.01683399463361811,,0.0
+Neural Chart,"stronger, finer potential U",Xp,,0.0077432508227059165,,0.0
+Neural Chart,"stronger, finer potential U",E,,0.06863332147535393,,0.0
+Neural Chart,X and Xp at the start × 3,all,,0.04762383197991308,,0.0
+Neural Chart,X and Xp at the start × 3,X,,0.022210264239570152,,0.0
+Neural Chart,X and Xp at the start × 3,Xp,,0.009952565800779632,,0.0
+Neural Chart,X and Xp at the start × 3,E,,0.07881458439744893,,0.0
+Neural Chart,16×16 grid,all,,0.040447642477268946,,0.0
+Neural Chart,16×16 grid,X,,0.01710139669147871,,0.0
+Neural Chart,16×16 grid,Xp,,0.007745222799985661,,0.0
+Neural Chart,16×16 grid,E,,0.06749510427346696,,0.0
