@@ -6,7 +6,7 @@ learned) and Phi carries everything that physics fixes (log c, U / T, the force,
 excess potential).  So dc/dt = S (K+ Phi+ - K- Phi-) is linear in the one-way rate constants.  Group the one-way
 channels whose log K is the same function of theta into classes r and integrate over the training trajectories,
 
-    c(t + 4 dt) - c(t) = sum_r kappa_r S int_t^{t + 4 dt} Phi_r dt           (Boole's rule),
+    c(t + 2 dt) - c(t) = sum_r kappa_r S int_t^{t + 2 dt} Phi_r dt           (Simpson rule),
 
 with kappa_r >= 0 the factor by which class r has to change.  This is a non-negative least-squares problem (NNLS),
 convex, so its optimum is global (fit_linear).  The optimum is mapped back to theta by least squares on log kappa.
@@ -98,26 +98,16 @@ def class_structure(model, c_ref, drive_ref, decimals=6):
 
 
 @torch.no_grad()
-def _rule(T1):
-    """Boole's rule over four sampling steps, or Simpson's over two when a trajectory is too short"""
-    return 'boole' if T1 >= 5 else 'simpson'
-
-
-def _boole(x, dt):
-    return 2 * dt / 45 * (7 * x[:, :-4] + 32 * x[:, 1:-3] + 12 * x[:, 2:-2] + 32 * x[:, 3:-1] + 7 * x[:, 4:])
-
-
 def _simpson(x, dt):
     return dt / 3 * (x[:, :-2] + 4 * x[:, 1:-1] + x[:, 2:])
 
 
-def assemble(model, tr, dt, rule=None, batch=16):
+def assemble(model, tr, dt, rule='simpson', batch=16):
     """the normal equations of the derivative fit in the class factors kappa (kappa = 1 is the current model):
     residual(kappa) = (yy - 2 kappa.h + kappa.G.kappa) / yy.  Returns a dict with params, U, rp, rm, fixed, G, h, yy."""
     C = tr['c']
     B, T1, M = C.shape
     assert T1 >= 3, 'need at least three samples per trajectory'
-    rule = rule or _rule(T1)
     hg = model.hg
     params, U, rp, rm = class_structure(model, C[:1, 0], _take(tr['drive'], slice(0, 1)))
     R = U.shape[0]
@@ -151,10 +141,7 @@ def assemble(model, tr, dt, rule=None, batch=16):
             Xo.index_add_(2, rp_t, Ap[:, None, :] * Wo[None]); Xo.index_add_(2, rm_t, -Am[:, None, :] * Wo[None])
             Xf, Yf = Xo.reshape(-1, R), (yo * wt[:, None]).reshape(-1)
             G += Xf.T @ Xf; h += Xf.T @ Yf; yy += (Yf ** 2).sum()
-        if rule == 'boole':
-            quad = lambda x: _boole(x, dt)
-            dC = Cb[:, 4:] - Cb[:, :-4]
-        elif rule == 'simpson':
+        if rule == 'simpson':
             quad = lambda x: _simpson(x, dt)
             dC = Cb[:, 2:] - Cb[:, :-2]
         elif rule == 'trapezoid':
@@ -164,7 +151,7 @@ def assemble(model, tr, dt, rule=None, batch=16):
             raise ValueError(rule)
         Ip, Im = quad(a).reshape(-1, hg.H), quad(b).reshape(-1, hg.H)
         dC = dC.reshape(-1, M)
-        om = 1.0 / torch.linalg.vector_norm(Cb[:, {'boole': 4, 'simpson': 2}.get(rule, 1):].reshape(-1, M), dim=-1)
+        om = 1.0 / torch.linalg.vector_norm((Cb[:, 2:] if rule == 'simpson' else Cb[:, 1:]).reshape(-1, M), dim=-1)
         Ip, Im, dC = Ip * om[:, None], Im * om[:, None], dC * om[:, None]       # the relative error of the rollout loss
         if kp.any() or km.any():
             dC = dC - hg.apply_S(Ip * kp - Im * km)
@@ -195,7 +182,7 @@ FLOOR = 1e-3            # the lowest rate constant of a class in the closed-form
 
 
 @torch.no_grad()
-def fit_linear(model, data, dt, rule=None, floor=FLOOR, batch=16, log=print):
+def fit_linear(model, data, dt, rule='simpson', floor=FLOOR, batch=16, log=print):
     """set the linear parameters of model to the non-negative least-squares optimum on data (a training set dict
     with c (B, T+1, M) and drive, or a dict holding it under 'train').  dt: sampling interval.  The log rate of no class starts below
     log(floor * largest fitted factor): the optimum may have a factor at zero, and a class whose rate is that small has no gradient.
@@ -259,7 +246,7 @@ def _projected_residual_backward(model, tr, dt, batch=16):
     drive = {k: v.float() if torch.is_tensor(v) and torch.is_floating_point(v) else v for k, v in tr['drive'].items()}
     B, T1, M = C.shape
     hg = model.hg
-    w, quad = (4, _boole) if _rule(T1) == 'boole' else (2, _simpson)
+    w, quad = 2, _simpson
     yy = torch.zeros((), dtype=torch.float64, device=C.device)
     for s0 in range(0, B, batch):
         Cb = C[s0:s0 + batch]
@@ -287,7 +274,7 @@ def quadrature_check(model, tr, dt, batch=16):
     drive = {k: v.float() if torch.is_tensor(v) and torch.is_floating_point(v) else v for k, v in tr['drive'].items()}
     B, T1, M = C.shape
     hg = model.hg
-    w, quad = (4, _boole) if _rule(T1) == 'boole' else (2, _simpson)
+    w, quad = 2, _simpson
     res = err = yy = 0.0
     for s0 in range(0, B, batch):
         idx = torch.arange(s0, min(B, s0 + batch), device=C.device)
