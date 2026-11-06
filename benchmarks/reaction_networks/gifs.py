@@ -141,9 +141,9 @@ def make_gif(benchmark, device='cuda', weights_dir=None, out=None, traj=None, st
 TRACK = {
     'schlogl': dict(set='high_a_low_b', traj=5, species='X', label='X', steps=range(0, 201, 4), speed=1,
                     condition='a = {a:.2f}, b = {b:.2f} (training a 2.85–3.10, b 1.0–3.2)'),
-    'schlogl_nonideal': dict(set='scene_stripe', traj=0, species='X', label='X', steps=range(0, 61), speed=10,
+    'schlogl_nonideal': dict(set='scene_stripe', traj=0, species='X', label='X', steps=range(0, 61), speed=10, n_part=300,
                              condition='a = {a:.2f}, b = {b:.2f} (training a 2.85–3.10, b 1.0–3.2)'),
-    'schlogl_nonideal_strong': dict(set='scene_stripe', traj=0, species='X', label='X', steps=range(0, 61), speed=10,
+    'schlogl_nonideal_strong': dict(set='scene_stripe', traj=0, species='X', label='X', steps=range(0, 61), speed=10, n_part=300,
                                     condition='a = {a:.2f}, b = {b:.2f} (training a 1.5–4.5, b 1.0–3.2)'),
     'phosphorylation_cycle': dict(set='strong_drive', traj=0, species='X', label='X', steps=range(0, 201, 4), speed=4,
                                   condition='drive ΔG = {dG:.2f} (training 1–3)'),

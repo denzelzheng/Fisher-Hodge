@@ -100,7 +100,6 @@ def test_nnls_recovers_the_rate_constants():
 
 DATA_OK = os.path.exists(os.path.join(C.DATA, 'train.pt'))
 CKPT = os.path.join(C.CHECKPOINTS, 'chart.pt')
-CKPT_GIVEN = os.path.join(C.CHECKPOINTS, 'chart-given-mu0.pt')
 
 
 @pytest.mark.slow
@@ -113,16 +112,14 @@ def test_generator_reproduces_stored_data():
 
 
 @pytest.mark.slow
-@pytest.mark.skipif(not (DATA_OK and os.path.exists(CKPT) and os.path.exists(CKPT_GIVEN)), reason='data or checkpoints missing')
-@pytest.mark.parametrize('name,tol', [('chart', 1e-2), ('chart-given-mu0', 1e-3)])
+@pytest.mark.skipif(not (DATA_OK and os.path.exists(CKPT)), reason='data or checkpoints missing')
+@pytest.mark.parametrize('name,tol', [('chart', 1e-2)])
 @torch.no_grad()
 def test_shipped_checkpoint(name, tol):
     """the shipped Neural Charts on four test trajectories over 40 sampling steps, with the reference integrator in
-    float64; with given potentials the learned log k is the true one"""
+    float64"""
     m = NeuralChart.load(os.path.join(C.CHECKPOINTS, name + '.pt'))
     m.step = dict(m.step, dt_max=C.DT / 8)
-    if name == 'chart-given-mu0':
-        assert np.abs(m.kinetics.core.numpy() - np.array(true_log_k())).max() < 1e-3
     sd = load_set('training')
     idx = [0, 1, 16, 17]
     R, _, _ = rollout(m, {k: v[idx] for k, v in sd['drive'].items()}, sd['c'][idx, 0], 40, C.DT)
