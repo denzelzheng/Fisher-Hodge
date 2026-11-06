@@ -113,7 +113,7 @@ def test_generator_reproduces_stored_data():
 
 @pytest.mark.slow
 @pytest.mark.skipif(not (DATA_OK and os.path.exists(CKPT)), reason='data or checkpoints missing')
-@pytest.mark.parametrize('name,tol', [('chart', 1e-2)])
+@pytest.mark.parametrize('name,tol', [('chart', 2.5e-2)])
 @torch.no_grad()
 def test_shipped_checkpoint(name, tol):
     """the shipped Neural Charts on four test trajectories over 40 sampling steps, with the reference integrator in

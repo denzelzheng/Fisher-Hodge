@@ -120,3 +120,14 @@ def test_no_projection_is_one_override():
     info = chart.fit(Trajectories(c, cond, dt=dt), iters=1, log=lambda *a: None)
     assert 'varpro' not in info and 'linear_fit' in info
     assert NeuralChart(hg, chemostats=[0.0, 0.0]).projection
+
+
+def test_the_projected_residual_reaches_both_networks():
+    """the path of variable projection that an exact start skips: both networks get a nonzero gradient"""
+    from neuralchart.fit import _projected_residual_backward
+    hg = network()
+    c, cond, dt = data(hg)
+    chart = NeuralChart(hg, chemostats=[0.0, 0.0])
+    assert _projected_residual_backward(chart, Trajectories(c, cond, dt=dt).as_dict(), dt) > 0
+    for ps in (chart.kinetics.net.parameters(), chart.free_energy.excess_parameters()):
+        assert any(p.grad is not None and float(p.grad.abs().max()) > 0 for p in ps)
