@@ -24,7 +24,7 @@ ASSETS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.ab
 # spatial start with the largest growth of spatial structure while it oscillates (0.40 -> 1.38).
 SCENES = [
     ('{sys}_turing.gif', 'turing', 30, ['chart', 'crnn_mass_action', 'fno'], 'Turing regime',
-     list(range(0, 40)) + list(range(40, 201, 5))),
+     list(range(0, 80)) + list(range(80, 201, 5))),
     ('{sys}_oscillation.gif', 'a_high', 30, ['chart', 'crnn_mass_action', 'fno'], 'Oscillations, a and b outside training',
      list(range(0, 201, 2))),
 ]
