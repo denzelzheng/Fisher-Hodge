@@ -101,7 +101,8 @@ def smooth_field(rng, n, K, std):
 
 def make_traj(args):
     """trajectory i of set `kind`: (states (steps + 1, 2 V), (log a, log b), homogeneous start)"""
-    kind, i, nsteps, n, seed, count = args
+    kind, i, nsteps, n, seed, count, system = args
+    C.configure(system)                      # a spawned worker starts from the default configuration
     rng = np.random.default_rng([seed, i])
     a, b = sample_ab(rng, kind)
     V = n * n
@@ -127,7 +128,7 @@ def make_set(name, procs=12, idx=None):
     """the dict of set `name` (trajectories idx, default all), computed with `procs` processes"""
     count, nsteps, n, seed = GEN[name]
     idx = range(count) if idx is None else idx
-    jobs = [(name, i, nsteps, n, seed, count) for i in idx]
+    jobs = [(name, i, nsteps, n, seed, count, C.SYSTEM) for i in idx]
     if procs > 1:
         # fresh worker processes, one thread each (a forked child can deadlock in a thread pool of the parent)
         from multiprocessing import get_context
