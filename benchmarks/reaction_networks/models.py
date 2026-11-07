@@ -56,17 +56,18 @@ class TrueActivity(FreeEnergy):
 
 
 class TrueMediumMobility(Mobility):
-    """the oracle with a true k that is not a class constant: the true factor of the medium, or the saturation factor"""
+    """the oracle with a true k that is not a class constant: the true factor of the medium, the saturation factor, or the crowding
+    factor of the MAPK cascade"""
     @property
     def rho_dependent(s):
-        return C.saturating()
+        return C.saturating() or C.crowded()
 
     def base(s, feats):
         k = super().base(feats)
         return k * torch.exp(feats['raw']['logm'].to(k.dtype)) if 'logm' in feats['raw'] else k
 
     def state_term(s, x, c):
-        return TR.pc_state_logk(s.hg, c)
+        return TR.pc_state_logk(s.hg, c) if C.is_pc() else TR.mapk_state_logk(s.hg, c)
 
 
 def _pc_ref_state(hg):
@@ -136,7 +137,7 @@ def oracle(n):
     m = set_true(NeuralChart(TR.hg_of(n), excess=False, material=False))
     if C.nonideal() or C.interacting():
         m.free_energy.__class__ = TrueActivity
-    if C.hetero() or C.saturating():
+    if C.hetero() or C.saturating() or C.crowded():
         m.kinetics.__class__ = TrueMediumMobility
     m.dt.fill_(C.DT)
     return m

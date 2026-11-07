@@ -78,7 +78,8 @@ def true_log_k():
 
 
 def oracle(n):
-    """the true rates in the chart class on the n x n grid, for the integration floor and the tests"""
+    """the true rates of the ideal model in the chart class on the n x n grid, for the integration floor and the tests (the non-ideal
+    variant has no oracle)"""
     m = set_true(NeuralChart(hg_of(n), excess=False, material=False))
     m.dt.fill_(DT)
     return m
