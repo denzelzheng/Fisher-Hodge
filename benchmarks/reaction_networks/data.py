@@ -16,7 +16,7 @@ Heterogeneous phosphorylation cycle (phosphorylation_heterogeneous; DT 0.05): th
   trajectory on its own random medium (truth.medium_map), so the test sets are on unseen media.
 Interacting and saturating phosphorylation cycles (phosphorylation_interacting, _saturating; DT 0.05): the sets of the
   phosphorylation cycle and high_concentration (16 x 200, training conditions, X and Xp at the start x 1.5, resp. x 3).
-MAPK cascade (DT 0.5): train (48 x 20 steps), train_conditions (ATP 0.5–2), high_atp (3–5), low_atp (0.15–0.3),
+MAPK cascade and crowded MAPK cascade (DT 0.1): train (48 x 20 steps), train_conditions (ATP 0.5–2), high_atp (3–5), low_atp (0.15–0.3),
   phosphorylated_start (ATP 0.5–2, most of every tier phosphorylated at t = 0); ADP = Pi = 1; 200 test steps.
 
     python -m benchmarks.schlogl.run generate

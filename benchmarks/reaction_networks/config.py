@@ -8,10 +8,10 @@ read the module-level values (SYSTEM, DT, N_TRAIN, W_TRAIN, DATA, ...).
     phosphorylation_heterogeneous   the same network on heterogeneous reaction media, 8 x 8 grid (DT 0.05)
     phosphorylation_interacting     the same network with a cross-species excess free energy, 8 x 8 grid (DT 0.05)
     phosphorylation_saturating      the same network with a state-dependent rate constant, 8 x 8 grid (DT 0.05)
-    mapk_cascade              MAPK cascade with three tiers, 4 x 4 grid (DT 0.5)
-    mapk_crowded              the same cascade whose reaction mobilities fall with the local density, 4 x 4 grid (DT 0.5)
+    mapk_cascade              MAPK cascade with three tiers, 4 x 4 grid (DT 0.1)
+    mapk_crowded              the same cascade whose reaction mobilities fall with the local density, 4 x 4 grid (DT 0.1)
 
-Protocol (every model, seed 0): training window 100 sampling steps (MAPK: 20 steps, also 10 time units), rollouts of
+Protocol (every model, seed 0): training window 100 sampling steps (MAPK: 20 steps, 2 time units), rollouts of
 K in [4, 20] steps, batch 8, Adam lr 1e-3 with a cosine schedule on p = max(step / steps, elapsed / 12 h) (500 steps for the Neural Chart, 4000 for the baselines), gradient
 clip 1.  Test rollouts run for 10T = 200 sampling steps.  Integration: neuralchart.fast, sample_err, float32 in training
 and evaluation, the rtol of neuralchart.chart;
@@ -30,7 +30,7 @@ T_TEST, T_STEPS = 200, 20                  # 10T, sampling steps per time unit T
 GRID = dict(schlogl=(0.05, 8, 100), schlogl_nonideal=(0.05, 8, 100), schlogl_nonideal_strong=(0.05, 8, 100),
             phosphorylation_cycle=(0.05, 8, 100), phosphorylation_heterogeneous=(0.05, 8, 100),
             phosphorylation_interacting=(0.05, 8, 100), phosphorylation_saturating=(0.05, 8, 100),
-            mapk_cascade=(0.5, 4, 20), mapk_crowded=(0.5, 4, 20))      # DT, training grid, training window
+            mapk_cascade=(0.1, 4, 20), mapk_crowded=(0.1, 4, 20))      # DT, training grid, training window
 STEP = dict(dt_max=DT / 8, theta0=0.5, theta1=0.5, max_sub=4000, t_tol=1e-9)
 MAXSUB_TRAIN, MAXSUB_EVAL = 2000, 4000
 LR, BATCH, KMIN, KMAX = 1e-3, 8, 4, 20

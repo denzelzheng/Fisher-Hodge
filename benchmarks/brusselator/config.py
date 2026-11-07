@@ -10,9 +10,9 @@ chemostats A, B, D, E are held fixed; a and b are the conditions.  X and Y diffu
 grid is 16 x 16 with spacing h = 2 lambda_c / 16 = 0.860, and the 32 x 32 test grid keeps h.  The homogeneous state
 loses stability at the Hopf line b = 1 + a^2, and stationary patterns appear above the Turing threshold
 b_T = (1 + a sqrt(D_X / D_Y))^2.  The reference solution uses DOP853 (rtol 1e-10, atol 1e-12) in float64, sampled
-every DT = 0.2.
+every DT = 0.1.
 
-Protocol (every trained model, seed 0).  Training windows of 50 sampling steps (10 time units).  Rollout loss over
+Protocol (every trained model, seed 0).  Training windows of 50 sampling steps (5 time units).  Rollout loss over
 K in [4, 20] steps from a random start inside the window, batch 8, Adam with learning rate 1e-3 and a cosine
 schedule, 500 steps for the Neural Chart and 4000 for the baselines, or 12 h of wall clock, gradient clip 1.  The continuous-time models use the positive adaptive
 SSP-RK2 of neuralchart.fast with error control (neuralchart.chart.RTOL) in float32; the substep cap is 2000 per sampling
@@ -39,7 +39,7 @@ def configure(name):
 
 configure(SYSTEM)
 
-DT, W_TRAIN, T_TEST, N_TRAIN, T_STEPS = 0.2, 50, 200, 16, 20      # T = 20 sampling steps, 10T = 200
+DT, W_TRAIN, T_TEST, N_TRAIN, T_STEPS = 0.1, 50, 200, 16, 20      # T = 20 sampling steps, 10T = 200
 KF, EPS, DIFF = (1.0, 1.0, 1.0, 1.0), 1e-3, (0.4, 3.6)
 LAMBDA_C = 2 * math.pi * (DIFF[0] * DIFF[1]) ** 0.25                # Turing wavelength at a = 1
 H_GRID = 2 * LAMBDA_C / N_TRAIN                                    # grid spacing (16 x 16 holds 2 wavelengths at a = 1)
