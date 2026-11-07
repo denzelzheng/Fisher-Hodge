@@ -20,13 +20,13 @@ from .models import FLOAT32_MODELS, load_trained
 ASSETS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'assets')
 # (file, test set, trajectory, models after the reference, what the scene shows, sampling steps shown).  Trajectory 30
 # of the Turing set is the spatial start whose pattern grows most (relative spatial std of X 0.40 -> 0.87); the pattern
-# forms in the first 8 time units, which are shown at every sampling step.  Trajectory 30 of the a 1.3-1.5 set is the
+# forms in the first 8 time units, which are shown at every fourth sampling step (0.1 time units).  Trajectory 30 of the a 1.3-1.5 set is the
 # spatial start with the largest growth of spatial structure while it oscillates (0.40 -> 1.38).
 SCENES = [
     ('{sys}_turing.gif', 'turing', 30, ['chart', 'crnn_mass_action', 'fno'], 'Turing regime',
-     list(range(0, 80)) + list(range(80, 201, 5))),
+     list(range(0, 320, 4)) + list(range(320, 801, 20))),
     ('{sys}_oscillation.gif', 'a_high', 30, ['chart', 'crnn_mass_action', 'fno'], 'Oscillations, a and b outside training',
-     list(range(0, 201, 2))),
+     list(range(0, 801, 8))),
 ]
 TRAINING_RANGE = 'training a 0.9–1.1, b 2.3–3.0'
 
@@ -84,7 +84,7 @@ def make_gifs(device='cuda', data=None, weights=None, scenes=SCENES, panel_in=2.
 # assets/brusselator_track_<test set>.gif: tracers move with the probability velocity v = J / rho of the species shown,
 # from the transport flux J of every model with its own hyperedge flux (the reference: the true flux).  Trajectory 30
 # of the Turing set as in brusselator_turing.gif; the pattern forms in the first 8 time units.
-TRACK = dict(set='turing', traj=30, species='X', steps=list(range(0, 40, 2)) + list(range(40, 201, 10)), speed=1,
+TRACK = dict(set='turing', traj=30, species='X', steps=list(range(0, 160, 8)) + list(range(160, 801, 40)), speed=1,
              models=['chart', 'crnn_mass_action', 'ude'], what='Turing regime')
 
 

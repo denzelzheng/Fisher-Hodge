@@ -82,7 +82,7 @@ def phase_portraits(device, data_kw, weights, path):
             ax.set_title(f'{SET_LABELS[s]}\nhomogeneous start decays', fontsize=9)
         else:
             ax.set_xlabel('site-mean X'); ax.set_ylabel('site-mean Y')
-            ax.set_title(f'{SET_LABELS[s]}\nlimit cycle, t = 20–40', fontsize=9)
+            ax.set_title(f'{SET_LABELS[s]}\nlimit cycle, t = 10–20', fontsize=9)
     h, l = axs[0].get_legend_handles_labels()
     fig.legend(h, l, loc='lower center', ncol=4, fontsize=8, bbox_to_anchor=(0.5, -0.14), frameon=False)
     fig.savefig(path, dpi=110, bbox_inches='tight')

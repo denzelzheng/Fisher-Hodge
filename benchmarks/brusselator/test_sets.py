@@ -3,13 +3,13 @@ well-mixed solution copied to every site (the limit-cycle test); a spatial start
 fixed point (a, b / a) (the pattern test).  The 32 x 32 set has the spacing of the training grid.
 
     key         label                                       count  steps  grid  a, b
-    train       -                                           64     50     16    a 0.9-1.1, b 2.3-3.0
-    training    training conditions                         32     200    16    a 0.9-1.1, b 2.3-3.0
-    b_high      b 3.2-3.7                                   32     200    16    a 0.9-1.1, b 3.2-3.7
-    b_far       b 4.0-4.6                                   32     200    16    a 0.9-1.1, b 4.0-4.6
-    a_high      a 1.3-1.5, b 1.15-1.5 x (1 + a^2)           32     200    16    both chemostats outside training
-    turing      Turing regime (below the Hopf line)         32     200    16    a 1.8-2.2, b 3.4-3.9
-    grid32      32 x 32 grid                                16     200    32    a 0.9-1.1, b 2.3-3.0
+    train       -                                           64     200    16    a 0.9-1.1, b 2.3-3.0
+    training    training conditions                         32     800    16    a 0.9-1.1, b 2.3-3.0
+    b_high      b 3.2-3.7                                   32     800    16    a 0.9-1.1, b 3.2-3.7
+    b_far       b 4.0-4.6                                   32     800    16    a 0.9-1.1, b 4.0-4.6
+    a_high      a 1.3-1.5, b 1.15-1.5 x (1 + a^2)           32     800    16    both chemostats outside training
+    turing      Turing regime (below the Hopf line)         32     800    16    a 1.8-2.2, b 3.4-3.9
+    grid32      32 x 32 grid                                16     800    32    a 0.9-1.1, b 2.3-3.0
 In 'train' every even trajectory starts from a point of a well-mixed burn-in with 0.5 % noise per site and every
 odd one from a random smooth field.  In the 16 x 16 test sets the first half starts homogeneous and the second half
 spatial.  In the Turing set a, b lie below the Hopf line by at least 0.3 and above the Turing threshold by at least

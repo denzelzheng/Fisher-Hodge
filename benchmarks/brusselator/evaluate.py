@@ -57,7 +57,6 @@ def site_map(hg, q, half=True):
 
 
 @torch.no_grad()
-@torch.no_grad()
 def excess_law(model, sd, every=20):
     """the learned excess potential against the true one on the reference states of a test set, over all sites and species"""
     from scipy.stats import spearmanr
@@ -75,6 +74,7 @@ def excess_law(model, sd, every=20):
                 median_diff=float(np.median(a - b)), std_true=float(b.std()), max_abs=float(np.abs(a).max()))
 
 
+@torch.no_grad()
 def set_metrics(model, sd, R, Yc, m):
     """the readouts of one test set, added to the dict m: R, Yc (B, T + 1, M) float64 on the CPU"""
     n = sd['n']
