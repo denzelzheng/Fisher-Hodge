@@ -10,7 +10,7 @@ import numpy as np
 import torch
 
 from neuralchart.graphs import Hypergraph
-from . import config as C
+from . import config as CF
 from .config import DT, KF, EPS, DIFF, H_GRID, SPECIES, CHEM, REACTIONS
 from .test_sets import GEN, sample_ab
 
@@ -43,7 +43,7 @@ def log_activity(c):
     """log of the activity y = c gamma at the states c (..., 2 V): ln gamma_X = ln gamma_Y = PHI (x + y), zero on the ideal model"""
     V = c.shape[-1] // 2
     rho = c[..., :V] + c[..., V:]
-    return torch.log(c) + C.PHI * torch.cat([rho, rho], -1)
+    return torch.log(c) + CF.PHI * torch.cat([rho, rho], -1)
 
 
 def true_excess_potential(c):
@@ -69,10 +69,10 @@ class TruthNP:
 
     def rhs(s, t, x):
         L = np.log(np.maximum(x, 1e-300))
-        if C.PHI:
+        if CF.PHI:
             V = x.shape[0] // 2
             rho = x[:V] + x[V:]
-            L = L + C.PHI * np.concatenate([rho, rho])
+            L = L + CF.PHI * np.concatenate([rho, rho])
         return s.S @ (s.kf * np.exp(s.Np @ L) - s.kb * np.exp(s.Nm @ L))
 
 
@@ -102,7 +102,7 @@ def smooth_field(rng, n, K, std):
 def make_traj(args):
     """trajectory i of set `kind`: (states (steps + 1, 2 V), (log a, log b), homogeneous start)"""
     kind, i, nsteps, n, seed, count, system = args
-    C.configure(system)                      # a spawned worker starts from the default configuration
+    CF.configure(system)                      # a spawned worker starts from the default configuration
     rng = np.random.default_rng([seed, i])
     a, b = sample_ab(rng, kind)
     V = n * n
@@ -128,7 +128,7 @@ def make_set(name, procs=12, idx=None):
     """the dict of set `name` (trajectories idx, default all), computed with `procs` processes"""
     count, nsteps, n, seed = GEN[name]
     idx = range(count) if idx is None else idx
-    jobs = [(name, i, nsteps, n, seed, count, C.SYSTEM) for i in idx]
+    jobs = [(name, i, nsteps, n, seed, count, CF.SYSTEM) for i in idx]
     if procs > 1:
         # fresh worker processes, one thread each (a forked child can deadlock in a thread pool of the parent)
         from multiprocessing import get_context
@@ -150,7 +150,7 @@ def make_set(name, procs=12, idx=None):
 
 
 def generate(sets, procs=12, data=None):
-    data = data or C.DATA
+    data = data or CF.DATA
     os.makedirs(data, exist_ok=True)
     for name in sets:
         t0 = time.time()
@@ -183,7 +183,7 @@ def conditions(logab):
 
 
 def load_set(name, device='cpu', data=None):
-    data = data or C.DATA
+    data = data or CF.DATA
     d = torch.load(os.path.join(data, f'{name}.pt'))
     d['c'] = d['c'].to(device)
     d['drive'] = conditions(d['logab'].to(device))
@@ -192,7 +192,7 @@ def load_set(name, device='cpu', data=None):
 
 
 def train_norm(data=None):
-    data = data or C.DATA
+    data = data or CF.DATA
     """z-scoring of the conditions and the concentration scale, from the training set (inputs of the black boxes)"""
     tr = torch.load(os.path.join(data, 'train.pt'))
     lab = tr['logab']
