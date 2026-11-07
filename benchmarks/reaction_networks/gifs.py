@@ -157,13 +157,15 @@ TRACK = {
                                        condition='X and Xp × 3 at the start, ΔG = {dG:.2f}'),
     'mapk_cascade': dict(set='low_atp', traj=0, species=('Kp', 'Kpp'), label='phosphorylated MAPK (Kp + Kpp)',
                          steps=range(10, 61), speed=1, max_age=8, n_part=300, condition='ATP = {atp:.2f} (training 0.5–2)'),
+    'mapk_crowded': dict(set='low_atp', traj=0, species=('Kp', 'Kpp'), label='phosphorylated MAPK (Kp + Kpp)',
+                         steps=range(10, 61), speed=1, max_age=8, n_part=300, condition='ATP = {atp:.2f} (training 0.5–2)'),
 }
 TRACK_MODELS = ['chart', 'crnn_mass_action', 'ude']
 TRACK_TITLE = dict(schlogl='Schlögl model', schlogl_nonideal='Non-ideal Schlögl model',
                    schlogl_nonideal_strong='Schlögl model with strong crowding',
                    phosphorylation_cycle='Phosphorylation cycle', phosphorylation_heterogeneous='Phosphorylation cycle',
                    phosphorylation_interacting='Interacting phosphorylation cycle', phosphorylation_saturating='Saturating phosphorylation cycle',
-                   mapk_cascade='MAPK cascade')
+                   mapk_cascade='MAPK cascade', mapk_crowded='Crowded MAPK cascade')
 
 
 def condition_text(benchmark, lab):
