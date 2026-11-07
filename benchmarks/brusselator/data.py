@@ -40,10 +40,10 @@ def true_constants(hg, logab):
 
 
 def log_activity(c):
-    """log of the activity y = c gamma at the states c (..., 2 V): ln gamma_X = ln gamma_Y = PHI (x + y), zero on the ideal model"""
+    """log of the activity at the states c (..., 2 V): ln gamma_Y = PHI y, ln gamma_X = 0 (the excess free energy PHI y^2 / 2 per
+    site), zero on the ideal model"""
     V = c.shape[-1] // 2
-    rho = c[..., :V] + c[..., V:]
-    return torch.log(c) + CF.PHI * torch.cat([rho, rho], -1)
+    return torch.log(c) + CF.PHI * torch.cat([torch.zeros_like(c[..., :V]), c[..., V:]], -1)
 
 
 def true_excess_potential(c):
@@ -71,8 +71,7 @@ class TruthNP:
         L = np.log(np.maximum(x, 1e-300))
         if CF.PHI:
             V = x.shape[0] // 2
-            rho = x[:V] + x[V:]
-            L = L + CF.PHI * np.concatenate([rho, rho])
+            L[V:] = L[V:] + CF.PHI * x[V:]
         return s.S @ (s.kf * np.exp(s.Np @ L) - s.kb * np.exp(s.Nm @ L))
 
 

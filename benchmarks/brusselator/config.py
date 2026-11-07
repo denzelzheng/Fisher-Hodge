@@ -3,8 +3,9 @@
 Physics (the reference, never shown to the models).  Four reactions at every site of a periodic n x n grid,
     R1 A -> X (k1 a),  R2 2X + Y -> 3X (k2 x^2 y),  R3 B + X -> Y + D (k3 b x),  R4 X -> E (k4 x),  k1 = ... = k4 = 1.
 Every reverse rate is eps = 1e-3 (times the chemostatted product, d = e = 1), so all affinities are finite.  The
-non-ideal variant (brusselator_nonideal) is mass action in the activities y = c gamma with ln gamma_X = ln gamma_Y =
-PHI (x + y), the gradient of the excess free energy G = PHI (x + y)^2 / 2 per site, PHI = 0.1.  The
+non-ideal variant (brusselator_nonideal) is mass action in the activities, with ln gamma_Y = PHI y and ln gamma_X = 0, the
+gradient of the excess free energy G = PHI y^2 / 2 per site, PHI = 0.1.  (An excess that also grows with x amplifies the
+autocatalytic step 2X + Y -> 3X and the reference solution blows up on patterned states.)  The
 chemostats A, B, D, E are held fixed; a and b are the conditions.  X and Y diffuse with D_X = 0.4 and D_Y = 3.6
 (transport rate D / h^2).  The Turing wavelength at a = 1 is lambda_c = 2 pi (D_X D_Y)^(1/4) = 6.88.  The training
 grid is 16 x 16 with spacing h = 2 lambda_c / 16 = 0.860, and the 32 x 32 test grid keeps h.  The homogeneous state
