@@ -144,7 +144,7 @@ def make_set(name, procs=12, idx=None):
                     os.environ[k] = v
     else:
         res = [make_traj(j) for j in jobs]
-    return dict(c=torch.as_tensor(np.stack([r[0] for r in res])), logab=torch.tensor([r[1] for r in res], dtype=torch.float64),
+    return dict(c=torch.as_tensor(np.stack([r[0] for r in res])).float(), logab=torch.tensor([r[1] for r in res], dtype=torch.float64),     # stored in float32
                 homog=torch.tensor([r[2] for r in res]), n=n)
 
 
@@ -184,7 +184,7 @@ def conditions(logab):
 def load_set(name, device='cpu', data=None):
     data = data or CF.DATA
     d = torch.load(os.path.join(data, f'{name}.pt'))
-    d['c'] = d['c'].to(device)
+    d['c'] = d['c'].to(device).double()
     d['drive'] = conditions(d['logab'].to(device))
     d['name'] = name
     return d
