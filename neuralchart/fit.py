@@ -298,8 +298,7 @@ def fit_varpro(model, tr, dt, steps=VP_STEPS, lr=VP_LR, batch=16, log=print, tra
     """G_theta and g_theta descend the derivative residual jointly, with the linear parameters at their closed-form optimum (fit_linear) at every
     step: by the envelope theorem the gradient at the optimal linear parameters is that of the projected residual.  Adam, a fixed number of
     steps, gradient clip 1.  A step whose residual or gradient is not finite, or after which the closed-form step cannot be assembled, is
-    undone and the learning rate is halved.  The descent ends at the iterate with the smallest projected residual.  The networks train in FP32,
-    the closed-form step stays in float64.  The descent does not run when, at the closed-form
+    undone and the learning rate is halved.  The networks train in FP32, the closed-form step stays in float64.  The descent does not run when, at the closed-form
     optimum, the part of the residual beyond the quadrature error is no larger than that error: there it could only fit the quadrature."""
     params = list(model.free_energy.excess_parameters()) + (list(model.kinetics.net.parameters()) if model.kinetics.net is not None else [])
     params = [p for p in params if p.requires_grad]
@@ -314,7 +313,6 @@ def fit_varpro(model, tr, dt, steps=VP_STEPS, lr=VP_LR, batch=16, log=print, tra
     res, err = quadrature_check(model, tr, dt, batch)
     log(f'varpro: residual {res:.4e}, quadrature error {err:.4e} at the closed-form optimum')
     last, nskip = [p.detach().clone() for p in params], 0
-    best = (float('inf'), None)
     for it in range(steps if res > 2 * err else 0):
         try:
             fit_linear(model, tr, dt, log=quiet)
@@ -335,8 +333,6 @@ def fit_varpro(model, tr, dt, steps=VP_STEPS, lr=VP_LR, batch=16, log=print, tra
             log(f'varpro it {it:4d}: non-finite step undone, lr {opt.param_groups[0]["lr"]:.2e}')
             continue
         hist.append(loss)
-        if loss < best[0]:
-            best = (loss, [p.detach().clone() for p in params])
         if it % 50 == 0:
             log(f'varpro it {it:4d}: projected derivative residual {hist[-1]:.4e} t {time.time() - t0:.0f}s')
             if trace is not None:
@@ -346,11 +342,6 @@ def fit_varpro(model, tr, dt, steps=VP_STEPS, lr=VP_LR, batch=16, log=print, tra
         opt.step()
     for p in model.parameters():
         p.grad = None
-    if hist and best[0] < hist[-1]:              # the descent ends at the iterate with the smallest projected residual
-        with torch.no_grad():
-            for p, q in zip(params, best[1]):
-                p.copy_(q)
-        log(f'varpro: back to the best iterate, projected derivative residual {best[0]:.4e} (last {hist[-1]:.4e})')
     info = fit_linear(model, tr, dt, log=log)
     done = len(hist)
     log(f'varpro: {done} steps, projected derivative residual {start:.4e} -> {info["residual_theta"]:.4e}, {time.time() - t0:.0f}s')
