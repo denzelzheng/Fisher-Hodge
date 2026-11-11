@@ -1,0 +1,22 @@
+Method,quantity,training conditions (ATP 0.5–2),ATP 3–5,ATP 0.15–0.3,phosphorylated initial states
+Neural Chart,hyperedges violating local detailed balance,0.0011232257326007325,0.000965831043956044,0.0030191163003663005,0.006825206043956044
+Neural Chart,samples with σ < 0,0.0,0.0,0.0,0.0
+Neural Chart,negative values,0.0,0.0,0.0,0.0
+CRNN (mass action),hyperedges violating local detailed balance,0.004428514194139194,0.003448374542124542,0.015531994047619048,0.00394202152014652
+CRNN (mass action),samples with σ < 0,0.0,0.0,0.0,0.0
+CRNN (mass action),negative values,0.0,0.0,0.0,0.0
+CRNN (condition features),hyperedges violating local detailed balance,0.031400240384615384,0.099444826007326,0.12474959935897435,0.0463384271978022
+CRNN (condition features),samples with σ < 0,0.0,0.0,0.0,0.0
+CRNN (condition features),negative values,0.0,0.0,0.0,0.0
+UDE closure,hyperedges violating local detailed balance,0.07256610576923077,0.06430288461538461,0.13431490384615385,0.8318810096153846
+UDE closure,samples with σ < 0,0.0,0.0,0.0,1.0
+UDE closure,negative values,0.09367933061962913,0.17522472862957938,0.15545673620533695,0.2672477456467662
+FNO,hyperedges violating local detailed balance,N/A,N/A,N/A,N/A
+FNO,samples with σ < 0,N/A,N/A,N/A,N/A
+FNO,negative values,0.12470583870420625,0.2487526854364541,0.202234565807327,0.41592110470375393
+BSMS-GNN,hyperedges violating local detailed balance,N/A,N/A,N/A,N/A
+BSMS-GNN,samples with σ < 0,N/A,N/A,N/A,N/A
+BSMS-GNN,negative values,0.10674256558118499,0.11615837714834916,0.15828527815468113,0.3134814210199005
+GENERIC-FNO,hyperedges violating local detailed balance,N/A,N/A,N/A,N/A
+GENERIC-FNO,samples with σ < 0,N/A,N/A,N/A,N/A
+GENERIC-FNO,negative values,0.29514536691542287,0.297382052804161,0.29822655189959296,0.30830488890773405

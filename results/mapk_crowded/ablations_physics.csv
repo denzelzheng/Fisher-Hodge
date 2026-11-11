@@ -1,0 +1,7 @@
+Method,quantity,training conditions (ATP 0.5–2),ATP 3–5,ATP 0.15–0.3,phosphorylated initial states
+Neural Chart,hyperedges violating local detailed balance,0.0011232257326007325,0.000965831043956044,0.0030191163003663005,0.006825206043956044
+Neural Chart,samples with σ < 0,0.0,0.0,0.0,0.0
+Neural Chart,negative values,0.0,0.0,0.0,0.0
+"Neural Chart, no excess free energy",hyperedges violating local detailed balance,7.869734432234433e-05,0.0,0.0008728250915750916,0.0025326236263736265
+"Neural Chart, no excess free energy",samples with σ < 0,0.0,0.0,0.0,0.0
+"Neural Chart, no excess free energy",negative values,0.0,0.0,0.0,0.0

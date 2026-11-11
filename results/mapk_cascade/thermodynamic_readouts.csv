@@ -1,9 +1,7 @@
 Method,quantity,training conditions (ATP 0.5–2),ATP 3–5,ATP 0.15–0.3,phosphorylated initial states
-Neural Chart,"σ, relative error (t > 0)",0.05563191618659194,0.05303431653472961,0.05298404880445562,0.05275551005974828
+Neural Chart,"σ, relative error (t > 0)",0.023423392009694243,0.04389320503945733,0.04848066664261025,0.019988975820541183
 Neural Chart,"cycle affinity, model; reference",17.033; 17.033,18.437; 18.437,15.429; 15.429,17.089; 17.089
-No chart (Flux-GNN),"σ, relative error (t > 0)",0.40617282028590274,0.10931236250725485,0.36406181051111225,0.38409374509616256
-No chart (Flux-GNN),"cycle affinity, model; reference",33.245; 17.033,29.204; 18.437,14.843; 15.429,33.933; 17.089
-CRNN (mass action),"σ, relative error (t > 0)",0.0701733157976151,0.01699987693248827,0.3787725953685053,0.05326305701889356
-CRNN (mass action),"cycle affinity, model; reference",22.447; 17.033,23.852; 18.437,20.844; 15.429,22.503; 17.089
-CRNN (condition features),"σ, relative error (t > 0)",0.32132146707869613,0.3199926781111099,0.7619659075027427,0.29864269937007415
-CRNN (condition features),"cycle affinity, model; reference",25.378; 17.033,30.003; 18.437,23.947; 15.429,25.510; 17.089
+CRNN (mass action),"σ, relative error (t > 0)",0.2917139616329363,0.2597710148926267,0.3707947539593278,0.1141820099032015
+CRNN (mass action),"cycle affinity, model; reference",26.444; 17.033,27.849; 18.437,24.841; 15.429,26.501; 17.089
+CRNN (condition features),"σ, relative error (t > 0)",0.4825311210567166,0.4305904481933299,0.30207958504737453,0.4947080736660102
+CRNN (condition features),"cycle affinity, model; reference",11.643; 17.033,12.173; 18.437,10.499; 15.429,11.675; 17.089

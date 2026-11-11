@@ -1,9 +1,9 @@
 Method,gradient steps,training time (h),final training loss,substeps per sampling step (mean),largest substeps per sampling step
-Neural Chart,4000,0.32,2.801620446472028e-06,19.817,91
-CRNN (mass action),4000,0.31,3.4048046349436795e-07,19.850,91
-CRNN (condition features),4000,0.22,0.02558717332116902,15.996,114
-UDE closure,4000,0.20,0.036601069066673514,8.709,31
-BSMS-GNN,4000,0.03,0.047294429980684075,1 (one-step map),1
-FNO,4000,0.09,0.00044740763936715664,1 (one-step map),1
-GENERIC-FNO,4000,0.06,0.04773308057337999,1 (one-step map),1
+Neural Chart,4000,0.05,4.042020486618831e-11,8.005,20
+CRNN (mass action),4000,0.04,1.9103785864920077e-11,8.005,20
+CRNN (condition features),4000,0.04,4.855798073644265e-06,8.017,43
+UDE closure,4000,0.15,0.0011412756976642412,8.000,8
+BSMS-GNN,4000,0.03,0.13337679125368596,1 (one-step map),1
+FNO,4000,0.09,3.5733621198232866e-05,1 (one-step map),1
+GENERIC-FNO,4000,0.05,0.0005519924743566662,1 (one-step map),1
 Persistence (u(t) = u(0)),0 (not trained),–,–,–,–

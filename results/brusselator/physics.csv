@@ -2,21 +2,21 @@ Method,quantity,training conditions,b 3.2–3.7,b 4.0–4.6,a 1.3–1.5 (a and b
 Neural Chart,hyperedges violating local detailed balance,0.0,0.0,0.0,0.0,0.0,0.0
 Neural Chart,samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0
 Neural Chart,negative concentration values (fraction),0.0,0.0,0.0,0.0,0.0,0.0
-CRNN (mass action),hyperedges violating local detailed balance,0.049768867316335536,0.032915496826171876,0.029096244122500704,0.07001816562995673,0.04463514598128046,0.013885884813646245
+CRNN (mass action),hyperedges violating local detailed balance,0.014469075241594758,0.016868970581923787,0.01747564370547587,0.017708573204498153,0.007278750587965112,0.016269113184844322
 CRNN (mass action),samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0
 CRNN (mass action),negative concentration values (fraction),0.0,0.0,0.0,0.0,0.0,0.0
-CRNN (condition features),hyperedges violating local detailed balance,0.23384552001953124,0.18982009887695311,0.18669891357421875,0.22990493774414061,0.24739761352539064,0.3165996551513672
+CRNN (condition features),hyperedges violating local detailed balance,0.044744110107421874,0.08780040740966796,0.12684345245361328,0.18062267303466797,0.19921226501464845,0.028332623004710105
 CRNN (condition features),samples with sigma < 0,0.0,0.0,0.0,0.0,0.0,0.0
 CRNN (condition features),negative concentration values (fraction),0.0,0.0,0.0,0.0,0.0,0.0
-UDE closure,hyperedges violating local detailed balance,0.6324692972716831,0.47181513427151284,0.052047133042534596,0.0007642743451814645,1.8151291010573128e-05,0.44400517809949624
-UDE closure,samples with sigma < 0,0.9921875,0.71875,0.059375,0.0,0.0,0.99375
-UDE closure,negative concentration values (fraction),0.019736218808302237,0.0035612950870646766,0.02243269735307836,0.3806953999533582,0.5600664888448383,0.029919524690998133
+UDE closure,hyperedges violating local detailed balance,0.4650180497044808,0.5957622183933222,0.014551713092476833,0.016225100795638814,7.557742712621898e-05,0.2429789984286005
+UDE closure,samples with sigma < 0,0.345703125,0.733984375,0.0,0.0,0.0,0.2515625
+UDE closure,negative concentration values (fraction),0.29079000065835675,0.11749153280079588,0.04062594486384207,0.40894819585869224,0.40903155723314605,0.30620945467335753
 BSMS-GNN,hyperedges violating local detailed balance,N/A,N/A,N/A,N/A,N/A,N/A
 BSMS-GNN,samples with sigma < 0,N/A,N/A,N/A,N/A,N/A,N/A
-BSMS-GNN,negative concentration values (fraction),0.008694321361940299,0.15133742906560946,0.3587931922419154,0.409199121579602,0.656533008784204,0.03196253230915734
+BSMS-GNN,negative concentration values (fraction),0.008773594164520912,0.031341286038935705,0.23995365900046817,0.013976212595583645,0.605467454622152,0.009727601850226279
 FNO,hyperedges violating local detailed balance,N/A,N/A,N/A,N/A,N/A,N/A
 FNO,samples with sigma < 0,N/A,N/A,N/A,N/A,N/A,N/A
-FNO,negative concentration values (fraction),0.0005520493236940299,0.0015693019278606964,0.0060758827930659206,0.0018258925101057213,0.0002219736279539801,0.00017065551150497512
+FNO,negative concentration values (fraction),0.005531949199243134,0.13129462195692884,0.23201680272705993,0.12393733297245631,0.01599288730883271,0.020094015476260142
 GENERIC-FNO,hyperedges violating local detailed balance,N/A,N/A,N/A,N/A,N/A,N/A
 GENERIC-FNO,samples with sigma < 0,N/A,N/A,N/A,N/A,N/A,N/A
 GENERIC-FNO,negative concentration values (fraction),0.0,0.0,0.0,0.0,0.0,0.0

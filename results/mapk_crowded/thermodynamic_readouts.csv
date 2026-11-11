@@ -1,0 +1,9 @@
+Method,quantity,training conditions (ATP 0.5–2),ATP 3–5,ATP 0.15–0.3,phosphorylated initial states
+Neural Chart,"σ, relative error (t > 0)",0.010400176489836991,0.03545541218912862,0.008147559829301619,0.1154960607496568
+Neural Chart,"cycle affinity, model; reference",17.033; 17.033,18.437; 18.437,15.429; 15.429,17.089; 17.089
+CRNN (mass action),"σ, relative error (t > 0)",0.17430529888426355,0.17781859497827146,0.25614590661229053,0.11088648573145068
+CRNN (mass action),"cycle affinity, model; reference",28.542; 17.033,29.947; 18.437,26.939; 15.429,28.599; 17.089
+CRNN (condition features),"σ, relative error (t > 0)",0.5128965824949444,0.5477562802709401,0.2554040603346639,0.5326366785840937
+CRNN (condition features),"cycle affinity, model; reference",10.487; 17.033,10.189; 18.437,10.164; 15.429,10.484; 17.089
+"Neural Chart, no excess free energy","σ, relative error (t > 0)",0.04559459964634589,0.12696285094666648,0.048827317829991924,0.21438894405369313
+"Neural Chart, no excess free energy","cycle affinity, model; reference",17.033; 17.033,18.437; 18.437,15.429; 15.429,17.089; 17.089

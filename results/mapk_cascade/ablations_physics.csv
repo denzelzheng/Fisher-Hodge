@@ -1,7 +1,4 @@
 Method,quantity,training conditions (ATP 0.5–2),ATP 3–5,ATP 0.15–0.3,phosphorylated initial states
-Neural Chart,hyperedges violating local detailed balance,0.02685010302197802,0.013514480311355312,0.028631524725274724,0.025927197802197804
+Neural Chart,hyperedges violating local detailed balance,0.0013092376373626373,0.0014308608058608058,0.001495249542124542,0.000729739010989011
 Neural Chart,samples with σ < 0,0.0,0.0,0.0,0.0
 Neural Chart,negative values,0.0,0.0,0.0,0.0
-No chart (Flux-GNN),hyperedges violating local detailed balance,0.08587311126373626,0.1147121108058608,0.13294843177655677,0.08341203067765568
-No chart (Flux-GNN),samples with σ < 0,0.0,0.0,0.0,0.0
-No chart (Flux-GNN),negative values,0.0,0.0,0.0,0.0

@@ -1,0 +1,3 @@
+Method,training conditions (ATP 0.5–2),ATP 3–5,ATP 0.15–0.3,phosphorylated initial states,trajectories with a negative value,parameters
+Neural Chart,0.0030241787566538825,0.008645700936087403,0.001017721413463863,0.05370472328594349,0,"9,039"
+"Neural Chart, no excess free energy",0.008590323978905856,0.032441853005499,0.0020930263950470294,0.09408682566700077,0,"7,214"

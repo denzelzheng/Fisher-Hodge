@@ -1,0 +1,3 @@
+Method,"largest |∇G|, training states","largest |g_θ|, training states",parameters of G_θ,parameters of g_θ
+Neural Chart,0.5221862338935641,0.27874438824544057,"1,825","7,169"
+"Neural Chart, no excess free energy",0.0,0.8026652545023942,0,"7,169"
