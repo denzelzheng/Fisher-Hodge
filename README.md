@@ -58,7 +58,7 @@ Examples are FNO, graph networks that emit fluxes, and closures in universal dif
 Seen as a learning problem, this mixing leads to three failures, all visible in the benchmarks below.
 
 1. **Spurious correlation and failure under a shift of the conditions.** The network cannot tell which changes of the rate come from the material and which come from the temperature or the drive. When the test conditions leave the training range, it fails. Trained at one temperature, FNO reaches an error of 1.1 at four times that temperature in porous media, and the UDE closure 0.16.
-2. **An ill-conditioned, non-convex optimization.** The kinetic parameters and the state are strongly coupled, and gradient descent from a generic start stops at poor local optima. On the oscillating Brusselator every black-box model stays above an error of 0.2.
+2. **An ill-conditioned, non-convex optimization.** The kinetic parameters and the state are strongly coupled, and gradient descent from a generic start stops at poor local optima. On the oscillating Brusselator every black-box model stays above an error of 0.39.
 3. **Observational equivalence.** Very different internal parameters can produce almost the same trajectories. A model of the phosphorylation cycle built on a network of candidate reactions reaches a trajectory error of 2e-5, and its entropy production is still wrong by a factor of 10. Fluxes that circulate around a cycle leave the state unchanged and change the entropy production (Theorem 1 of [docs/theory.md](docs/theory.md)). The learned flux of each step, and every readout built on it, then cannot be trusted. The same freedom lets the UDE closure send up to 82 % of its edge fluxes against the physical force.
 
 The Neural Chart addresses all three with one structural factorization of the rate of each step on a given hypergraph.
@@ -300,8 +300,7 @@ The truth differs in what it asks of the chart.
 | Phosphorylation cycle on heterogeneous media | the same | mobilities from a hidden medium, seen through 3 descriptors | the same, on unseen media |
 | Phosphorylation cycle with interactions | the same | a cross-species excess free energy | drive, potential, higher concentrations, larger grid |
 | Phosphorylation cycle with a saturating rate | the same | a mobility that falls with the local density | drive, potential, higher concentrations, larger grid |
-| Brusselator | four reactions, two diffusing species | nothing | chemostat levels, Turing regime, finer grid |
-| MAPK cascade | 22 species, 20 reactions | nothing | ATP level, initial state |
+| Crowded MAPK cascade | 22 species, 20 reactions | reaction mobilities that fall with the local density | ATP level, initial state |
 
 The code is the same on all of them: `NeuralChart(hypergraph, chemostats=...)` and `chart.fit(trajectories)`.
 
@@ -323,24 +322,22 @@ The Neural Chart trains for 500 rollout steps after variable projection, or for 
 | Phosphorylation, heterogeneous media | **0.015** | 0.029 (CRNN, condition features) | stronger, finer potential U | **0.021** | 0.049 (CRNN, condition features) |
 | Phosphorylation, interactions | **4.4e-04** | 0.022 (UDE closure) | stronger, finer potential U | **0.019** | 0.149 (CRNN, condition features) |
 | Phosphorylation, saturating rate | **9.9e-04** | 0.019 (FNO) | X and Xp at the start × 3 | **0.013** | 0.090 (UDE closure) |
-| Brusselator | 6.2e-03 | **1.7e-03** (CRNN, mass action) | a 1.3–1.5 (a and b outside training) | 0.016 | **3.8e-03** (CRNN, mass action) |
-| MAPK cascade | 0.011 | **8.1e-03** (CRNN, condition features) | ATP 3–5 | **0.019** | 0.027 (CRNN, mass action) |
+| Crowded MAPK cascade | **3.0e-03** | 0.021 (CRNN, mass action) | phosphorylated initial states | 0.054 | **0.050** (CRNN, mass action) |
 
 On every benchmark and every test set no sample of the Neural Chart has negative entropy production, and no concentration becomes negative.
 
-The Neural Chart is the most accurate model on 43 of the 50 test sets. The sets where a baseline is more accurate are these.
+The Neural Chart is the most accurate model on 40 of the 44 test sets. The sets where a baseline is more accurate are these.
 
 | Benchmark | test set | Neural Chart | most accurate baseline |
 |---|---|---|---|
 | Porous media | 32×32 grid | 0.037 | 0.035 (UDE closure) |
 | Porous media with crowding | training conditions | 0.035 | 0.029 (UDE closure) |
 | Porous media with crowding | 32×32 grid | 0.041 | 0.031 (UDE closure) |
-| Brusselator | training conditions | 6.2e-03 | 1.7e-03 (CRNN, mass action) |
-| Brusselator | a 1.3–1.5 (a and b outside training) | 0.016 | 3.8e-03 (CRNN, mass action) |
-| MAPK cascade | training conditions (ATP 0.5–2) | 0.011 | 8.1e-03 (CRNN, condition features) |
-| MAPK cascade | phosphorylated initial states | 0.011 | 8.3e-03 (CRNN, condition features) |
+| Crowded MAPK cascade | phosphorylated initial states | 0.054 | 0.050 (CRNN, mass action) |
 
-On the Brusselator and the MAPK cascade the truth is ideal mass action, so CRNN with mass action has exactly the right model class, and the start check keeps the two networks of the Neural Chart at zero. Both models then fit the same constants. In the Neural Chart the forward and backward rates of a step are tied by the standard potentials, which the data of a nearly irreversible step leave weakly determined, and this makes its rollout training slower than that of free rate constants. On porous media the three sets are under the training conditions, where the UDE closure, a free flux on the same graph with the same descriptors, trains for eight times as many steps. Under every changed condition the Neural Chart is ahead.
+On porous media the three sets are under the training conditions, where the UDE closure, a free flux on the same graph with the same descriptors, trains for eight times as many steps.
+On the crowded MAPK cascade the phosphorylated initial states are states that training never visited, and both models are at 0.05 there.
+Under every changed temperature, drive, potential and chemostat level the Neural Chart is ahead.
 
 The baselines are:
 - the UDE closure, a free neural flux on the same graph
@@ -659,97 +656,57 @@ The learned $\log k$ has a Pearson r of 0.998 to 0.999 against the truth, includ
 
 ![Tracers, phosphorylation cycle with a saturating rate](assets/phosphorylation_saturating_track_high_concentration.gif)
 
-## Ideal reaction networks
-
-In these two benchmarks the truth is ideal mass action, and the two networks have nothing to learn beyond constants.
-The start check finds this and keeps them at zero, so the Neural Chart trains only its class mobilities and standard potentials.
-CRNN with mass action is given the same graph and only those constants, so it has exactly the right model class and is the fair comparison.
-
-### Brusselator: oscillations and Turing patterns
-
-The Brusselator $A\to X$, $2X+Y\to3X$, $B+X\to Y+D$, $X\to E$ with chemostats $A$, $B$, $D$, $E$ on a 16×16 periodic grid, with diffusing $X$ and $Y$.
-Depending on the chemostat levels it shows a limit cycle or Turing patterns.
-
-| Turing pattern formation (a = 1.90, b = 3.90) | Oscillation, both chemostats outside the training range (a = 1.39, b = 4.30) |
-|---|---|
-| ![Brusselator, Turing pattern](assets/brusselator_turing.gif) | ![Brusselator, oscillation](assets/brusselator_oscillation.gif) |
-
-| Method | training conditions | b 3.2–3.7 | b 4.0–4.6 | a 1.3–1.5 (a and b outside training) | Turing regime (below the Hopf line) | 32×32 grid | parameters |
-|---|---|---|---|---|---|---|---|
-| **Neural Chart** | 6.2e-03 | **1.2e-03** | **1.6e-03** | 0.016 | **2.0e-03** | **0.015** | 5,994 |
-| CRNN (mass action) | **1.7e-03** | 1.2e-03 | 1.8e-03 | **3.8e-03** | 0.030 | 0.017 | 12 |
-| CRNN (condition features) | 0.677 | 0.718 | 0.754 | 0.675 | 0.622 | 0.756 | 4,866 |
-| UDE closure | 0.492 | 0.568 | 0.615 | 0.945 | 1.394 | 0.594 | 4,929 |
-| BSMS-GNN | 0.601 | 0.716 | 0.859 | 0.929 | 1.533 | 0.647 | 1,723,522 |
-| FNO | 0.202 | 0.303 | 0.669 | 0.731 | 0.349 | 0.695 | 303,778 |
-| GENERIC-FNO | 0.757 | 0.822 | 0.999 | 0.744 | 0.587 | 0.813 | 1,003,588 |
-| Persistence (u(t) = u(0)) | 0.757 | 0.822 | 0.999 | 0.744 | 0.587 | 0.813 | 0 |
-
-| Method | hyperedges with flux against the true force | samples with σ < 0 | negative values |
-|---|---|---|---|
-| Neural Chart | 0 | 0 | 0 |
-| CRNN (mass action) | 0.070 | 0 | 0 |
-| CRNN (condition features) | 0.317 | 0 | 0 |
-| UDE closure | 0.632 | 0.994 | 0.560 |
-| BSMS-GNN | N/A | N/A | 0.657 |
-| FNO | N/A | N/A | 6.1e-03 |
-| GENERIC-FNO | N/A | N/A | 0 |
-
-CRNN with mass action is more accurate than the Neural Chart under the training conditions (1.7e-3 against 6.2e-3) and with both chemostats outside training (3.8e-3 against 0.016).
-The Neural Chart is ahead in the Turing regime (2.0e-3 against 0.030) and on the 32×32 grid (0.015 against 0.017), and the two are equal at b 3.2–3.7.
-Both are far more accurate than every other baseline.
-No hyperedge of the Neural Chart carries flux against the true force on this task.
-
-The steps of the Brusselator are close to irreversible, and the affinity of such a step, and with it the internal standard potentials, is only weakly determined by data (Theorem 0(iii)(d) and Theorem 2 of the theory notes).
-
-In the Turing regime half of the test trajectories start from a uniform state, which is unstable to spatial perturbations.
-In FP32 integration rounding noise can break the symmetry and grow into a pattern, so the error of these trajectories depends on rounding (`results/brusselator/NOTES.md`).
-
-![Tracers, Brusselator Turing regime](assets/brusselator_track_turing.gif)
-
-The tracer animation follows the Turing trajectory above.
-
-![Brusselator phase portraits](assets/brusselator_phase_portraits.png)
-
-### MAPK cascade
+### Crowded MAPK cascade
 
 The Huang–Ferrell MAPK cascade with 22 species and 20 reactions (binding and catalysis of every enzymatic step) on a 4×4 grid.
 ATP, ADP and $P_i$ are chemostatted, and the kinase MAPK diffuses.
+The truth divides the mobility of every reaction at a site by $1+\rho/K$, where $\rho$ is the total concentration of the 22 species at that site and $K=1$.
 The test sets change the ATP level and the initial state.
 
-![MAPK cascade, low ATP](assets/mapk_cascade_low_atp.gif)
+![Crowded MAPK cascade, low ATP](assets/mapk_crowded_low_atp.gif)
 
 The animation shows all 22 species at the 16 sites.
 
 | Method | training conditions (ATP 0.5–2) | ATP 3–5 | ATP 0.15–0.3 | phosphorylated initial states | parameters |
 |---|---|---|---|---|---|
-| **Neural Chart** | 0.011 | **0.019** | **8.5e-03** | 0.011 | 9,039 |
-| CRNN (mass action) | 8.5e-03 | 0.027 | 0.020 | 8.7e-03 | 46 |
-| CRNN (condition features) | **8.1e-03** | 0.032 | 0.099 | **8.3e-03** | 5,890 |
-| UDE closure | 0.090 | 0.745 | 0.390 | 0.084 | 8,641 |
-| FNO | 0.469 | 0.819 | 0.675 | 0.472 | 61,206 |
-| BSMS-GNN | 2.307 | 8.783 | 4.501 | 10.463 | 1,066,006 |
-| GENERIC-FNO | 1.682 | 1.734 | 1.563 | 1.818 | 1,035,220 |
-| Persistence (u(t) = u(0)) | 0.649 | 0.755 | 0.407 | 1.181 | 0 |
+| **Neural Chart** | **3.0e-03** | **8.6e-03** | **1.0e-03** | 0.054 | 9,039 |
+| CRNN (mass action) | 0.021 | 0.014 | 6.3e-03 | **0.050** | 46 |
+| CRNN (condition features) | 0.029 | 0.217 | 0.041 | 0.092 | 5,890 |
+| UDE closure | 0.359 | 1.338 | 0.206 | 2.310 | 8,641 |
+| FNO | 0.697 | 57.549 | 0.167 | 471338.086 | 61,206 |
+| BSMS-GNN | 0.378 | 1.122 | 0.397 | 2.140 | 1,066,006 |
+| GENERIC-FNO | 1.051 | 1.192 | 0.813 | 1.329 | 1,035,220 |
+| Persistence (u(t) = u(0)) | 0.666 | 0.951 | 0.358 | 0.893 | 0 |
 
 | Method | hyperedges with flux against the true force | samples with σ < 0 | negative values |
 |---|---|---|---|
-| Neural Chart | 0.029 | 0 | 0 |
-| CRNN (mass action) | 0.054 | 0 | 0 |
-| CRNN (condition features) | 0.232 | 0 | 0 |
-| UDE closure | 0.837 | 1.000 | 0.354 |
-| FNO | N/A | N/A | 0.421 |
-| BSMS-GNN | N/A | N/A | 0.495 |
-| GENERIC-FNO | N/A | N/A | 0.362 |
+| Neural Chart | 6.8e-03 | 0 | 0 |
+| CRNN (mass action) | 0.016 | 0 | 0 |
+| CRNN (condition features) | 0.125 | 0 | 0 |
+| UDE closure | 0.832 | 1.000 | 0.267 |
+| FNO | N/A | N/A | 0.416 |
+| BSMS-GNN | N/A | N/A | 0.313 |
+| GENERIC-FNO | N/A | N/A | 0.308 |
 
-CRNN with condition features is more accurate than the Neural Chart under the training conditions (8.1e-3 against 0.011) and from the phosphorylated initial states (8.3e-3 against 0.011).
-At new ATP levels the Neural Chart is ahead (0.019 and 8.5e-3, against 0.027 and 0.020 for CRNN with mass action and 0.032 and 0.099 for CRNN with condition features).
-ATP enters the Neural Chart only through the force, so a new ATP level changes no learned parameter.
-The internal standard potentials are weakly determined here: 2.9 % of the hyperedges carry flux against the true force, and the learned $\log k$ has a Pearson r of 0.85 to 0.88 against the truth.
+The Neural Chart is more accurate than every baseline under the training conditions and at both new ATP levels (3.0e-3, 8.6e-3 and 1.0e-3 against 0.021, 0.014 and 6.3e-3 for CRNN with mass action).
+From the phosphorylated initial states its error grows to 0.054, the same level as CRNN with mass action (0.050).
+The material network reads the local densities of all 22 species, and the phosphorylated starts are states that training never visited.
+Its $\log k$ has a Pearson r of 0.987 to 0.994 against the true crowded rate constants on the test states.
+CRNN with mass action has the right graph but one constant per reaction, so it cannot follow the crowding, and its entropy production is off by 17 to 26 % where the Neural Chart is within 1 to 4 % under the training conditions and the new ATP levels.
+Without $G_\theta$ the same model reaches 8.6e-3 under the training conditions and 0.094 from the phosphorylated starts (`results/mapk_crowded/ablations.md`).
 
-![Tracers, MAPK cascade](assets/mapk_cascade_track_low_atp.gif)
+![Tracers, crowded MAPK cascade](assets/mapk_crowded_track_low_atp.gif)
 
 The tracers follow phosphorylated MAPK ($K_p+K_{pp}$) at low ATP.
+
+## Ideal reaction networks
+
+The repository also holds two networks whose truth is mass action with constant rates: the MAPK cascade without crowding (`mapk_cascade`) and the Brusselator (`brusselator`), four reactions with diffusing $X$ and $Y$ on a 16×16 grid, with limit cycles and Turing patterns.
+There the start check keeps both networks of the Neural Chart at zero, and CRNN with mass action has exactly the right model class.
+On the MAPK cascade the Neural Chart is within a factor of 1.4 of CRNN with mass action on every test set, and ahead on three of the four.
+On the Brusselator CRNN with mass action is ahead on all six test sets, by a factor of 2.3 to 12, and both stay below 2e-3.
+In the Neural Chart the forward and backward rates of a step are tied by the standard potentials, which the data of a nearly irreversible step leave weakly determined, and this makes its rollout training slower than that of free rate constants.
+The tables are in `results/mapk_cascade/` and `results/brusselator/`.
 
 ## How each part contributes
 
@@ -841,7 +798,7 @@ Here modules meet at shared species of a hypergraph, which brings in the potenti
 - **Second law.** Non-negative dissipation holds with respect to the model's own force. The physics tables measure the distance to the true force.
 - **Transfer across conditions is conditional.** It needs the invariance to hold in the truth and the test states to lie where the networks are accurate. A new condition can drive the system to states that training never visited.
 - **The convex start covers one step.** The non-negative least squares on the class constants is convex. The mapping back to coupled parameters and the rollouts are not.
-- **The start check is a heuristic.** It compares the residual at the convex optimum with the quadrature error that the integrator measures, and it was validated only on the ten simulated benchmarks here. A sampling step that is coarse for the fastest time scale can mislead it.
+- **The start check is a heuristic.** It compares the residual at the convex optimum with the quadrature error that the integrator measures, and it was validated only on the simulated benchmarks here. A sampling step that is coarse for the fastest time scale misleads it: on the crowded MAPK cascade sampled every 0.5 time units it kept both networks at zero, and the benchmark uses 0.1.
 - **Chemostat standard free energies are inputs.** Where they cannot be looked up, they are fitted, density data do not fix them, and cycle affinities and the entropy production are unreliable.
 - **Internal standard potentials are weakly determined by concentration data.** Theorem 0(iii)(d) and Theorem 2 of [docs/theory.md](docs/theory.md) show why: the affinity of a step that is close to irreversible carries little information in the data.
 - **$G_\theta$ is local.** Gradient energies and long-range interactions are outside the model class.
@@ -872,7 +829,7 @@ python -m neuralchart.run --task schlogl_nonideal --cmd gifs                    
 The data go to `data/<task>/`, or to `$NEURALCHART_DATA/<task>` when that variable is set.
 The trained charts of every benchmark are in `checkpoints/`.
 
-Tasks: `porous_media`, `porous_media_crowding`, `schlogl_nonideal`, `schlogl_nonideal_strong`, `phosphorylation_cycle`, `phosphorylation_heterogeneous`, `phosphorylation_interacting`, `phosphorylation_saturating`, `brusselator`, `mapk_cascade`, `compose_reaction_transport`, `compose_cycle_cycle`, `compose_thermo_cross`, `compose_kinetic_cross`.
+Tasks: `porous_media`, `porous_media_crowding`, `schlogl_nonideal`, `schlogl_nonideal_strong`, `phosphorylation_cycle`, `phosphorylation_heterogeneous`, `phosphorylation_interacting`, `phosphorylation_saturating`, `mapk_crowded`, `mapk_cascade`, `brusselator`, `compose_reaction_transport`, `compose_cycle_cycle`, `compose_thermo_cross`, `compose_kinetic_cross`.
 
 Models: `chart` and its ablations (`chart-const-k`, `chart-no-excess`, `chart-zero-init`, `chart-no-projection`, `chart-reversible`, `chart-learned-chem-mu0`, `chart-given-mu0`, `flux_gnn`), and the baselines `ude`, `crnn_mass_action`, `crnn_features`, `fno`, `bsms`, `generic_fno`, `helmfluid` (porous media only) and `persistence`.
 HelmFluid needs its upstream code (see [THIRD_PARTY.md](THIRD_PARTY.md)).
