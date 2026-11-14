@@ -58,7 +58,7 @@ Examples are FNO, graph networks that emit fluxes, and closures in universal dif
 Seen as a learning problem, this mixing leads to three failures, all visible in the benchmarks below.
 
 1. **Spurious correlation and failure under a shift of the conditions.** The network cannot tell which changes of the rate come from the material and which come from the temperature or the drive. When the test conditions leave the training range, it fails. Trained at one temperature, FNO reaches an error of 1.1 at four times that temperature in porous media, and the UDE closure 0.16.
-2. **An ill-conditioned, non-convex optimization.** The kinetic parameters and the state are strongly coupled, and gradient descent from a generic start stops at poor local optima. On the oscillating Brusselator every black-box model stays above an error of 0.39.
+2. **An ill-conditioned, non-convex optimization.** The kinetic parameters and the state are strongly coupled, and gradient descent from a generic start stops at poor local optima. On the crowded MAPK cascade every black-box model stays above an error of 0.35.
 3. **Observational equivalence.** Very different internal parameters can produce almost the same trajectories. A model of the phosphorylation cycle built on a network of candidate reactions reaches a trajectory error of 2e-5, and its entropy production is still wrong by a factor of 10. Fluxes that circulate around a cycle leave the state unchanged and change the entropy production (Theorem 1 of [docs/theory.md](docs/theory.md)). The learned flux of each step, and every readout built on it, then cannot be trusted. The same freedom lets the UDE closure send up to 82 % of its edge fluxes against the physical force.
 
 The Neural Chart addresses all three with one structural factorization of the rate of each step on a given hypergraph.
@@ -703,7 +703,7 @@ The tracers follow phosphorylated MAPK ($K_p+K_{pp}$) at low ATP.
 
 The repository also holds two networks whose truth is mass action with constant rates: the MAPK cascade without crowding (`mapk_cascade`) and the Brusselator (`brusselator`), four reactions with diffusing $X$ and $Y$ on a 16×16 grid, with limit cycles and Turing patterns.
 There the start check keeps both networks of the Neural Chart at zero, and CRNN with mass action has exactly the right model class.
-On the MAPK cascade the Neural Chart is within a factor of 1.4 of CRNN with mass action on every test set, and ahead on three of the four.
+On the MAPK cascade the Neural Chart is ahead of CRNN with mass action on three of the four test sets and within a factor of 1.4 on the fourth.
 On the Brusselator CRNN with mass action is ahead on all six test sets, by a factor of 2.3 to 12, and both stay below 2e-3.
 In the Neural Chart the forward and backward rates of a step are tied by the standard potentials, which the data of a nearly irreversible step leave weakly determined, and this makes its rollout training slower than that of free rate constants.
 The tables are in `results/mapk_cascade/` and `results/brusselator/`.
